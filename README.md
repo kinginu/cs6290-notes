@@ -8,8 +8,9 @@ textbook-style summary of what the lectures cover.  Built with
 - `en/` English edition, `ja/` Japanese edition — same chapter files under
   `lessons/`, one chapter per lesson.
 - `figures/` and `references.bib` are shared by both editions.
-- PDFs: `make docker-all` → `en/build/main.pdf`, `ja/build/main.pdf`
-  (or download the `notes-pdf` artifact from the latest Actions run).
+- **Read the latest PDFs in the browser** (rebuilt by CI on every push):
+  [English](../../blob/pdf/notes-en.pdf) · [日本語](../../blob/pdf/notes-ja.pdf)
+- Local build: `make docker-all` → `en/build/main.pdf`, `ja/build/main.pdf`.
 
 ## Status
 
