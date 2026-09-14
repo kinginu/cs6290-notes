@@ -1,0 +1,16 @@
+% A branch resolved in EX: the two instructions fetched after it are flushed.
+\begin{tikzpicture}[x=0.95cm,y=0.55cm, font=\footnotesize\sffamily,
+  st/.style={draw, minimum width=0.9cm, minimum height=0.5cm, inner sep=0pt, fill=ln-box},
+  bad/.style={st, fill=ln-caution!15, text=ln-caution}]
+  \foreach \c in {1,...,8} { \node at (\c,0.7) {\c}; }
+  \node[anchor=east] at (0.5,0.7) {\iflangja{サイクル}{cycle}};
+  \node[anchor=east] at (0.5,0) {BEQ};
+  \foreach \s/\lab in {0/IF,1/ID,2/EX,3/MEM,4/WB} { \node[st] at (\s+1,0) {\lab}; }
+  \node[anchor=east] at (0.5,-1) {I$_{\text{next}}$};
+  \node[bad] at (2,-1) {IF}; \node[bad] at (3,-1) {ID};
+  \node[anchor=east] at (0.5,-2) {I$_{\text{next}+1}$};
+  \node[bad] at (3,-2) {IF};
+  \node[anchor=east] at (0.5,-3) {\iflangja{分岐先}{target}};
+  \foreach \s/\lab in {0/IF,1/ID,2/EX,3/MEM,4/WB} { \node[st] at (\s+4,-3) {\lab}; }
+  \draw[->,ln-caution] (3,0.35) -- (3,-2.4) node[below,font=\scriptsize] {\iflangja{フラッシュ}{flush}};
+\end{tikzpicture}

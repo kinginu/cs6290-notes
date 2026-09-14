@@ -1,0 +1,12 @@
+% Five instructions flowing through a five-stage pipeline.
+\begin{tikzpicture}[x=0.95cm,y=0.55cm, font=\footnotesize\sffamily,
+  st/.style={draw, minimum width=0.9cm, minimum height=0.5cm, inner sep=0pt, fill=ln-box}]
+  \foreach \c in {1,...,9} { \node at (\c,0.7) {\c}; }
+  \node[anchor=east] at (0.5,0.7) {\iflangja{サイクル}{cycle}};
+  \foreach \i/\name in {0/I$_1$,1/I$_2$,2/I$_3$,3/I$_4$,4/I$_5$} {
+    \node[anchor=east] at (0.5,-\i) {\name};
+    \foreach \s/\lab in {0/IF,1/ID,2/EX,3/MEM,4/WB} {
+      \node[st] at (\i+\s+1,-\i) {\lab};
+    }
+  }
+\end{tikzpicture}

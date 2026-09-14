@@ -144,6 +144,7 @@
 \ifln@ja
   \AtBeginDocument{%
     \renewcommand*{\chapterformat}{第\thechapter 章}%
+    \renewcommand*{\chaptermarkformat}{第\thechapter 章\enskip}%
     \renewcommand*{\contentsname}{目次}%
     \renewcommand*{\listfigurename}{図目次}%
     \renewcommand*{\listtablename}{表目次}%
@@ -361,6 +362,29 @@
 ]{hyperref}
 \AtBeginDocument{\hypersetup{pdflang=\ln@langcode}}
 \RequirePackage[capitalise,noabbrev]{cleveref}
+\ifln@ja
+  \crefformat{chapter}{第#2#1#3章}
+  \Crefformat{chapter}{第#2#1#3章}
+  \crefformat{section}{#2#1#3~節}
+  \Crefformat{section}{#2#1#3~節}
+  \crefformat{subsection}{#2#1#3~節}
+  \Crefformat{subsection}{#2#1#3~節}
+  \crefname{figure}{図}{図}          \Crefname{figure}{図}{図}
+  \crefname{table}{表}{表}           \Crefname{table}{表}{表}
+  \crefname{equation}{式}{式}        \Crefname{equation}{式}{式}
+  \crefname{algorithm}{アルゴリズム}{アルゴリズム}
+  \Crefname{algorithm}{アルゴリズム}{アルゴリズム}
+  \crefname{lstlisting}{リスト}{リスト} \Crefname{lstlisting}{リスト}{リスト}
+  \crefname{definition}{定義}{定義}  \Crefname{definition}{定義}{定義}
+  \crefname{example}{例}{例}         \Crefname{example}{例}{例}
+  \crefname{note}{注}{注}            \Crefname{note}{注}{注}
+  \crefname{sidenote}{注}{注}        \Crefname{sidenote}{注}{注}
+  \crefname{page}{ページ}{ページ}    \Crefname{page}{ページ}{ページ}
+\else
+  \crefname{definition}{Definition}{Definitions}
+  \crefname{example}{Example}{Examples}
+  \crefname{note}{Note}{Notes}
+\fi
 
 %% --------------------------------------------------------- misc typography
 \setlength{\parskip}{0pt}

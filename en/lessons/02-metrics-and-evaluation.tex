@@ -1,0 +1,261 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Metrics and Evaluation}
+\lessoninfo{
+  video={Lesson 2, videos 1--25},
+  textbook={H\&P \cite{hennessy2017} §1.8--1.9},
+  keywords={latency, throughput, speedup, benchmark, geometric mean, iron law, CPI, Amdahl's law, diminishing returns},
+}
+
+Before we can improve performance we must be able to measure it, compare
+two machines, and predict the effect of a change.  This lesson introduces
+the vocabulary (latency, throughput, speedup), the methodology (benchmarks
+and how to summarize them) and two analytical tools that recur throughout
+the course: the iron law of performance and Amdahl's law.
+
+\section{Performance}
+
+\enquote{Performance} is ambiguous until we say what we are
+measuring.\source{Lesson 2, videos 2--3; H\&P §1.8.}
+
+\begin{definition}[Latency]
+  The \term{latency}[レイテンシ] of a task is the time from its start to its
+  completion.
+\end{definition}
+
+\begin{definition}[Throughput]
+  The \term{throughput}[スループット] of a system is the number of tasks it
+  completes per unit time.
+\end{definition}
+
+Throughput is \emph{not} simply the inverse of latency.  When tasks overlap
+(pipelining, Lesson 3) or run in parallel (multiprocessors), a system can
+complete many tasks per second even though each individual task takes a
+long time.\caution{Throughput $=1/\text{latency}$ holds only when tasks are
+processed one at a time, strictly one after another.}
+
+\begin{example}
+  A processor that takes \SI{10}{\second} for each of two programs run one
+  after the other has latency \SI{10}{\second} per program and throughput
+  \SI{0.1}{programs/s}.  A second processor that takes \SI{15}{\second} per
+  program but runs two at once has a worse latency yet a throughput of
+  $2/15 \approx \SI{0.13}{programs/s}$.
+\end{example}
+
+\section{Comparing performance}
+
+To say that machine $X$ is \enquote{$N$ times faster} than machine $Y$ we
+use the \term{speedup}[高速化率]:\source{Lesson 2, videos 4--7.}
+\begin{equation}
+  N \;=\; \frac{\text{speed}(X)}{\text{speed}(Y)}
+     \;=\; \frac{\text{latency}(Y)}{\text{latency}(X)}
+     \;=\; \frac{\text{throughput}(X)}{\text{throughput}(Y)} .
+  \label{eq:speedup}
+\end{equation}
+Note that latency appears \emph{inverted}: a shorter time means a higher
+speed.  A speedup greater than 1 means $X$ is better; a speedup below 1
+means it is worse (a \enquote{speedup of 0.8} is a slowdown).  Speedups
+compose multiplicatively: if $X$ is $2\times$ faster than $Y$ and $Y$ is
+$3\times$ faster than $Z$, then $X$ is $6\times$ faster than $Z$.
+
+\tip{Always keep the ratio in the form
+$\text{old time}/\text{new time}$; most sign errors in this course come
+from inverting it.}
+
+\section{Measuring performance}
+
+The ideal measurement runs the user's actual workload on the actual machine.
+This is rarely possible---the machine may not exist yet, and the workload is
+usually unknown---so we resort to \term{benchmarks}[ベンチマーク]: programs,
+together with their input data, that a community agrees to use as a proxy
+for real workloads.\source{Lesson 2, videos 8--10; H\&P §1.8.}  A collection
+of such programs is a \emph{benchmark suite}.
+
+\subsection{Types of benchmarks}
+
+From most to least representative:
+\begin{description}
+  \item[Real applications] complete programs with realistic inputs.  Most
+    representative, but hardest to set up, and impossible on a simulator or
+    an incomplete prototype.
+  \item[Kernels] the most time-consuming part of a real application (e.g.\ a
+    matrix multiply), extracted so that it can be run on its own.  Easier to
+    run; still reflects the real work.
+  \item[Synthetic benchmarks] programs written to \emph{behave like} real
+    applications (similar mix of instructions and memory accesses) while
+    being simpler to run.  Useful early in a design.
+  \item[Peak performance] the theoretical maximum rate the hardware can
+    sustain (e.g.\ instructions per second if every unit were busy).  A
+    marketing number that no real program reaches.
+\end{description}
+
+\begin{note}
+  Peak performance is not a benchmark result at all; it is an upper bound
+  that says nothing about how close real programs get to it.
+\end{note}
+
+\subsection{Benchmark standards}
+
+Because a vendor could pick benchmarks that flatter its own product,
+independent organizations define standard suites.\source{Lesson 2, video
+12; \cite{spec}.}  SPEC (Standard Performance Evaluation Corporation)
+publishes CPU, graphics and server suites; TPC does the same for
+transaction-processing workloads; EEMBC for embedded systems.  Members of
+these organizations agree on the programs, inputs and reporting rules.
+
+\section{Summarizing performance}
+
+A suite yields one number per program; we usually want one number per
+machine.\source{Lesson 2, videos 13--14; H\&P §1.8.}
+
+\begin{itemize}
+  \item \textbf{Execution times} may be combined with the ordinary
+    arithmetic mean: the average time is well defined, and the ratio of the
+    average times of two machines equals the speedup of the total runtime.
+  \item \textbf{Speedups} (ratios) must \emph{not} be averaged
+    arithmetically.  The arithmetic mean of ratios depends on which machine
+    is the reference, and it does not equal the ratio of the mean times.
+    Use the \term{geometric mean}[幾何平均]:
+    \begin{equation}
+      \overline{S} = \Bigl(\prod_{i=1}^{n} S_i\Bigr)^{1/n} .
+      \label{eq:geomean}
+    \end{equation}
+\end{itemize}
+
+\begin{example}
+  Program A takes \SI{10}{\second} on machine $X$ and \SI{20}{\second} on
+  $Y$; program B takes \SI{20}{\second} on $X$ and \SI{10}{\second} on
+  $Y$.  The per-program speedups of $X$ over $Y$ are 2 and 0.5.  The
+  arithmetic mean, 1.25, suggests $X$ is faster; computed with $Y$ as the
+  reference the arithmetic mean is also 1.25, suggesting $Y$ is faster---a
+  contradiction.  The geometric mean is $\sqrt{2\times 0.5} = 1$ either way,
+  correctly reporting that the machines are equivalent on this suite.
+\end{example}
+
+\begin{keypoint}
+  Average \emph{times} arithmetically; average \emph{speedups}
+  geometrically.  The geometric mean is the only mean for which the mean of
+  the ratios equals the ratio of the means.
+\end{keypoint}
+
+\section{The iron law of performance}
+
+The \term{iron law}[性能の鉄則] decomposes CPU time into three factors
+that map onto the different parts of a computer system:\source{Lesson 2,
+videos 15--18; H\&P §1.9.}
+\begin{equation}
+  \text{CPU time}
+  \;=\; \underbrace{\#\text{instructions}}_{\text{IC}}
+  \;\times\; \underbrace{\frac{\text{cycles}}{\text{instruction}}}_{\text{CPI}}
+  \;\times\; \underbrace{\frac{\text{seconds}}{\text{cycle}}}_{T_{\mathrm{clk}}} .
+  \label{eq:iron-law}
+\end{equation}
+
+\begin{description}
+  \item[Instruction count (IC)] determined by the algorithm, the compiler
+    and the instruction set (ISA).
+  \item[Cycles per instruction (CPI)] determined by the ISA and by the
+    processor's microarchitecture (pipelining, out-of-order execution,
+    caches, \ldots).  Most of this course is about lowering CPI.
+  \item[Clock cycle time ($T_{\mathrm{clk}}$)] determined by the
+    microarchitecture (how much logic sits between two latches), the circuit
+    design and the fabrication technology.
+\end{description}
+
+The value of the law is that it exposes trade-offs: a change that reduces
+one factor often increases another.  A deeper pipeline lowers
+$T_{\mathrm{clk}}$ but raises CPI; a richer ISA lowers IC but may raise CPI
+or $T_{\mathrm{clk}}$.\caution{Never evaluate a change by a single factor.
+\enquote{Higher clock frequency} is not \enquote{faster} unless CPI and IC
+are unchanged.}
+
+\subsection{Unequal instruction times}
+
+When different instruction classes take different numbers of cycles, the
+CPI is a weighted average.  With $n$ classes,
+\begin{equation}
+  \text{CPU time} \;=\; \Bigl(\sum_{i=1}^{n} \text{IC}_i \times \text{CPI}_i\Bigr)
+  \times T_{\mathrm{clk}} ,
+  \label{eq:iron-law-classes}
+\end{equation}
+where $\text{IC}_i$ and $\text{CPI}_i$ are the count and cycles per
+instruction of class $i$.
+
+\begin{example}
+  A program executes $10^{9}$ instructions on a \SI{2}{\giga\hertz}
+  processor: \SI{60}{\percent} are ALU operations (1 cycle),
+  \SI{30}{\percent} loads/stores (2 cycles) and \SI{10}{\percent} branches
+  (3 cycles).  The average CPI is $0.6\cdot 1 + 0.3\cdot 2 + 0.1\cdot 3 =
+  1.5$, so the CPU time is $10^{9}\times 1.5 \times \SI{0.5}{\nano\second}
+  = \SI{0.75}{\second}$.
+\end{example}
+
+\section{Amdahl's law}
+
+\term{Amdahl's law}[Amdahl1967@Amdahl's law] predicts the overall speedup
+obtained by speeding up only \emph{part} of the execution.\source{\cite{amdahl1967}; Lesson 2, videos 19--22; H\&P §1.9.}
+
+\begin{definition}[Amdahl's law]
+  If an enhancement speeds up a fraction $f_{\mathrm{enh}}$ of the
+  \emph{original} execution time by a factor $s_{\mathrm{enh}}$, the overall
+  speedup is
+  \begin{equation}
+    S_{\mathrm{overall}} \;=\;
+    \frac{1}{(1 - f_{\mathrm{enh}}) + \dfrac{f_{\mathrm{enh}}}{s_{\mathrm{enh}}}} .
+    \label{eq:amdahl}
+  \end{equation}
+\end{definition}
+
+\caution{$f_{\mathrm{enh}}$ is a fraction of the \emph{original} time, not
+of the time after the change, and not a fraction of the instruction count.}
+
+\begin{example}
+  Floating-point instructions account for \SI{40}{\percent} of the run
+  time.  A new FP unit makes them $4\times$ faster.  The overall speedup is
+  $1/(0.6 + 0.4/4) = 1/0.7 \approx 1.43$.  Making the FP unit infinitely
+  fast would only reach $1/0.6 \approx 1.67$.
+\end{example}
+
+\subsection{Implications}
+
+Letting $s_{\mathrm{enh}} \to \infty$ in \cref{eq:amdahl} gives the upper
+bound $S_{\mathrm{overall}} \le 1/(1-f_{\mathrm{enh}})$.  Two design
+principles follow.\source{Lesson 2, videos 21--24.}
+
+\begin{keypoint}[Make the common case fast]
+  A modest speedup of a large fraction of the time beats a huge speedup of
+  a small fraction.  Optimize what the program actually spends its time on.
+\end{keypoint}
+
+The lecture also states the converse, jokingly called \enquote{Lhadma's
+law}: \emph{do not sacrifice the uncommon case too much} when speeding up the
+common one.  If the \SI{10}{\percent} that is left untouched by an
+optimization is made $10\times$ slower as a side effect, it now takes as
+long as the whole original program, and the overall speedup becomes a
+slowdown.
+
+\subsection{Diminishing returns}
+
+Repeatedly improving the same part of the execution yields
+\term{diminishing returns}[収穫逓減]: once that part has shrunk, it is no
+longer the common case, and the remaining time is dominated by everything
+else.  After each improvement the architect should re-measure and ask what
+the common case is \emph{now}.
+
+\begin{example}
+  Starting from the previous example (FP $=\SI{40}{\percent}$ of time),
+  the first $2\times$ FP speedup gives $S = 1/(0.6+0.2) = 1.25$.  A second
+  $2\times$ FP speedup on the new machine, where FP is now only
+  $0.2/0.8 = \SI{25}{\percent}$ of the time, gives just
+  $1/(0.75+0.125) \approx 1.14$.
+\end{example}
+
+\begin{keypoint}[Lesson summary]
+  Measure with latency or throughput as appropriate; compare with speedups
+  and summarize them with the geometric mean.  The iron law
+  (\cref{eq:iron-law}) attributes time to IC, CPI and clock period; Amdahl's
+  law (\cref{eq:amdahl}) bounds what any partial improvement can achieve.
+\end{keypoint}
+
+\end{document}

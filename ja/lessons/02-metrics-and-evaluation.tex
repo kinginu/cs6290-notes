@@ -1,0 +1,257 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{性能指標と評価}
+\lessoninfo{
+  video={Lesson 2，動画 1--25},
+  textbook={H\&P \cite{hennessy2017} §1.8--1.9},
+  keywords={レイテンシ，スループット，高速化率，ベンチマーク，幾何平均，性能の鉄則，CPI，Amdahl の法則，収穫逓減},
+}
+
+性能を改善するには，まず性能を測定し，2つのマシンを比較し，変更の効果を
+予測できなければならない．この章では用語（レイテンシ，スループット，
+高速化率），方法論（ベンチマークとその要約法），そして本講義を通じて
+繰り返し現れる2つの解析ツール---性能の鉄則と Amdahl の法則---を導入する．
+
+\section{性能}
+
+「性能」は，何を測るのかを言わない限り曖昧である．\source{Lesson 2，動画
+2--3；H\&P §1.8．}
+
+\begin{definition}[レイテンシ]
+  タスクの\term[れいてんし]{レイテンシ}[latency]とは，開始から完了までの
+  時間である．
+\end{definition}
+
+\begin{definition}[スループット]
+  システムの\term[するーぷっと]{スループット}[throughput]とは，単位時間
+  当たりに完了するタスク数である．
+\end{definition}
+
+スループットは単純にレイテンシの逆数\emph{ではない}．タスクが重なって
+（パイプライン化，第3章）あるいは並列に（マルチプロセッサ）実行される
+場合，個々のタスクに長い時間がかかっても，システムは毎秒多数のタスクを
+完了できる．\caution{スループット $=1/\text{レイテンシ}$ が成り立つのは，
+タスクを一度に1つずつ，厳密に順番に処理する場合だけである．}
+
+\begin{example}
+  2つのプログラムを順に実行し，それぞれに \SI{10}{\second} かかる
+  プロセッサは，レイテンシがプログラム当たり \SI{10}{\second}，
+  スループットが \SI{0.1}{programs/s} である．プログラム当たり
+  \SI{15}{\second} かかるが2つを同時に実行できる別のプロセッサは，
+  レイテンシは劣るがスループットは $2/15 \approx \SI{0.13}{programs/s}$
+  となる．
+\end{example}
+
+\section{性能の比較}
+
+マシン $X$ がマシン $Y$ より「$N$ 倍速い」と言うために
+\term[こうそくかりつ]{高速化率}[speedup]を用いる．\source{Lesson 2，
+動画 4--7．}
+\begin{equation}
+  N \;=\; \frac{\text{speed}(X)}{\text{speed}(Y)}
+     \;=\; \frac{\text{latency}(Y)}{\text{latency}(X)}
+     \;=\; \frac{\text{throughput}(X)}{\text{throughput}(Y)}
+  \label{eq:speedup}
+\end{equation}
+レイテンシは\emph{逆向き}に現れることに注意する．時間が短いほど速い
+からである．高速化率が 1 より大きければ $X$ が優れ，1 未満なら劣る
+（「高速化率 0.8」は減速である）．高速化率は乗法的に合成される．$X$ が
+$Y$ の2倍速く，$Y$ が $Z$ の3倍速ければ，$X$ は $Z$ の6倍速い．
+
+\tip{比は常に $\text{旧時間}/\text{新時間}$ の形で保つこと．本講義で
+生じる符号の誤りの大半は，この比の逆転が原因である．}
+
+\section{性能の測定}
+
+理想的な測定は，ユーザの実際のワークロードを実際のマシンで走らせること
+である．これが可能なことは稀で---マシンはまだ存在しないかもしれず，
+ワークロードは通常不明である---そこで
+\term[べんちまーく]{ベンチマーク}[benchmark]に頼る．ベンチマークとは，
+実ワークロードの代理としてコミュニティが合意したプログラムと入力データの
+組である．\source{Lesson 2，動画 8--10；H\&P §1.8．}そのようなプログラムの
+集まりを\emph{ベンチマークスイート}と呼ぶ．
+
+\subsection{ベンチマークの種類}
+
+代表性の高い順に:
+\begin{description}
+  \item[実アプリケーション] 現実的な入力を伴う完全なプログラム．最も
+    代表的だが，準備が最も難しく，シミュレータや未完成のプロトタイプでは
+    実行できない．
+  \item[カーネル] 実アプリケーションの最も時間を消費する部分（例えば
+    行列積）を切り出し，単独で実行できるようにしたもの．実行しやすく，
+    実際の処理を反映している．
+  \item[合成ベンチマーク] 実アプリケーションと\emph{同様に振る舞う}
+    （命令やメモリアクセスの構成が似ている）ように書かれた，より実行の
+    簡単なプログラム．設計の初期段階で有用．
+  \item[ピーク性能] ハードウェアが理論上維持できる最大レート（例えば
+    全ユニットが常に稼働した場合の毎秒命令数）．実プログラムが到達する
+    ことのないマーケティング用の数値．
+\end{description}
+
+\begin{note}
+  ピーク性能はベンチマーク結果ですらない．実プログラムがどれだけそれに
+  近づけるかを何も語らない上限値である．
+\end{note}
+
+\subsection{ベンチマークの標準}
+
+ベンダは自社製品に有利なベンチマークを選びうるため，独立した組織が
+標準スイートを定めている．\source{Lesson 2，動画 12；\cite{spec}．}SPEC
+（Standard Performance Evaluation Corporation）は CPU，グラフィックス，
+サーバのスイートを公開し，TPC はトランザクション処理ワークロードに，
+EEMBC は組込みシステムに対して同様のことを行う．これらの組織の会員は，
+プログラム，入力，報告規則について合意する．
+
+\section{性能の要約}
+
+スイートからはプログラムごとに1つの数値が得られるが，通常はマシンごとに
+1つの数値が欲しい．\source{Lesson 2，動画 13--14；H\&P §1.8．}
+
+\begin{itemize}
+  \item \textbf{実行時間}は通常の算術平均で合成してよい．平均時間は
+    well-defined であり，2台のマシンの平均時間の比は総実行時間の高速化率に
+    等しい．
+  \item \textbf{高速化率}（比）を算術平均しては\emph{ならない}．比の算術
+    平均はどちらのマシンを基準にするかに依存し，平均時間の比とも一致
+    しない．\term[きかへいきん]{幾何平均}[geometric mean]を用いる．
+    \begin{equation}
+      \overline{S} = \Bigl(\prod_{i=1}^{n} S_i\Bigr)^{1/n}
+      \label{eq:geomean}
+    \end{equation}
+\end{itemize}
+
+\begin{example}
+  プログラム A はマシン $X$ で \SI{10}{\second}，$Y$ で \SI{20}{\second}
+  かかり，プログラム B は $X$ で \SI{20}{\second}，$Y$ で \SI{10}{\second}
+  かかる．$X$ の $Y$ に対するプログラムごとの高速化率は 2 と 0.5 である．
+  算術平均 1.25 は $X$ が速いことを示唆するが，$Y$ を基準にして計算した
+  算術平均も 1.25 となり，$Y$ が速いことを示唆する---矛盾である．幾何平均
+  はどちら向きでも $\sqrt{2\times 0.5} = 1$ となり，このスイートでは
+  両マシンが同等であることを正しく報告する．
+\end{example}
+
+\begin{keypoint}
+  \emph{時間}は算術平均，\emph{高速化率}は幾何平均で平均する．比の平均が
+  平均の比に等しくなる平均は幾何平均だけである．
+\end{keypoint}
+
+\section{性能の鉄則}
+
+\term[せいのうのてっそく]{性能の鉄則}[iron law of performance]は，CPU
+時間を，計算機システムの異なる部分に対応する3つの因子に分解する．
+\source{Lesson 2，動画 15--18；H\&P §1.9．}
+\begin{equation}
+  \text{CPU 時間}
+  \;=\; \underbrace{\text{命令数}}_{\text{IC}}
+  \;\times\; \underbrace{\frac{\text{サイクル数}}{\text{命令}}}_{\text{CPI}}
+  \;\times\; \underbrace{\frac{\text{秒}}{\text{サイクル}}}_{T_{\mathrm{clk}}}
+  \label{eq:iron-law}
+\end{equation}
+
+\begin{description}
+  \item[命令数（IC）] アルゴリズム，コンパイラ，命令セット（ISA）で決まる．
+  \item[命令当たりサイクル数（CPI）] ISA とプロセッサのマイクロ
+    アーキテクチャ（パイプライン化，アウトオブオーダ実行，キャッシュ
+    など）で決まる．本講義の大半は CPI を下げることに関するものである．
+  \item[クロックサイクル時間（$T_{\mathrm{clk}}$）] マイクロアーキテクチャ
+    （2つのラッチの間にどれだけの論理があるか），回路設計，製造技術で
+    決まる．
+\end{description}
+
+この法則の価値は，トレードオフを露わにすることにある．1つの因子を減らす
+変更は，しばしば別の因子を増やす．深いパイプラインは $T_{\mathrm{clk}}$ を
+下げるが CPI を上げる．高機能な ISA は IC を下げるが CPI や
+$T_{\mathrm{clk}}$ を上げうる．\caution{変更を単一の因子で評価しては
+ならない．CPI と IC が不変でない限り，「クロック周波数が高い」は
+「速い」ではない．}
+
+\subsection{命令ごとに時間が異なる場合}
+
+命令クラスごとに必要なサイクル数が異なる場合，CPI は重み付き平均になる．
+$n$ 個のクラスについて，
+\begin{equation}
+  \text{CPU 時間} \;=\; \Bigl(\sum_{i=1}^{n} \text{IC}_i \times \text{CPI}_i\Bigr)
+  \times T_{\mathrm{clk}}
+  \label{eq:iron-law-classes}
+\end{equation}
+ここで $\text{IC}_i$，$\text{CPI}_i$ はクラス $i$ の命令数と命令当たり
+サイクル数である．
+
+\begin{example}
+  あるプログラムが \SI{2}{\giga\hertz} のプロセッサで $10^{9}$ 命令を
+  実行する．\SI{60}{\percent} が ALU 演算（1 サイクル），
+  \SI{30}{\percent} がロード/ストア（2 サイクル），\SI{10}{\percent} が
+  分岐（3 サイクル）である．平均 CPI は
+  $0.6\cdot 1 + 0.3\cdot 2 + 0.1\cdot 3 = 1.5$ なので，CPU 時間は
+  $10^{9}\times 1.5 \times \SI{0.5}{\nano\second} = \SI{0.75}{\second}$
+  である．
+\end{example}
+
+\section{Amdahl の法則}
+
+\term[あむだーるのほうそく]{Amdahl の法則}[Amdahl's law]は，実行の
+\emph{一部}だけを高速化したときの全体の高速化率を予測する．
+\source{\cite{amdahl1967}；Lesson 2，動画 19--22；H\&P §1.9．}
+
+\begin{definition}[Amdahl の法則]
+  ある改善が\emph{元の}実行時間のうち割合 $f_{\mathrm{enh}}$ を
+  $s_{\mathrm{enh}}$ 倍速くするとき，全体の高速化率は
+  \begin{equation}
+    S_{\mathrm{overall}} \;=\;
+    \frac{1}{(1 - f_{\mathrm{enh}}) + \dfrac{f_{\mathrm{enh}}}{s_{\mathrm{enh}}}}
+    \label{eq:amdahl}
+  \end{equation}
+  である．
+\end{definition}
+
+\caution{$f_{\mathrm{enh}}$ は\emph{元の}時間に対する割合であって，変更後の
+時間に対する割合でも，命令数に対する割合でもない．}
+
+\begin{example}
+  浮動小数点命令が実行時間の \SI{40}{\percent} を占める．新しい FP
+  ユニットによりそれらが4倍速くなった．全体の高速化率は
+  $1/(0.6 + 0.4/4) = 1/0.7 \approx 1.43$ である．FP ユニットを無限に
+  速くしても $1/0.6 \approx 1.67$ にしか届かない．
+\end{example}
+
+\subsection{含意}
+
+\cref{eq:amdahl} で $s_{\mathrm{enh}} \to \infty$ とすると，上限
+$S_{\mathrm{overall}} \le 1/(1-f_{\mathrm{enh}})$ が得られる．ここから
+2つの設計原則が導かれる．\source{Lesson 2，動画 21--24．}
+
+\begin{keypoint}[頻出ケースを速くせよ]
+  時間の大きな部分をそこそこ速くする方が，小さな部分を劇的に速くするより
+  効く．プログラムが実際に時間を費やしている部分を最適化すること．
+\end{keypoint}
+
+講義では冗談めかして「Lhadma の法則」と呼ばれる逆命題も述べられる．頻出
+ケースを速くする際に，\emph{稀なケースを犠牲にしすぎてはならない}．ある
+最適化で手を付けなかった \SI{10}{\percent} の部分が副作用で 10 倍遅く
+なれば，その部分だけで元のプログラム全体と同じ時間がかかり，全体としては
+減速になる．
+
+\subsection{収穫逓減}
+
+実行の同じ部分を繰り返し改善すると\term[しゅうかくていげん]{収穫逓減}[diminishing returns]
+が生じる．その部分が縮んでしまえば，もはや頻出ケースではなく，残りの時間は
+それ以外のすべてに支配される．改善のたびにアーキテクトは再測定し，
+\emph{今}の頻出ケースは何かを問い直すべきである．
+
+\begin{example}
+  前の例（FP $=$ 時間の \SI{40}{\percent}）から始めると，最初の FP 2倍
+  高速化で $S = 1/(0.6+0.2) = 1.25$ が得られる．新しいマシンでは FP は
+  時間の $0.2/0.8 = \SI{25}{\percent}$ しか占めないので，2回目の FP 2倍
+  高速化はわずか $1/(0.75+0.125) \approx 1.14$ にしかならない．
+\end{example}
+
+\begin{keypoint}[章のまとめ]
+  状況に応じてレイテンシまたはスループットで測り，高速化率で比較し，
+  幾何平均で要約する．性能の鉄則（\cref{eq:iron-law}）は時間を IC・CPI・
+  クロック周期に帰着させ，Amdahl の法則（\cref{eq:amdahl}）は部分的改善で
+  達成できる上限を定める．
+\end{keypoint}
+
+\end{document}

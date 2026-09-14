@@ -1,0 +1,227 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Introduction}
+\lessoninfo{
+  video={Lesson 1, videos 1--19},
+  textbook={H\&P \cite{hennessy2017} §1.1--1.6},
+  keywords={computer architecture, Moore's law, memory wall, dynamic power, static power, fabrication cost, yield},
+}
+
+This lesson defines what computer architecture is, explains why it is a
+discipline in its own right, and introduces the technology trends and the
+three quantities---performance, power and cost---that constrain every design
+decision in the rest of the course.
+
+\section{What is computer architecture?}
+
+\term{Computer architecture}[コンピュータアーキテクチャ] is the discipline
+of designing a computer that is well suited to its purpose, using the
+fabrication technology that is available.\source{Lesson 1, videos 2--3;
+H\&P §1.1--1.3.}  Two points in this definition deserve emphasis.
+
+\begin{itemize}
+  \item \emph{Well suited to its purpose.}  A mobile phone, a laptop and a
+    data-center server are all computers, but they optimize for different
+    things: battery life, size and weight in one case; raw performance and
+    throughput per dollar in another.  Architecture is therefore about
+    \emph{trade-offs}, not about a single best design.
+  \item \emph{Available technology.}  The architect does not design
+    transistors, but must know what the current process can deliver---how
+    many transistors fit on a chip, how fast they switch, how much power they
+    dissipate---because those numbers bound what is achievable.
+\end{itemize}
+
+\subsection{Why do we need it?}
+
+Computer architecture serves two goals.\margin{The lecture summarizes these
+as \enquote{improve performance} and \enquote{improve abilities}.}
+\begin{enumerate}
+  \item \textbf{Improve performance}, in the broad sense: execution speed,
+    battery life, size, weight, energy efficiency.
+  \item \textbf{Improve abilities}: make the computer able to do things it
+    could not do before, e.g.\ 3D graphics, hardware support for debugging,
+    security features.
+\end{enumerate}
+
+A further reason is timing.  A processor that is designed today will be
+fabricated several years from now, so the architect must \emph{anticipate}
+where the technology will be at that time rather than design for today's
+parameters.\tip{Whenever a design decision in later lessons looks
+over-engineered, ask which technology trend it was anticipating.}
+
+\section{Technology trends}
+
+\subsection{Moore's law}
+
+\term{Moore's law}[ムーアの法則] is the empirical observation that the number
+of transistors that can be placed on a chip of a given area doubles roughly
+every 18 to 24 months.\source{\cite{moore1965}; Lesson 1, video 6; H\&P
+§1.4.}  It is a trend, not a law of physics, but it held for several decades
+and shaped the expectations of the whole industry.  The lecture derives the
+following consequences, all with the same 18--24-month doubling period:
+\begin{itemize}
+  \item processor \emph{speed} doubles (more transistors allow more
+    parallelism and smaller, faster gates);
+  \item the \emph{energy per operation} halves;
+  \item \emph{memory capacity} doubles.
+\end{itemize}
+
+\begin{example}
+  If speed doubles every two years, a factor-of-$2^{5} = 32$ improvement is
+  expected over a decade.  Conversely, a design team that spends four years
+  producing a processor only $2\times$ faster than the one it replaces has
+  merely kept pace with the trend.
+\end{example}
+
+\subsection{The memory wall}
+
+Not every component follows the same curve.  While processor performance
+doubled every 18--24 months, memory \emph{latency} improved only by about
+$1.1\times$ over the same interval.\source{\cite{wulf1995}; Lesson 1,
+video 8; H\&P §2.1.}  The result is a gap between how fast the processor
+can consume data and how fast memory can supply it that widens every
+generation.  This gap is called the \term{memory wall}[メモリウォール] and
+is the reason why caches (Lessons 12--14) are so important.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/memory-wall}
+  \caption{Processor performance and memory latency improve at different
+    rates; the difference is the memory wall.}
+  \label{fig:memory-wall}
+\end{figure}
+
+\begin{keypoint}
+  Memory capacity keeps up with Moore's law; memory \emph{latency} does not.
+  Most of the memory-system design in this course exists to hide that
+  latency.
+\end{keypoint}
+
+\section{Speed, power and cost}
+
+For a long time \enquote{better} simply meant \enquote{faster}.  Today the
+architect has to balance three quantities:\source{Lesson 1, videos 9--10.}
+\begin{description}
+  \item[Performance] how fast the machine runs its intended workload;
+  \item[Power] how much energy it consumes, which sets battery life for
+    portable devices and cooling cost for servers;
+  \item[Cost] how much it costs to fabricate.
+\end{description}
+Which of these dominates depends on the product: weight and battery life for
+a phone, cost for an embedded controller, performance for a supercomputer.
+\caution{\enquote{Faster} without a workload and a power/cost budget is not
+a meaningful design goal.}
+
+\section{Power consumption}
+
+The power dissipated by a processor has two components.\source{Lesson 1,
+videos 11--13; H\&P §1.5.}
+
+\subsection{Dynamic (active) power}
+
+\term{Dynamic power}[動的電力] is consumed by charging and discharging the
+capacitance of wires and gates whenever a signal switches:
+\begin{equation}
+  P_{\mathrm{dyn}} = \tfrac{1}{2}\, C\, V^{2}\, f\, \alpha ,
+  \label{eq:active-power}
+\end{equation}
+where $C$ is the total capacitance being switched, $V$ the supply voltage,
+$f$ the clock frequency and $\alpha$ the \emph{activity factor}, the
+fraction of the capacitance that actually switches each cycle.\margin{$C$
+grows with chip size and transistor count; $\alpha$ depends on the workload
+and on how much logic is left idle.}
+
+Two facts follow directly from \cref{eq:active-power}.
+\begin{itemize}
+  \item Power scales with the \emph{square} of the voltage, so lowering $V$
+    is the most effective lever.  However, the maximum frequency a circuit
+    can sustain also drops as $V$ drops, so in practice $V$ and $f$ are
+    lowered together and power falls roughly with $V^{3}$.
+  \item Doubling the frequency at constant voltage doubles the power; the
+    same speedup obtained by doubling the transistor count (more parallel
+    hardware) costs power only through the larger $C$.
+\end{itemize}
+
+\begin{example}
+  Reducing the supply voltage by \SI{15}{\percent} while keeping $C$, $f$ and
+  $\alpha$ fixed reduces dynamic power to $0.85^{2} \approx 0.72$ of its
+  original value, i.e.\ by about \SI{28}{\percent}.
+\end{example}
+
+\subsection{Static power}
+
+\term{Static power}[静的電力] (leakage power) is consumed even when no
+signal switches, because transistors are imperfect switches and leak current
+when off.  Leakage grows as the supply voltage---and with it the transistor
+threshold voltage---is reduced.  There is therefore a trade-off: lowering
+$V$ reduces dynamic power but increases static power, and the total
+$P = P_{\mathrm{dyn}} + P_{\mathrm{static}}$ has a minimum at some
+intermediate voltage (\cref{fig:power}).
+
+\begin{marginfigure}
+  \resizebox{\linewidth}{!}{\input{figures/power-vs-voltage}}
+  \caption{Dynamic and static power pull in opposite directions as the
+    supply voltage changes.}
+  \label{fig:power}
+\end{marginfigure}
+
+\begin{keypoint}[Power]
+  Dynamic power $\propto C V^{2} f \alpha$ favors low voltage; static power
+  penalizes it.  Modern designs sit near the minimum of the sum and get
+  further gains from reducing $C$, $\alpha$ and $f$ rather than $V$.
+\end{keypoint}
+
+\section{Fabrication cost}
+
+Chips are manufactured on circular silicon \term{wafers}[ウェハ], each of
+which is cut into many identical rectangular \term{dies}[ダイ].  The cost of
+processing a wafer is roughly fixed, so the cost of a single die
+is\source{Lesson 1, videos 15--17; H\&P §1.6.}
+\begin{equation}
+  \text{cost per die} \;=\;
+  \frac{\text{cost per wafer}}
+       {\text{dies per wafer} \times \text{yield}} .
+  \label{eq:die-cost}
+\end{equation}
+
+\subsection{Yield}
+
+Not every die works: defects are scattered over the wafer, and a die that
+contains a defect is usually discarded.  The \term{yield}[歩留まり] is the
+fraction of dies that are functional.  Because defects fall at random
+positions, a larger die is more likely to contain one, so yield
+\emph{decreases} as die area increases.\margin{H\&P §1.6 gives an empirical
+model, $\text{yield} \approx 1/(1 + \text{defect density}\times
+\text{area})^{N}$.}
+
+\subsection{Consequences}
+
+Combining \cref{eq:die-cost} with the yield behaviour gives the central
+result of this section: halving the die area \emph{more than} halves the
+cost per die, because it doubles the number of dies per wafer \emph{and}
+raises the yield.  Read together with Moore's law this offers the architect
+two options each technology generation:
+\begin{itemize}
+  \item keep the die area constant and pack in twice the transistors---a
+    more capable chip at roughly the same cost; or
+  \item keep the design constant and let it shrink to half the area---the
+    same chip at well under half the cost.
+\end{itemize}
+
+\begin{example}
+  Suppose a wafer costs \$5000 and holds 100 dies of a given design with a
+  yield of \SI{50}{\percent}: the cost per working die is
+  $5000/(100\times 0.5) = \$100$.  A shrink that fits 200 dies per wafer and
+  raises the yield to \SI{70}{\percent} lowers the cost to
+  $5000/(200\times 0.7) \approx \$36$, less than half.
+\end{example}
+
+\begin{keypoint}[Lesson summary]
+  Architecture is trade-off engineering under three constraints---
+  performance, power and cost---driven by technology trends (Moore's law) and
+  their exceptions (the memory wall).  The next lesson makes
+  \enquote{performance} precise.
+\end{keypoint}
+
+\end{document}

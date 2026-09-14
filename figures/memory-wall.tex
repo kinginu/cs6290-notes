@@ -1,0 +1,8 @@
+% Processor vs. memory performance trend (schematic, log scale).
+\begin{tikzpicture}[x=1cm,y=1cm,>={Stealth[length=2mm]}, font=\small\sffamily]
+  \draw[->] (0,0) -- (6.4,0) node[below left] {\iflangja{年}{year}};
+  \draw[->] (0,0) -- (0,4.2) node[left] {\iflangja{性能（対数）}{performance (log)}};
+  \draw[thick,ln-accent] (0.3,0.3) -- (6,3.9) node[pos=0.75,above left] {\iflangja{プロセッサ}{processor}};
+  \draw[thick,ln-caution] (0.3,0.3) -- (6,1.2) node[pos=0.8,below] {\iflangja{メモリ（遅延）}{memory (latency)}};
+  \draw[<->,ln-muted] (5.6,1.15) -- (5.6,3.65) node[midway,right,font=\footnotesize] {\iflangja{差}{gap}};
+\end{tikzpicture}

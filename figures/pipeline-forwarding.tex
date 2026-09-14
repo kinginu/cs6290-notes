@@ -1,0 +1,12 @@
+% RAW dependence resolved by forwarding from EX/MEM to EX.
+\begin{tikzpicture}[x=0.95cm,y=0.6cm, font=\footnotesize\sffamily,
+  st/.style={draw, minimum width=0.9cm, minimum height=0.5cm, inner sep=0pt, fill=ln-box},
+  >={Stealth[length=1.6mm]}]
+  \foreach \c in {1,...,6} { \node at (\c,0.7) {\c}; }
+  \node[anchor=east] at (0.5,0) {\texttt{ADD R1,R2,R3}};
+  \foreach \s/\lab in {0/IF,1/ID,2/EX,3/MEM,4/WB} { \node[st] (a\s) at (\s+1,0) {\lab}; }
+  \node[anchor=east] at (0.5,-1) {\texttt{SUB R4,R1,R5}};
+  \foreach \s/\lab in {0/IF,1/ID,2/EX,3/MEM,4/WB} { \node[st] (b\s) at (\s+2,-1) {\lab}; }
+  \draw[->,thick,ln-tip] (a2.south east) to[out=-60,in=120] (b2.north west);
+  \node[ln-tip,font=\scriptsize] at (4.6,-0.35) {\iflangja{フォワーディング}{forwarding}};
+\end{tikzpicture}

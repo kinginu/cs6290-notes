@@ -1,0 +1,16 @@
+% Active vs. static power as a function of supply voltage (schematic).
+\begin{tikzpicture}[x=1cm,y=1cm,>={Stealth[length=2mm]}, font=\small\sffamily]
+  \draw[->] (0,0) -- (6.2,0) node[below left] {\iflangja{電源電圧 $V$}{supply voltage $V$}};
+  \draw[->] (0,0) -- (0,4.2) node[left] {\iflangja{電力}{power}};
+  % active ~ V^2
+  \draw[thick,ln-accent] plot[domain=0.6:5.6,samples=40] (\x,{0.11*\x*\x});
+  \node[ln-accent,anchor=west] at (4.3,3.4) {\iflangja{動的電力 $\propto V^2$}{active $\propto V^2$}};
+  % static: grows as V drops (leakage at low threshold)
+  \draw[thick,ln-caution] plot[domain=0.6:5.6,samples=40] (\x,{1.6/\x});
+  \node[ln-caution,anchor=west] at (0.9,2.9) {\iflangja{静的電力}{static (leakage)}};
+  % total
+  \draw[thick,dashed,ln-muted] plot[domain=0.6:5.6,samples=40] (\x,{0.11*\x*\x+1.6/\x});
+  \node[ln-muted,anchor=south west] at (4.0,1.1) {\iflangja{合計}{total}};
+  \draw[dotted] (1.94,0) -- (1.94,{0.11*1.94*1.94+1.6/1.94});
+  \node[below,font=\footnotesize] at (1.94,0) {$V_{\mathrm{opt}}$};
+\end{tikzpicture}

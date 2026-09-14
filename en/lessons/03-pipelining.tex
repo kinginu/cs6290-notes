@@ -1,0 +1,293 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Pipelining}
+\lessoninfo{
+  video={Lesson 3, videos 1--18},
+  textbook={H\&P \cite{hennessy2017} Appendix C.1--C.3},
+  keywords={pipeline, stage, pipeline CPI, stall, flush, control dependence, data dependence, RAW, WAR, WAW, hazard, forwarding, pipeline depth},
+}
+
+Pipelining is the first and most fundamental technique for raising
+throughput: instead of finishing one instruction before starting the next,
+the processor overlaps the execution of several instructions, each in a
+different stage of completion.  This lesson reviews how a pipelined
+processor works, quantifies its ideal performance, and then studies the
+\emph{dependences} between instructions that prevent the ideal from being
+reached.
+
+\section{The idea of pipelining}
+
+Executing an instruction involves a sequence of steps that use different
+pieces of hardware.  If the steps are arranged as \term{stages}[ステージ]
+separated by latches, then as soon as instruction $I_1$ leaves stage~1 for
+stage~2, instruction $I_2$ can enter stage~1.  With $k$ stages, up to $k$
+instructions are in flight at once.\source{Lesson 3, videos 2--3; H\&P
+§C.1.}
+
+The consequences for the two metrics of Lesson 2 are different:
+\begin{itemize}
+  \item \textbf{Throughput} improves by up to a factor of $k$: in steady
+    state one instruction completes every stage time instead of every $k$
+    stage times.
+  \item \textbf{Latency} of an individual instruction does \emph{not}
+    improve.  It is the same total work, and the latches between stages add
+    a small overhead, so per-instruction latency slightly increases.
+\end{itemize}
+
+\subsection{Pipelining in a processor}
+
+The classic five-stage pipeline (\cref{fig:stages}) is used throughout the
+course as the reference design.\margin{Real processors have 10--20 stages;
+the five-stage model captures every issue that matters here.}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/pipeline-stages}
+  \caption{The five-stage instruction pipeline.}
+  \label{fig:stages}
+\end{figure}
+
+\begin{description}
+  \item[IF] \emph{instruction fetch}: read the instruction at the program
+    counter (PC) from the instruction memory and increment the PC.
+  \item[ID] \emph{instruction decode} and register read: determine the
+    operation and read the source operands from the register file.
+  \item[EX] \emph{execute}: perform the ALU operation, or compute the
+    memory address for a load/store, or evaluate a branch condition.
+  \item[MEM] \emph{memory}: access data memory for loads and stores.
+  \item[WB] \emph{write back}: write the result into the register file.
+\end{description}
+
+\Cref{fig:timing} shows five independent instructions flowing through the
+pipeline.  After the first four cycles fill the pipeline, one instruction
+completes per cycle.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/pipeline-timing}
+  \caption{Instruction timing in a five-stage pipeline: from cycle 5 on, one
+    instruction completes every cycle.}
+  \label{fig:timing}
+\end{figure}
+
+\section{Pipeline CPI}
+
+In the ideal case of \cref{fig:timing} the pipeline completes one
+instruction per cycle, so the CPI of the iron law
+(\cref{eq:iron-law}) is~1.\source{Lesson 3, video 6; H\&P §C.1.}  Two
+effects raise it above~1.
+\begin{itemize}
+  \item \emph{Fill and drain.}  The first instruction takes $k$ cycles
+    before anything completes.  For a program of $n$ instructions the total
+    is $k + (n-1)$ cycles, i.e.\ CPI $= (k+n-1)/n \to 1$ as $n$ grows.  For
+    real programs ($n$ in the billions) this is negligible.
+  \item \emph{Stalls.}  Whenever the pipeline cannot advance an instruction
+    to the next stage, a cycle passes without an instruction completing.
+    These cycles are what actually determine the CPI of a pipelined
+    processor:
+    \begin{equation}
+      \text{CPI} \;=\; 1 + \frac{\text{stall cycles}}{\text{instruction}} .
+      \label{eq:pipeline-cpi}
+    \end{equation}
+\end{itemize}
+
+\section{Stalls and flushes}
+
+Two mechanisms lose cycles in a pipeline.\source{Lesson 3, videos 7--8;
+H\&P §C.2.}
+
+\begin{definition}[Stall]
+  A \term{stall}[ストール] holds an instruction (and everything behind it)
+  in its current stage for one or more cycles while the instructions ahead
+  of it continue.  A bubble---an empty slot---travels down the pipeline in
+  its place.
+\end{definition}
+
+\begin{definition}[Flush]
+  A \term{flush}[フラッシュ] discards instructions that have already been
+  fetched into the pipeline because they should not have been executed at
+  all, typically because they follow a branch whose outcome was guessed
+  wrongly.
+\end{definition}
+
+A stall of $c$ cycles costs $c$ cycles; a flush of $m$ instructions costs
+$m$ cycles, since each flushed instruction occupied a slot in which a useful
+instruction could have completed.
+
+\section{Control dependences}
+
+A \term{control dependence}[制御依存] exists when whether an instruction
+executes at all depends on the outcome of an earlier branch.\source{Lesson
+3, videos 9--10; H\&P §C.2.}  In the five-stage pipeline the branch
+condition and target are known only at the end of EX.  By then the two
+following instructions have already been fetched (\cref{fig:flush}); if the
+branch is taken they must be flushed and the fetch restarted at the target.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/pipeline-branch-flush}
+  \caption{A taken branch resolved in EX wastes two fetch slots.}
+  \label{fig:flush}
+\end{figure}
+
+The cost of this on the CPI depends on how often it happens.  Typical
+figures used in the lecture are that \SI{20}{\percent} of instructions are
+branches and \SI{60}{\percent} of branches are taken; with the simple
+policy of always fetching the fall-through instruction (\enquote{predict
+not taken}), only taken branches cause a flush:
+\begin{equation}
+  \text{CPI} = 1 + 0.2 \times 0.6 \times 2 = 1.24 .
+  \label{eq:branch-cpi}
+\end{equation}
+
+\begin{example}
+  In a deeper pipeline where the branch is resolved in stage 10, each taken
+  branch flushes nine instructions.  With the same branch statistics the
+  CPI becomes $1 + 0.2\times 0.6\times 9 = 2.08$---the processor completes
+  less than one instruction every two cycles.  This is why branch prediction
+  (Lesson 4) matters more the deeper the pipeline.
+\end{example}
+
+\tip{Cycles lost to control dependences $=$ (fraction of instructions that
+are branches) $\times$ (fraction mispredicted) $\times$ (instructions
+flushed per misprediction).}
+
+\section{Data dependences}
+
+A \term{data dependence}[データ依存] exists between two instructions when
+they access the same register or memory location and at least one of them
+writes it.\source{Lesson 3, videos 11--12; H\&P §C.2.}  There are three
+kinds, named by the order of the accesses in program order:
+
+\begin{description}
+  \item[RAW (read after write)] the later instruction \emph{reads} a value
+    that the earlier one \emph{writes}.  Also called a \emph{true} or
+    \emph{flow} dependence: the data really has to flow from one to the
+    other.
+  \item[WAR (write after read)] the later instruction \emph{writes} a
+    location that the earlier one \emph{reads}.  An \emph{anti} dependence.
+  \item[WAW (write after write)] both instructions \emph{write} the same
+    location; the later write must be the one that survives.  An
+    \emph{output} dependence.
+\end{description}
+
+WAR and WAW are called \term{false dependences}[偽の依存] or \emph{name}
+dependences: no data moves between the instructions; they merely reuse the
+same register name.  They can be removed by renaming (Lesson 6).  A RAW
+dependence cannot.\margin{RAR---two reads of the same register---is not a
+dependence: order does not matter.}
+
+\begin{example}
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+  I1:  ADD R1, R2, R3     ; R1 <- R2 + R3
+  I2:  SUB R4, R1, R5     ; RAW on R1 with I1
+  I3:  MUL R1, R6, R7     ; WAW on R1 with I1, WAR on R1 with I2
+  \end{lstlisting}
+\end{example}
+
+\section{Dependences and hazards}
+
+A dependence is a property of the \emph{program}; whether it causes a
+problem depends on the \emph{pipeline}.\source{Lesson 3, videos 13--14;
+H\&P §C.2.}
+
+\begin{definition}[Hazard]
+  A \term{hazard}[ハザード] is a situation in which a particular pipeline
+  would violate a dependence if it continued unmodified---the dependent
+  instruction would read a stale value or execute when it should not.
+\end{definition}
+
+In the five-stage pipeline:
+\begin{itemize}
+  \item A \textbf{RAW} dependence is a hazard only if the instructions are
+    close enough.  Registers are written in WB and read in ID, so an
+    instruction depends hazardously on the previous one and the one before
+    it, but an instruction three or more slots behind reads the register
+    after it has been written.\margin{With a register file that writes in
+    the first half of the cycle and reads in the second half, the distance
+    shrinks by one.}
+  \item \textbf{WAR} and \textbf{WAW} dependences never cause hazards here,
+    because instructions read registers in ID and write in WB \emph{in
+    program order}; a later instruction cannot overtake an earlier one.
+    They become hazards in out-of-order pipelines (Lesson 6).
+  \item \textbf{Control} dependences are always hazards, because the
+    pipeline fetches instructions after the branch before the branch has
+    resolved.
+\end{itemize}
+
+\begin{keypoint}
+  Dependences are decided by the program; hazards by the pipeline.  The
+  same program has more hazards in a deeper or out-of-order pipeline.
+\end{keypoint}
+
+\section{Handling hazards}
+
+Once a hazard is detected, the pipeline has three options.\source{Lesson 3,
+videos 15--16; H\&P §C.2.}
+
+\begin{enumerate}
+  \item \textbf{Flush} the dependent instructions---for control hazards,
+    where the wrong instructions were fetched.
+  \item \textbf{Stall} the dependent instruction until the value it needs
+    has been written---always correct, but costs cycles.
+  \item \textbf{Fix} the value by \term{forwarding}[フォワーディング]
+    (bypassing): route the result directly from the stage that produced it
+    to the stage that needs it, without waiting for it to reach the
+    register file (\cref{fig:forwarding}).
+\end{enumerate}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/pipeline-forwarding}
+  \caption{Forwarding: the ALU result of \texttt{ADD} is fed straight into
+    the EX stage of \texttt{SUB}, avoiding a stall.}
+  \label{fig:forwarding}
+\end{figure}
+
+Forwarding removes most RAW stalls but not all of them: a value cannot be
+forwarded \emph{backwards in time}.  The result of a load is only available
+at the end of MEM, whereas the next instruction needs it at the start of
+its own EX, which is the same cycle.  One stall cycle is therefore
+unavoidable for a \emph{load-use} pair even with full forwarding.
+
+\begin{example}
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+  LW  R1, 0(R2)      ; R1 available at end of MEM (cycle 4)
+  ADD R3, R1, R4     ; needs R1 at start of EX (cycle 4): stall 1 cycle
+  \end{lstlisting}
+  With forwarding but no stall the \texttt{ADD} would use a stale R1;
+  without forwarding it would stall two cycles.
+\end{example}
+
+\section{How many stages?}
+
+If pipelining a $k$-stage design gives up to $k\times$ the throughput, why
+not use hundreds of stages?\source{Lesson 3, video 17; H\&P §C.1, §1.5.}
+Three effects pull in different directions as the depth increases:
+\begin{itemize}
+  \item \textbf{Clock period decreases} (less logic per stage), which
+    lowers $T_{\mathrm{clk}}$ in the iron law---the intended benefit.  But
+    the latch overhead per stage does not shrink, so the gain flattens out.
+  \item \textbf{CPI increases}: more stages means more instructions in
+    flight between a branch and its resolution, hence more instructions
+    flushed per misprediction, and more distance over which RAW hazards
+    need stalls.
+  \item \textbf{Power increases}: more latches switch every cycle and the
+    higher frequency raises dynamic power (\cref{eq:active-power}).
+\end{itemize}
+
+Considering performance alone (the product CPI $\times T_{\mathrm{clk}}$),
+the optimum is deep---on the order of 30--40 stages.  Once power is
+included, the optimum moves to roughly 10--15 stages, which is where
+current designs sit.
+
+\begin{keypoint}[Lesson summary]
+  Pipelining raises throughput, not latency; ideal CPI is 1 and every stall
+  or flush adds to it (\cref{eq:pipeline-cpi}).  Control and RAW dependences
+  turn into hazards that cost cycles; forwarding removes most RAW stalls,
+  and branch prediction (next lesson) attacks the control hazards.  Pipeline
+  depth trades clock period against CPI and power.
+\end{keypoint}
+
+\end{document}

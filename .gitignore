@@ -21,3 +21,6 @@ dist/
 *.pdf
 # editor / OS
 .DS_Store
+
+# rendered page previews
+.png/
