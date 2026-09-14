@@ -253,10 +253,7 @@
   {\sffamily\bfseries\color{ln-accent}}% head font
   {.}{0.6em}%                           punctuation, space after head
   {\thmname{#1}\thmnumber{ #2}\thmnote{ \normalfont\sffamily(#3)}}
-\theoremstyle{lnplain}
-\newtheorem{definition}{\definitionname}[chapter]
-\newtheorem{example}[definition]{\examplename}
-\newtheorem{note}[definition]{\notename}
+%% The environments themselves are declared after cleveref (end of class).
 
 %% keypoint: shaded box for take-aways.  Optional argument = subtitle.
 \RequirePackage[skins,breakable]{tcolorbox}
@@ -267,8 +264,8 @@
   fontupper=\normalfont,
   title={\keypointname\notblank{#1}{ --- #1}{}},
   fonttitle=\sffamily\bfseries, coltitle=ln-accent,
-  attach title to upper={\par},
-  before upper={\ln@inboxtrue},
+  detach title,
+  before upper={\ln@inboxtrue\tcbtitle\par},
 }
 
 %% ------------------------------------------------------------ lesson info
@@ -393,6 +390,16 @@
   \crefname{example}{Example}{Examples}
   \crefname{note}{Note}{Notes}
 \fi
+
+%% definition / example / note share one counter per chapter
+\theoremstyle{lnplain}
+\newtheorem{definition}{\definitionname}[chapter]
+\newtheorem{example}[definition]{\examplename}
+\newtheorem{note}[definition]{\notename}
+%% cleveref would name all three after the shared counter ("Definition");
+%% alias the counter inside each environment so \cref prints the right name.
+\AtBeginEnvironment{example}{\crefalias{definition}{example}}
+\AtBeginEnvironment{note}{\crefalias{definition}{note}}
 
 %% --------------------------------------------------------- misc typography
 \setlength{\parskip}{0pt}

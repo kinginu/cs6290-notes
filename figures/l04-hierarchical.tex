@@ -1,0 +1,16 @@
+% Hierarchical predictor: tagged upper levels override a cheap 2BC table.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  box/.style={draw, fill=ln-box, minimum height=0.8cm, minimum width=3.0cm, inner sep=2pt, align=center}]
+  \node[draw, fill=ln-box, minimum width=0.9cm, minimum height=0.6cm] (pc) at (0,0) {PC};
+  \node[box, fill=ln-accent!15] (g) at (3.2,1.3) {\iflangja{グローバル履歴予測器}{global-history predictor}\\[-1pt]{\scriptsize\iflangja{小・タグ付き}{small, tagged}}};
+  \node[box, fill=ln-accent!8] (l) at (3.2,0) {\iflangja{ローカル履歴予測器}{local-history predictor}\\[-1pt]{\scriptsize\iflangja{小・タグ付き}{small, tagged}}};
+  \node[box] (b) at (3.2,-1.3) {\iflangja{2 ビットカウンタテーブル}{2-bit counter table}\\[-1pt]{\scriptsize\iflangja{大・タグなし}{large, untagged}}};
+  \draw (pc.east) -- (1.2,0);
+  \draw (1.2,1.3) -- (1.2,-1.3);
+  \fill (1.2,0) circle (1.2pt);
+  \foreach \n in {g,l,b} { \draw[->] (1.2,0 |- \n.west) -- (\n.west); }
+  \node[draw, fill=white, align=left, font=\scriptsize, minimum height=3.4cm, text width=2.3cm] (sel) at (6.8,0)
+    {\iflangja{1.\ グローバルがヒット\\\quad$\to$ それを使う\\[3pt]2.\ ローカルがヒット\\\quad$\to$ それを使う\\[3pt]3.\ それ以外\\\quad$\to$ 2BC を使う}{1.\ global hit\\\quad$\to$ use global\\[3pt]2.\ local hit\\\quad$\to$ use local\\[3pt]3.\ otherwise\\\quad$\to$ use 2BC}};
+  \foreach \n in {g,l,b} { \draw[->] (\n.east) -- (sel.west |- \n.east); }
+  \draw[->] (sel.east) -- ++(0.6,0) node[right] {\iflangja{予測}{prediction}};
+\end{tikzpicture}

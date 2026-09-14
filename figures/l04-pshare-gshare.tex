@@ -1,0 +1,40 @@
+% PShare (private history) and GShare (global history), both with a shared
+% pattern history table of two-bit counters.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  box/.style={draw, fill=ln-box, minimum height=0.6cm, minimum width=0.9cm, inner sep=2pt},
+  xor/.style={inner sep=0pt, font=\large}]
+  % ---------------- (a) PShare
+  \node[anchor=west, font=\footnotesize\bfseries] at (-0.45,1.45) {(a) PShare};
+  \node[box] (pca) at (0,0) {PC};
+  \draw[fill=ln-box] (1.3,-0.7) rectangle (2.9,0.7);
+  \foreach \y in {-0.35,0.35} { \draw[ln-rule] (1.3,\y) -- (2.9,\y); }
+  \fill[ln-accent!15] (1.31,-0.34) rectangle (2.89,0.34);
+  \node[font=\scriptsize, text=ln-muted] at (2.1,0.95) {\iflangja{BHT（ローカル履歴）}{BHT (private histories)}};
+  \draw[->] (pca.east) -- (1.3,0);
+  \node[xor] (xa) at (4.0,0) {$\oplus$};
+  \draw[->] (2.9,0) -- (xa.west);
+  \draw[->] (pca.south) -- (0,-1.0) -- (4.0,-1.0) -- (xa.south);
+  \draw[fill=ln-box] (5.0,-0.7) rectangle (6.2,0.7);
+  \foreach \y in {-0.35,0,0.35} { \draw[ln-rule] (5.0,\y) -- (6.2,\y); }
+  \node[font=\scriptsize, text=ln-muted] at (5.6,0.95) {\iflangja{PHT（2 ビットカウンタ）}{PHT (2-bit counters)}};
+  \draw[->] (xa.east) -- (5.0,0);
+  \draw[->] (6.2,0) -- (7.0,0) node[right] {\iflangja{予測}{prediction}};
+  % ---------------- (b) GShare
+  \begin{scope}[yshift=-3.4cm]
+  \node[anchor=west, font=\footnotesize\bfseries] at (-0.45,1.45) {(b) GShare};
+  \foreach \i/\b in {0/1,1/0,2/1,3/1,4/0,5/1} {
+    \draw[fill=ln-accent!15] (1.3+0.2667*\i,-0.3) rectangle ++(0.2667,0.6);
+    \node[font=\scriptsize\ttfamily] at (1.4333+0.2667*\i,0) {\b};
+  }
+  \node[font=\scriptsize, text=ln-muted, align=center] at (2.1,0.8) {\iflangja{グローバル履歴\\（シフトレジスタ）}{global history\\(shift register)}};
+  \node[xor] (xb) at (4.0,0) {$\oplus$};
+  \draw[->] (2.9,0) -- (xb.west);
+  \node[box] (pcb) at (0,-1.0) {PC};
+  \draw[->] (pcb.east) -- (4.0,-1.0) -- (xb.south);
+  \draw[fill=ln-box] (5.0,-0.7) rectangle (6.2,0.7);
+  \foreach \y in {-0.35,0,0.35} { \draw[ln-rule] (5.0,\y) -- (6.2,\y); }
+  \node[font=\scriptsize, text=ln-muted] at (5.6,0.95) {\iflangja{PHT（2 ビットカウンタ）}{PHT (2-bit counters)}};
+  \draw[->] (xb.east) -- (5.0,0);
+  \draw[->] (6.2,0) -- (7.0,0) node[right] {\iflangja{予測}{prediction}};
+  \end{scope}
+\end{tikzpicture}

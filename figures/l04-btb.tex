@@ -1,0 +1,25 @@
+% A realistic BTB: low-order PC bits (above the alignment bits) index a
+% small table of predicted targets.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]}]
+  % PC fields
+  \node[anchor=east] at (-0.1,0.3) {PC};
+  \draw[fill=white] (0,0) rectangle (3.0,0.6);   \node at (1.5,0.3) {31 \dots\ 10};
+  \draw[fill=ln-accent!15] (3.0,0) rectangle (5.6,0.6); \node at (4.3,0.3) {9 \dots\ 2};
+  \draw[fill=ln-box] (5.6,0) rectangle (6.4,0.6); \node at (6.0,0.3) {1\,0};
+  \node[anchor=west, font=\scriptsize, text=ln-muted] at (6.5,0.3) {\iflangja{常に 00}{always 00}};
+  % index
+  \draw[->] (4.3,0) -- (4.3,-0.8) node[midway, right, font=\scriptsize] {\iflangja{インデックス（8 ビット）}{index (8 bits)}};
+  % table: 6 rows of 0.45
+  \fill[ln-accent!15] (3.0,-2.15) rectangle (5.6,-2.6);
+  \foreach \i in {0,...,5} { \draw (3.0,-0.8-0.45*\i) rectangle (5.6,-1.25-0.45*\i); }
+  \draw (3.7,-0.8) -- (3.7,-3.5);
+  \foreach \i/\lab in {0/0,1/1,3/170,5/255} {
+    \node[font=\scriptsize, text=ln-muted] at (3.35,-1.025-0.45*\i) {\lab}; }
+  \foreach \i in {2,4} { \node[font=\scriptsize, text=ln-muted] at (3.35,-1.0-0.45*\i) {$\vdots$}; }
+  \node at (4.65,-2.375) {\iflangja{分岐先}{target}};
+  \node[font=\scriptsize, text=ln-muted, anchor=north] at (4.3,-3.55) {BTB};
+  % lookup and update
+  \draw[->, thick] (5.6,-2.375) -- (7.0,-2.375) node[right] {\iflangja{予測した次の PC}{predicted next PC}};
+  \draw[->, dashed, ln-caution] (0.6,-2.375) -- (3.0,-2.375)
+    node[pos=0.0, above right, font=\scriptsize, align=left] {\iflangja{分岐解決時に\\実際の分岐先を書く}{on resolution:\\write actual target}};
+\end{tikzpicture}

@@ -1,0 +1,372 @@
+en	ja	reading	lesson	note
+computer architecture	コンピュータアーキテクチャ	こんぴゅーたあーきてくちゃ	1	
+Moore's law	ムーアの法則	むーあのほうそく	1	
+memory wall	メモリウォール	めもりうぉーる	1	
+dynamic power	動的電力	どうてきでんりょく	1	also: active power
+supply voltage	電源電圧	でんげんでんあつ	1	
+clock frequency	クロック周波数	くろっくしゅうはすう	1	
+activity factor	活性化率	かっせいかりつ	1	fraction of capacitance switched per cycle
+static power	静的電力	せいてきでんりょく	1	also: leakage power
+threshold voltage	しきい値電圧	しきいちでんあつ	1	
+fabrication cost	製造コスト	せいぞうこすと	1	
+wafers	ウェハ	うぇは	1	
+dies	ダイ	だい	1	
+defect	欠陥	けっかん	1	manufacturing defect on a wafer
+yield	歩留まり	ぶどまり	1	
+latency	レイテンシ	れいてんし	2	
+throughput	スループット	するーぷっと	2	
+speedup	高速化率	こうそくかりつ	2	
+benchmarks	ベンチマーク	べんちまーく	2	
+benchmark suite	ベンチマークスイート	べんちまーくすいーと	2	
+real application	実アプリケーション	じつあぷりけーしょん	2	benchmark type
+kernel	カーネル	かーねる	2	benchmark type (not the OS kernel)
+synthetic benchmark	合成ベンチマーク	ごうせいべんちまーく	2	
+peak performance	ピーク性能	ぴーくせいのう	2	
+Standard Performance Evaluation Corporation	SPEC	SPEC	2	
+SPEC	SPEC	SPEC	2	see: Standard Performance Evaluation Corporation
+Transaction Processing Performance Council	TPC	TPC	2	
+TPC	TPC	TPC	2	see: Transaction Processing Performance Council
+Embedded Microprocessor Benchmark Consortium	EEMBC	EEMBC	2	
+EEMBC	EEMBC	EEMBC	2	see: Embedded Microprocessor Benchmark Consortium
+arithmetic mean	算術平均	さんじゅつへいきん	2	
+geometric mean	幾何平均	きかへいきん	2	
+iron law	性能の鉄則	せいのうのてっそく	2	iron law of performance
+CPU time	CPU 時間	CPU じかん	2	
+instruction count	命令数	めいれいすう	2	
+IC	IC	IC	2	see: instruction count
+cycles per instruction	命令当たりサイクル数	めいれいあたりさいくるすう	2	
+CPI	CPI	CPI	2	see: cycles per instruction
+clock cycle time	クロックサイクル時間	くろっくさいくるじかん	2	
+instruction set architecture	命令セットアーキテクチャ	めいれいせっとあーきてくちゃ	2	
+ISA	ISA	ISA	2	see: instruction set architecture
+microarchitecture	マイクロアーキテクチャ	まいくろあーきてくちゃ	2	
+Amdahl's law	Amdahl の法則	あむだーるのほうそく	2	
+make the common case fast	頻出ケースを速くせよ	ひんしゅつけーすをはやくせよ	2	design principle
+Lhadma's law	Lhadma の法則	らどまのほうそく	2	do not make the uncommon case too slow
+diminishing returns	収穫逓減	しゅうかくていげん	2	
+pipelining	パイプライン化	ぱいぷらいんか	3	
+stages	ステージ	すてーじ	3	
+latch	ラッチ	らっち	3	pipeline register between stages
+five-stage pipeline	5 段パイプライン	5だんぱいぷらいん	3	
+instruction fetch stage	命令フェッチステージ	めいれいふぇっちすてーじ	3	
+IF	IF	IF	3	see: instruction fetch stage
+instruction decode stage	命令デコードステージ	めいれいでこーどすてーじ	3	
+ID	ID	ID	3	see: instruction decode stage
+execute stage	実行ステージ	じっこうすてーじ	3	
+EX	EX	EX	3	see: execute stage
+memory stage	メモリステージ	めもりすてーじ	3	
+MEM	MEM	MEM	3	see: memory stage
+write-back stage	書き戻しステージ	かきもどしすてーじ	3	
+WB	WB	WB	3	see: write-back stage
+program counter	プログラムカウンタ	ぷろぐらむかうんた	3	
+PC	PC	PC	3	see: program counter
+stall	ストール	すとーる	3	
+bubble	バブル	ばぶる	3	empty pipeline slot created by a stall
+flush	フラッシュ	ふらっしゅ	3	discarding fetched instructions (not: flash memory)
+control dependence	制御依存	せいぎょいぞん	3	
+data dependence	データ依存	でーたいぞん	3	
+read-after-write dependence	RAW 依存	RAW いぞん	3	also: true dependence, flow dependence
+RAW	RAW	RAW	3	see: read-after-write dependence
+write-after-read dependence	WAR 依存	WAR いぞん	3	also: anti-dependence
+WAR	WAR	WAR	3	see: write-after-read dependence
+write-after-write dependence	WAW 依存	WAW いぞん	3	also: output dependence
+WAW	WAW	WAW	3	see: write-after-write dependence
+false dependences	偽の依存	ぎのいぞん	3	also: name dependence
+hazard	ハザード	はざーど	3	
+control hazard	制御ハザード	せいぎょはざーど	3	
+data hazard	データハザード	でーたはざーど	3	
+forwarding	フォワーディング	ふぉわーでぃんぐ	3	also: bypassing
+pipeline depth	パイプライン段数	ぱいぷらいんだんすう	3	number of pipeline stages
+taken branch	成立分岐	せいりつぶんき	4	
+not-taken branch	不成立分岐	ふせいりつぶんき	4	
+branch target address	分岐先アドレス	ぶんきさきあどれす	4	
+branch prediction	分岐予測	ぶんきよそく	4	
+branch misprediction	分岐予測ミス	ぶんきよそくみす	4	
+misprediction penalty	予測ミスペナルティ	よそくみすぺなるてぃ	4	cycles lost per misprediction
+branch prediction accuracy	分岐予測精度	ぶんきよそくせいど	4	
+predict not taken	不成立予測	ふせいりつよそく	4	static prediction: always fetch PC+4
+branch target buffer	分岐先バッファ	ぶんきさきばっふぁ	4	
+BTB	BTB	BTB	4	see: branch target buffer
+direction predictor	方向予測器	ほうこうよそくき	4	predicts taken/not taken
+branch history table	分岐履歴テーブル	ぶんきりれきてーぶる	4	
+BHT	BHT	BHT	4	see: branch history table
+one-bit predictor	1 ビット予測器	1びっとよそくき	4	
+1BP	1BP	1BP	4	see: one-bit predictor
+two-bit predictor	2 ビット予測器	2びっとよそくき	4	
+2BP	2BP	2BP	4	see: two-bit predictor
+saturating counter	飽和カウンタ	ほうわかうんた	4	
+history-based predictor	履歴ベース予測器	りれきべーすよそくき	4	
+N-bit history predictor	N ビット履歴予測器	Nびっとりれきよそくき	4	
+pattern history table	パターン履歴テーブル	ぱたーんりれきてーぶる	4	table of shared counters indexed by history
+PHT	PHT	PHT	4	see: pattern history table
+private branch history	ローカル分岐履歴	ろーかるぶんきりれき	4	per-branch history; also: local history
+PShare predictor	PShare 予測器	PShare よそくき	4	private history, shared counters
+global branch history	グローバル分岐履歴	ぐろーばるぶんきりれき	4	
+GShare predictor	GShare 予測器	GShare よそくき	4	global history XOR PC, shared counters
+tournament predictor	トーナメント予測器	とーなめんとよそくき	4	
+meta-predictor	メタ予測器	めたよそくき	4	chooses among predictors
+hierarchical predictor	階層型予測器	かいそうがたよそくき	4	
+return address stack	リターンアドレススタック	りたーんあどれすすたっく	4	
+RAS	RAS	RAS	4	see: return address stack
+predecoding	プリデコード	ぷりでこーど	4	marking RET etc. when instructions are loaded
+predication	プレディケーション	ぷれでぃけーしょん	5	removing a branch by computing both paths and selecting
+if-conversion	if 変換	if へんかん	5	
+conditional move	条件付きムーブ	じょうけんつきむーぶ	5	
+MOVZ	MOVZ	MOVZ	5	MIPS move-if-zero instruction
+MOVN	MOVN	MOVN	5	MIPS move-if-not-zero instruction
+CMOVcc	CMOVcc	CMOVcc	5	x86 conditional move instructions
+condition code	条件コード	じょうけんこーど	5	
+full predication	完全プレディケーション	かんぜんぷれでぃけーしょん	5	condition field on every instruction
+architectural register	アーキテクチャレジスタ	あーきてくちゃれじすた	6	register visible to the programmer
+physical register	物理レジスタ	ぶつりれじすた	6	
+register renaming	レジスタリネーミング	れじすたりねーみんぐ	6	
+register alias table	レジスタエイリアステーブル	れじすたえいりあすてーぶる	6	
+RAT	RAT	RAT	6	see: register alias table
+instruction-level parallelism	命令レベル並列性	めいれいれべるへいれつせい	6	
+ILP	ILP	ILP	6	see: instruction-level parallelism
+instructions per cycle	サイクル当たり命令数	さいくるあたりめいれいすう	6	reciprocal of CPI
+IPC	IPC	IPC	6	see: instructions per cycle
+out-of-order execution	アウトオブオーダ実行	あうとおぶおーだじっこう	7	
+Tomasulo's algorithm	Tomasulo のアルゴリズム	とますろのあるごりずむ	7	
+instruction queue	命令キュー	めいれいきゅー	7	
+reservation station	リザベーションステーション	りざべーしょんすてーしょん	7	
+RS	RS	RS	7	see: reservation station
+common data bus	共通データバス	きょうつうでーたばす	7	
+CDB	CDB	CDB	7	see: common data bus
+issue	発行	はっこう	7	Tomasulo step: instruction queue to reservation station
+dispatch	ディスパッチ	でぃすぱっち	7	Tomasulo step: reservation station to execution
+write result	結果書き込み	けっかかきこみ	7	Tomasulo step; also: broadcast
+precise exception	正確な例外	せいかくなれいがい	8	
+phantom exception	ファントム例外	ふぁんとむれいがい	8	exception raised by a mispredicted instruction
+reorder buffer	リオーダバッファ	りおーだばっふぁ	8	
+ROB	ROB	ROB	8	see: reorder buffer
+commit	コミット	こみっと	8	also: retirement
+branch misprediction recovery	分岐予測ミス回復	ぶんきよそくみすかいふく	8	
+unified reservation station	統合リザベーションステーション	とうごうりざべーしょんすてーしょん	8	
+superscalar	スーパースカラ	すーぱーすから	8	
+load-store queue	ロードストアキュー	ろーどすとあきゅー	9	
+LSQ	LSQ	LSQ	9	see: load-store queue
+store-to-load forwarding	ストアロードフォワーディング	すとあろーどふぉわーでぃんぐ	9	
+tree height reduction	木の高さ削減	きのたかささくげん	10	
+loop unrolling	ループ展開	るーぷてんかい	10	
+function call inlining	インライン展開	いんらいんてんかい	10	
+very long instruction word	VLIW	VLIW	11	
+VLIW	VLIW	VLIW	11	see: very long instruction word
+backward compatibility	後方互換性	こうほうごかんせい	11	
+Itanium	Itanium	Itanium	11	Intel IA-64 processor with VLIW-style instructions
+digital signal processor	DSP	DSP	11	
+DSP	DSP	DSP	11	see: digital signal processor
+locality principle	局所性の原理	きょくしょせいのげんり	12	
+temporal locality	時間的局所性	じかんてききょくしょせい	12	
+spatial locality	空間的局所性	くうかんてききょくしょせい	12	
+cache	キャッシュ	きゃっしゅ	12	
+cache hit	キャッシュヒット	きゃっしゅひっと	12	
+cache miss	キャッシュミス	きゃっしゅみす	12	
+average memory access time	平均メモリアクセス時間	へいきんめもりあくせすじかん	12	
+AMAT	AMAT	AMAT	12	see: average memory access time
+hit time	ヒット時間	ひっとじかん	12	
+hit rate	ヒット率	ひっとりつ	12	
+miss rate	ミス率	みすりつ	12	
+miss penalty	ミスペナルティ	みすぺなるてぃ	12	
+L1 cache	L1 キャッシュ	L1 きゃっしゅ	12	first-level cache
+cache block	キャッシュブロック	きゃっしゅぶろっく	12	
+block size	ブロックサイズ	ぶろっくさいず	12	
+cache line	キャッシュライン	きゃっしゅらいん	12	block-sized slot in the cache
+block offset	ブロックオフセット	ぶろっくおふせっと	12	
+block number	ブロック番号	ぶろっくばんごう	12	
+tag	タグ	たぐ	12	cache
+valid bit	有効ビット	ゆうこうびっと	12	
+direct-mapped cache	ダイレクトマップキャッシュ	だいれくとまっぷきゃっしゅ	12	
+index	インデックス	いんでっくす	12	cache
+set-associative cache	セットアソシアティブキャッシュ	せっとあそしあてぃぶきゃっしゅ	12	
+fully associative cache	フルアソシアティブキャッシュ	ふるあそしあてぃぶきゃっしゅ	12	
+associativity	連想度	れんそうど	12	
+replacement policy	置換アルゴリズム	ちかんあるごりずむ	12	cache
+least recently used	LRU	LRU	12	replacement policy
+LRU	LRU	LRU	12	see: least recently used
+write-through policy	ライトスルー方式	らいとするーほうしき	12	cache write policy
+write-back policy	ライトバック方式	らいとばっくほうしき	12	cache write policy
+dirty bit	ダーティビット	だーてぃびっと	12	
+virtual memory	仮想記憶	かそうきおく	13	
+physical memory	物理メモリ	ぶつりめもり	13	
+physical address	物理アドレス	ぶつりあどれす	13	
+virtual address space	仮想アドレス空間	かそうあどれすくうかん	13	
+virtual address	仮想アドレス	かそうあどれす	13	
+page	ページ	ぺーじ	13	
+page frame	ページフレーム	ぺーじふれーむ	13	
+page table	ページテーブル	ぺーじてーぶる	13	
+page fault	ページフォールト	ぺーじふぉーると	13	
+virtual page number	仮想ページ番号	かそうぺーじばんごう	13	
+page offset	ページオフセット	ぺーじおふせっと	13	
+physical frame number	物理フレーム番号	ぶつりふれーむばんごう	13	
+flat page table	単一レベルページテーブル	たんいつれべるぺーじてーぶる	13	
+page table entry	ページテーブルエントリ	ぺーじてーぶるえんとり	13	
+PTE	PTE	PTE	13	see: page table entry
+multi-level page table	多段ページテーブル	ただんぺーじてーぶる	13	
+page size	ページサイズ	ぺーじさいず	13	
+internal fragmentation	内部断片化	ないぶだんぺんか	13	
+translation lookaside buffer	TLB	TLB	13	
+TLB	TLB	TLB	13	see: translation lookaside buffer
+TLB miss	TLB ミス	TLB みす	13	
+page table walk	ページテーブルウォーク	ぺーじてーぶるうぉーく	13	
+pipelined cache	パイプライン化キャッシュ	ぱいぷらいんかきゃっしゅ	14	
+virtually accessed cache	仮想アドレスキャッシュ	かそうあどれすきゃっしゅ	14	
+virtually indexed physically tagged cache	仮想インデックス物理タグキャッシュ	かそういんでっくすぶつりたぐきゃっしゅ	14	
+VIPT	VIPT	VIPT	14	see: virtually indexed physically tagged cache
+aliasing	エイリアシング	えいりあしんぐ	14	virtual addresses mapping to the same physical address
+way prediction	ウェイ予測	うぇいよそく	14	
+not most recently used	NMRU	NMRU	14	replacement policy
+NMRU	NMRU	NMRU	14	see: not most recently used
+pseudo-LRU	疑似 LRU	ぎじ LRU	14	replacement policy
+PLRU	PLRU	PLRU	14	see: pseudo-LRU
+compulsory miss	初期参照ミス	しょきさんしょうみす	14	3C model
+capacity miss	容量性ミス	ようりょうせいみす	14	3C model
+conflict miss	競合性ミス	きょうごうせいみす	14	3C model
+prefetching	プリフェッチ	ぷりふぇっち	14	
+prefetch instruction	プリフェッチ命令	ぷりふぇっちめいれい	14	
+hardware prefetching	ハードウェアプリフェッチ	はーどうぇあぷりふぇっち	14	
+stream buffer	ストリームバッファ	すとりーむばっふぁ	14	
+stride prefetcher	ストライドプリフェッチャ	すとらいどぷりふぇっちゃ	14	
+correlating prefetcher	相関プリフェッチャ	そうかんぷりふぇっちゃ	14	
+loop interchange	ループ交換	るーぷこうかん	14	
+overlap miss	オーバーラップミス	おーばーらっぷみす	14	cache misses in progress at the same time
+miss-under-miss support	ミスアンダーミス対応	みすあんだーみすたいおう	14	
+cache hierarchy	キャッシュ階層	きゃっしゅかいそう	14	also: multilevel caches
+L2 cache	L2 キャッシュ	L2 きゃっしゅ	14	second-level cache
+last-level cache	最終レベルキャッシュ	さいしゅうれべるきゃっしゅ	14	
+LLC	LLC	LLC	14	see: last-level cache
+local hit rate	局所ヒット率	きょくしょひっとりつ	14	
+global hit rate	大域ヒット率	たいいきひっとりつ	14	
+local miss rate	局所ミス率	きょくしょみすりつ	14	
+global miss rate	大域ミス率	たいいきみすりつ	14	
+misses per 1000 instructions	1000 命令当たりミス数	1000めいれいあたりみすすう	14	
+inclusion property	包含性	ほうがんせい	14	
+static random-access memory	SRAM	SRAM	15	
+SRAM	SRAM	SRAM	15	see: static random-access memory
+dynamic random-access memory	DRAM	DRAM	15	
+DRAM	DRAM	DRAM	15	see: dynamic random-access memory
+memory cell	メモリセル	めもりせる	15	
+word line	ワード線	わーどせん	15	
+bit line	ビット線	びっとせん	15	
+trench cell	トレンチセル	とれんちせる	15	DRAM cell with trench capacitor
+refresh	リフレッシュ	りふれっしゅ	15	DRAM
+row decoder	行デコーダ	ぎょうでこーだ	15	
+sense amplifier	センスアンプ	せんすあんぷ	15	
+column multiplexer	列マルチプレクサ	れつまるちぷれくさ	15	
+destructive read	破壊読み出し	はかいよみだし	15	
+fast page mode	ファストページモード	ふぁすとぺーじもーど	15	
+front-side bus	フロントサイドバス	ふろんとさいどばす	15	
+FSB	FSB	FSB	15	see: front-side bus
+northbridge	ノースブリッジ	のーすぶりっじ	15	
+magnetic disk	磁気ディスク	じきでぃすく	16	
+platter	プラッタ	ぷらった	16	
+spindle	スピンドル	すぴんどる	16	
+disk head	磁気ヘッド	じきへっど	16	
+track	トラック	とらっく	16	disk
+cylinder	シリンダ	しりんだ	16	disk
+sector	セクタ	せくた	16	disk
+seek time	シーク時間	しーくじかん	16	
+rotational latency	回転待ち時間	かいてんまちじかん	16	
+optical disk	光ディスク	ひかりでぃすく	16	
+magnetic tape	磁気テープ	じきてーぷ	16	
+sequential access	順次アクセス	じゅんじあくせす	16	
+flash memory	フラッシュメモリ	ふらっしゅめもり	16	not: flush
+solid-state disk	SSD	SSD	16	
+SSD	SSD	SSD	16	see: solid-state disk
+hybrid disk	ハイブリッドディスク	はいぶりっどでぃすく	16	magnetic disk with flash cache
+I/O bus	I/O バス	IO ばす	16	
+southbridge	サウスブリッジ	さうすぶりっじ	16	
+dependability	ディペンダビリティ	でぃぺんだびりてぃ	17	
+fault	フォールト	ふぉーると	17	defect that may cause an error
+error	エラー	えらー	17	incorrect internal state
+failure	故障	こしょう	17	deviation of delivered service from specification
+reliability	信頼性	しんらいせい	17	
+availability	可用性	かようせい	17	
+mean time to failure	平均故障時間	へいきんこしょうじかん	17	
+MTTF	MTTF	MTTF	17	see: mean time to failure
+mean time to repair	平均修復時間	へいきんしゅうふくじかん	17	
+MTTR	MTTR	MTTR	17	see: mean time to repair
+mean time between failures	平均故障間隔	へいきんこしょうかんかく	17	
+MTBF	MTBF	MTBF	17	see: mean time between failures
+hardware fault	ハードウェアフォールト	はーどうぇあふぉーると	17	fault by cause
+design fault	設計フォールト	せっけいふぉーると	17	fault by cause
+operation fault	運用フォールト	うんようふぉーると	17	fault by cause
+environmental fault	環境フォールト	かんきょうふぉーると	17	fault by cause
+permanent fault	永久フォールト	えいきゅうふぉーると	17	fault by duration
+intermittent fault	間欠フォールト	かんけつふぉーると	17	fault by duration
+transient fault	過渡フォールト	かとふぉーると	17	fault by duration
+fault avoidance	フォールト回避	ふぉーるとかいひ	17	
+fault tolerance	フォールトトレランス	ふぉーるととれらんす	17	
+checkpointing	チェックポインティング	ちぇっくぽいんてぃんぐ	17	
+N-module redundancy	N モジュール冗長	N もじゅーるじょうちょう	17	
+parity	パリティ	ぱりてぃ	17	
+error-correcting code	誤り訂正符号	あやまりていせいふごう	17	
+ECC	ECC	ECC	17	see: error-correcting code
+redundant array of independent disks	RAID	RAID	17	
+RAID	RAID	RAID	17	see: redundant array of independent disks
+RAID 0	RAID 0	RAID 0	17	striping
+striping	ストライピング	すとらいぴんぐ	17	
+RAID 1	RAID 1	RAID 1	17	mirroring
+mirroring	ミラーリング	みらーりんぐ	17	
+RAID 4	RAID 4	RAID 4	17	block-interleaved parity on a dedicated disk
+RAID 5	RAID 5	RAID 5	17	distributed parity
+RAID 6	RAID 6	RAID 6	17	two check blocks per stripe
+Flynn's taxonomy	Flynn の分類	ふりんのぶんるい	18	
+single instruction, single data	SISD	SISD	18	
+SISD	SISD	SISD	18	see: single instruction, single data
+single instruction, multiple data	SIMD	SIMD	18	
+SIMD	SIMD	SIMD	18	see: single instruction, multiple data
+multiple instruction, single data	MISD	MISD	18	
+MISD	MISD	MISD	18	see: multiple instruction, single data
+multiple instruction, multiple data	MIMD	MIMD	18	
+MIMD	MIMD	MIMD	18	see: multiple instruction, multiple data
+multiprocessor	マルチプロセッサ	まるちぷろせっさ	18	
+multicore processor	マルチコアプロセッサ	まるちこあぷろせっさ	18	
+centralized shared memory	集中共有メモリ	しゅうちゅうきょうゆうめもり	18	
+uniform memory access	UMA	UMA	18	
+UMA	UMA	UMA	18	see: uniform memory access
+symmetric multiprocessor	対称型マルチプロセッサ	たいしょうがたまるちぷろせっさ	18	
+SMP	SMP	SMP	18	see: symmetric multiprocessor
+distributed shared memory	分散共有メモリ	ぶんさんきょうゆうめもり	18	
+non-uniform memory access	NUMA	NUMA	18	
+NUMA	NUMA	NUMA	18	see: non-uniform memory access
+message passing	メッセージパッシング	めっせーじぱっしんぐ	18	
+shared memory	共有メモリ	きょうゆうめもり	18	programming model
+chip multiprocessor	チップマルチプロセッサ	ちっぷまるちぷろせっさ	18	
+CMP	CMP	CMP	18	see: chip multiprocessor
+simultaneous multithreading	同時マルチスレッディング	どうじまるちすれっでぃんぐ	18	
+SMT	SMT	SMT	18	see: simultaneous multithreading
+cache coherence	キャッシュコヒーレンス	きゃっしゅこひーれんす	19	not: memory consistency
+bus snooping	バススヌーピング	ばすすぬーぴんぐ	19	
+write-update coherence	書き込み時更新方式	かきこみじこうしんほうしき	19	
+write-invalidate coherence	書き込み時無効化方式	かきこみじむこうかほうしき	19	
+MSI protocol	MSI プロトコル	MSI ぷろとこる	19	modified, shared, invalid
+cache-to-cache transfer	キャッシュ間転送	きゃっしゅかんてんそう	19	
+MOSI protocol	MOSI プロトコル	MOSI ぷろとこる	19	modified, owned, shared, invalid
+MESI protocol	MESI プロトコル	MESI ぷろとこる	19	modified, exclusive, shared, invalid
+MOESI protocol	MOESI プロトコル	MOESI ぷろとこる	19	
+directory-based coherence	ディレクトリ方式	でぃれくとりほうしき	19	
+coherence miss	コヒーレンスミス	こひーれんすみす	19	
+true sharing	真共有	しんきょうゆう	19	
+false sharing	偽共有	ぎきょうゆう	19	also: フォールスシェアリング
+lock	ロック	ろっく	20	
+mutual exclusion	相互排除	そうごはいじょ	20	
+critical section	クリティカルセクション	くりてぃかるせくしょん	20	
+atomic instruction	アトミック命令	あとみっくめいれい	20	
+test-and-set	テストアンドセット	てすとあんどせっと	20	
+load-linked/store-conditional	LL/SC	LL SC	20	
+LL/SC	LL/SC	LL SC	20	see: load-linked/store-conditional
+barrier synchronization	バリア同期	ばりあどうき	20	
+memory consistency	メモリ一貫性	めもりいっかんせい	21	
+sequential consistency	逐次一貫性	ちくじいっかんせい	21	
+relaxed consistency	緩和一貫性	かんわいっかんせい	21	
+data race	データ競合	でーたきょうごう	21	
+consistency model	一貫性モデル	いっかんせいもでる	21	
+strong consistency	強い一貫性	つよいいっかんせい	21	
+causal consistency	因果一貫性	いんがいっかんせい	21	
+weak consistency	弱い一貫性	よわいいっかんせい	21	
+many-core processor	メニーコアプロセッサ	めにーこあぷろせっさ	22	
+network on chip	ネットワークオンチップ	ねっとわーくおんちっぷ	22	
+mesh	メッシュ	めっしゅ	22	network topology
+distributed last-level cache	分散最終レベルキャッシュ	ぶんさんさいしゅうれべるきゃっしゅ	22	
+on-chip directory	オンチップディレクトリ	おんちっぷでぃれくとり	22	coherence directory

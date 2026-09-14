@@ -1,0 +1,825 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Branches}
+\lessoninfo{
+  video={Lesson 4, videos 1--48},
+  textbook={H\&P \cite{hennessy2017} §3.3, §3.9, §C.2},
+  keywords={branch prediction, misprediction penalty, predict not taken, branch target buffer, branch history table, two-bit predictor, history-based predictor, PShare, GShare, tournament predictor, hierarchical predictor, return address stack, predecoding},
+}
+
+Lesson 3 showed that control dependences are hazards in every pipeline: the
+processor has to fetch the instructions that follow a branch long before it
+knows where the branch goes, and every wrong choice flushes work.  This lesson
+studies how the fetch stage makes that choice.  Starting from the simplest
+policy---always continue with the next instruction---it develops the
+structures used in real processors: branch target buffers, saturating
+counters, predictors that learn patterns from branch history, combinations of
+several predictors, and a dedicated predictor for function returns.  Along the
+way it shows why prediction accuracy matters more the deeper the pipeline.
+
+\section{Branches in a pipeline}
+\label{sec:l04-branch-pipeline}
+
+Consider a conditional branch \texttt{BEQ R1,R2,L} in the five-stage pipeline
+of Lesson 3.\source{Lesson 4, videos 1--3; H\&P §C.2.}  If R1 equals R2,
+execution continues at label~L; the branch is then a \term{taken
+branch}[成立分岐], and the address of~L is its \term{branch target
+address}[分岐先アドレス].
+
+Otherwise execution continues with the next instruction in memory, at PC+4,
+and the branch is a \term{not-taken branch}[不成立分岐].  The pipeline learns
+which case applies only when the branch has passed through three stages: IF
+fetches it, ID reads R1 and R2, and EX compares them and computes the target.
+The branch is \emph{resolved} at the end of EX (\cref{fig:l04-branch-pipeline}).
+
+The fetch stage cannot wait for that.  In cycle~2, while the branch is in ID,
+and again in cycle~3, it must load \emph{some} instruction.  When the branch
+resolves, two instructions are already in the pipeline behind it.  If they
+are the instructions that really follow the branch, nothing is lost; if not,
+they are flushed and two cycles are wasted.  Fetching nothing during these
+cycles would waste the same two cycles unconditionally, so it always pays to
+fetch the instruction that is most likely to be the right one.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l04-branch-pipeline}
+  \caption{A branch in the five-stage pipeline.  The two instructions fetched
+    before the branch resolves are predictions; they are flushed if the
+    prediction was wrong.}
+  \label{fig:l04-branch-pipeline}
+\end{figure}
+
+\begin{definition}[Branch prediction]
+  \label{def:l04-branch-prediction}
+  The choice, made in the fetch stage, of the address from which the next
+  instruction is fetched, before the current instruction has been decoded
+  or executed, is called \term{branch prediction}[分岐予測].
+\end{definition}
+
+\begin{definition}[Misprediction]
+  A \term{branch misprediction}[分岐予測ミス] occurs when the branch, once
+  resolved, turns out to go elsewhere than predicted.  The instructions
+  fetched from the wrong address are flushed and fetching restarts at the
+  correct address.
+\end{definition}
+
+\subsection{What the predictor knows}
+
+At the time of the fetch the only available information is the PC of the
+instruction being fetched; the instruction itself has not even been decoded
+yet.  From this address alone the predictor has to answer three questions:
+\begin{enumerate}
+  \item Is the instruction a branch at all?
+  \item If it is, is it taken?
+  \item If it is taken, what is its target address?
+\end{enumerate}
+The answer is a single number, the next PC: PC+4 for a non-branch or a
+not-taken branch, the target address for a taken
+branch.\margin{Unconditional jumps, calls and returns are branches that are
+always taken; for them only questions 1 and~3 matter.}
+
+\section{Prediction accuracy and performance}
+\label{sec:l04-accuracy}
+
+With a predictor in place, the only cycles lost to control hazards are those
+spent on mispredicted paths.\source{Lesson 4, videos 4--5; H\&P §C.2.}
+Specializing \cref{eq:pipeline-cpi} to branches gives
+\begin{equation}
+  \text{CPI} \;=\; 1 \;+\;
+  \frac{\text{mispredictions}}{\text{instruction}} \times
+  \frac{\text{penalty}}{\text{misprediction}} .
+  \label{eq:l04-cpi}
+\end{equation}
+
+\begin{definition}[Accuracy and penalty]
+  The \term{branch prediction accuracy}[分岐予測精度] is the fraction of
+  branches whose outcome is predicted correctly, so that
+  \begin{equation*}
+    \frac{\text{mispredictions}}{\text{instruction}} =
+    \frac{\text{branches}}{\text{instruction}} \times
+    (1 - \text{accuracy}) ,
+  \end{equation*}
+  assuming that non-branch instructions are always predicted correctly, with
+  PC+4 as the next PC.  The \term{misprediction penalty}[予測ミスペナルティ] is
+  the number of cycles lost per misprediction; in a pipeline that holds one
+  instruction per stage it equals the number of instructions flushed.  A
+  branch resolved in stage $r$ has a penalty of $r-1$ cycles.
+\end{definition}
+
+The two factors of \cref{eq:l04-cpi} have different origins.  The first is
+set by the predictor (and by how many branches the program executes); the
+second is set by the pipeline, namely by how late branches are resolved.  A
+better predictor shrinks the first factor, while a deeper pipeline enlarges
+the second, so the same predictor costs more in a deeper pipeline.  A perfect
+predictor would reach the ideal CPI of~1 regardless of the depth.
+
+\begin{example}
+  \label{ex:l04-cpi}
+  In a program \SI{15}{\percent} of the instructions are branches and the
+  predictor is \SI{92}{\percent} accurate.  Mispredictions per instruction
+  are $0.15 \times 0.08 = 0.012$.  If branches are resolved in EX (stage~3,
+  penalty~2), $\text{CPI} = 1 + 0.012 \times 2 = 1.024$.  In a pipeline that
+  resolves branches in stage~11 (penalty~10), the same predictor gives
+  $\text{CPI} = 1 + 0.012 \times 10 = 1.12$.
+\end{example}
+
+\section{Predict not taken}
+\label{sec:l04-not-taken}
+
+The alternative to predicting is to refuse to predict: the fetch stage simply
+waits until it knows the next PC.\source{Lesson 4, videos 6--8; H\&P §C.2.}
+Since even whether an instruction is a branch is known only after ID, the
+wait affects every instruction.  A non-branch is followed by a fetch two
+cycles after its own fetch, and a branch, taken or not, by a fetch three
+cycles later.
+
+\begin{table}[b]
+  \centering\small
+  \caption{Cycles from the fetch of an instruction until the correct next
+    instruction is fetched, in the five-stage pipeline.}
+  \label{tab:l04-not-taken}
+  \begin{tabular}{@{}lcc@{}}
+    \toprule
+    Instruction        & Refuse to predict & Predict not taken \\
+    \midrule
+    Taken branch       & 3 & 3 \\
+    Not-taken branch   & 3 & 1 \\
+    Not a branch       & 2 & 1 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The simplest real predictor is to \term{predict not taken}[不成立予測]:
+always fetch from PC+4.  This needs no memory and no hardware beyond what the
+fetch stage already has, since it increments the PC anyway.  It is right for
+every non-branch and every not-taken branch, and wrong only for taken
+branches, which cost three cycles as before.  \Cref{tab:l04-not-taken}
+compares the two policies; predict not taken is never worse.
+
+Its accuracy, however, is poor.  Most branches are taken---loop branches
+jump back most of the time, and unconditional jumps, calls and returns are
+always taken---so predict not taken mispredicts the majority of branches.
+With the typical statistics used in Lesson 3 it mispredicts on
+\SI{12}{\percent} of all instructions, giving the CPI of \cref{eq:branch-cpi}.
+
+\begin{note}[Several predictions in flight]
+  In a deep pipeline several branches can be between IF and the resolution
+  stage at the same time, each carrying the prediction made when it was
+  fetched.  When a branch resolves as mispredicted, everything fetched after
+  it is flushed, including later branches together with their predictions.
+  A branch fetched on a wrong path therefore never causes a flush of its own:
+  only mispredictions of branches on the correct path cost cycles.
+\end{note}
+
+\section{The need for better prediction}
+\label{sec:l04-better}
+
+How much a better predictor is worth depends on the
+pipeline.\source{Lesson 4, videos 9--11; H\&P §3.3.}  A processor that
+handles $w$ instructions per stage flushes $w$ times as many instructions per
+misprediction as a one-instruction-wide pipeline of the same depth, so the
+execution time relative to perfect prediction is
+\begin{equation}
+  \frac{T}{T_{\text{perfect}}} \;=\; 1 +
+  \frac{\text{mispredictions}}{\text{instruction}} \times
+  (\text{instructions flushed per misprediction}) ,
+  \label{eq:l04-relative}
+\end{equation}
+which for $w=1$ is exactly the CPI of \cref{eq:l04-cpi}.
+
+\begin{example}
+  \label{ex:l04-better}
+  Let \SI{15}{\percent} of the instructions be branches, \SI{70}{\percent} of
+  them taken, so that predict not taken is \SI{30}{\percent} accurate.
+  \Cref{tab:l04-better} evaluates \cref{eq:l04-relative} for three
+  predictors and three pipelines: a five-stage pipeline (2 instructions
+  flushed), a pipeline resolving branches in stage~13 (12 flushed), and the
+  same depth with 3 instructions per stage (36 flushed).
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Execution time relative to perfect prediction for the branch
+    statistics of \cref{ex:l04-better}.}
+  \label{tab:l04-better}
+  \begin{tabular}{@{}lcccc@{}}
+    \toprule
+    Predictor & Mispred./instr. & Stage 3 & Stage 13 & Stage 13, 3 wide \\
+    \midrule
+    Not taken (\SI{30}{\percent}) & 0.105  & 1.21  & 2.26  & 4.78 \\
+    \SI{90}{\percent} accurate    & 0.015  & 1.03  & 1.18  & 1.54 \\
+    \SI{99}{\percent} accurate    & 0.0015 & 1.003 & 1.018 & 1.054 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Three observations follow.  In the shallow pipeline even predict not taken
+costs only \SI{21}{\percent}, and improving from \SI{90}{\percent} to
+\SI{99}{\percent} accuracy gains less than \SI{3}{\percent}.  In the deep
+pipeline predict not taken more than doubles the execution time, and the
+same improvement is worth a speedup of $1.18/1.018 \approx 1.16$.  In the deep
+and wide pipeline it is worth $1.54/1.054 \approx 1.46$.  Modern processors
+are both deep and wide, which is why they invest heavily in branch prediction.
+
+\begin{keypoint}
+  What matters is the \emph{misprediction} rate, not the accuracy.  Going
+  from \SI{90}{\percent} to \SI{99}{\percent} accuracy looks like a small
+  step but removes \SI{90}{\percent} of the mispredictions, and the deeper and
+  wider the pipeline, the more each remaining misprediction costs.
+\end{keypoint}
+
+\section{The branch target buffer}
+\label{sec:l04-btb}
+
+Predict not taken uses no information about the instruction being fetched.
+Better predictors use its \emph{history}: what the instruction at this PC did
+the previous times it was executed.\source{Lesson 4, videos 12--15; H\&P
+§3.9; \cite{lee1984}.}  The next PC is predicted as a function of the PC and
+of this history.  Because the instruction stored at an address does not
+change, whether it is a branch and where a direct branch jumps to are the
+same every time; and most branches go in the same direction most of the time.
+
+\begin{definition}[Branch target buffer]
+  A \term{branch target buffer}[分岐先バッファ]
+  \index{BTB|see{branch target buffer}}(BTB) is a table, indexed by the PC
+  of the instruction being fetched, that stores the predicted next PC for
+  that instruction.
+\end{definition}
+
+In IF the BTB is read with the current PC, and its output is used as the
+next PC.  When the branch resolves, the actual next PC is compared with the
+prediction.  On a mismatch the wrongly fetched instructions are flushed and
+the actual target is written into the BTB entry, so that the next execution
+of the same instruction is predicted with the new target.
+
+\subsection{A realistic BTB}
+
+A BTB cannot have one entry for every possible instruction address.  It must
+be read within the fetch cycle, in addition to the fetch itself, which
+limits it to a small table---hundreds to a few thousand entries.  The PC is
+therefore mapped to an entry by a simple hash: a few of its low-order bits.
+Instructions executed close together in time, such as those of a loop, lie
+close together in memory; they share their high-order bits but differ in the
+low-order bits, which spreads them over different entries.  Two instructions
+collide only if they are far apart in the code, and such instructions are
+less likely to be active at the same time.
+
+With fixed-length 4-byte instructions aligned to word boundaries, the two
+lowest bits of every PC are zero and carry no information, so a BTB with
+$2^k$ entries is indexed by bits $k+1$ to~2 (\cref{fig:l04-btb}).  With
+variable-length instructions (x86) the index starts at bit~0.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l04-btb}
+  \caption{A 256-entry BTB indexed by PC bits 9--2.  The entry is read in IF
+    and written with the actual target when a branch resolves.}
+  \label{fig:l04-btb}
+\end{figure}
+
+\begin{example}
+  \label{ex:l04-btb-index}
+  In a 256-entry BTB, the instruction at \texttt{0x004012A8} uses bits 9--2 of
+  its PC: $(\texttt{0x12A8} \gg 2) \mathbin{\&} \texttt{0xFF} =
+  \texttt{0x4AA} \mathbin{\&} \texttt{0xFF} = \texttt{0xAA}$, i.e.\
+  entry~170.  The next instruction, at \texttt{0x004012AC}, uses entry~171;
+  the instruction at \texttt{0x004016A8}, 256 instructions further on, shares
+  entry~170.
+\end{example}
+
+\section{Direction prediction}
+\label{sec:l04-direction}
+
+A BTB alone answers the direction question implicitly: an entry that holds
+PC+4 means \enquote{not taken}.\source{Lesson 4, videos 16--21; H\&P §C.2.}
+This spends a full target address on every non-branch and every not-taken
+branch.  It is cheaper to split the prediction: a
+\term{direction predictor}[方向予測器] decides whether the instruction is a
+taken branch, and the BTB is consulted only when it says so.
+
+\begin{definition}[Branch history table]
+  A \term{branch history table}[分岐履歴テーブル]
+  \index{BHT|see{branch history table}}(BHT) is a direction predictor in the
+  form of a table indexed by low-order PC bits.  In its simplest form each entry is a single
+  bit holding the outcome of the last execution of the branch: 0 selects
+  PC+4 as the next PC, 1 selects the target from the BTB.  This is the
+  \term{one-bit predictor}[1 ビット予測器]\index{1BP|see{one-bit predictor}}
+  (1BP).
+\end{definition}
+
+When a branch resolves, its BHT entry is set to the actual outcome, and, if
+the branch was taken, the target is written into the BTB
+(\cref{fig:l04-bht-btb}).  This organization has three advantages.  The BHT
+entry of a non-branch instruction is never written, stays~0, and correctly
+predicts PC+4.  The BTB needs entries only for taken branches, which are far
+fewer than all instructions.  And since a BHT entry is a single bit, the BHT
+can have many more entries than the BTB at the same cost, so that different
+branches rarely share an entry.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l04-bht-btb}
+  \caption{Next-PC prediction with a BHT and a BTB.  The BHT bit selects
+    between PC+4 and the BTB target; both tables are updated when the
+    branch resolves.}
+  \label{fig:l04-bht-btb}
+\end{figure}
+
+\begin{example}
+  \label{ex:l04-1bp-trace}
+  An inner loop processes three array elements each time it is entered:
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+0x0400  Inner: LW   R2, 0(R3)     ; load element
+0x0404         ADD  R5, R5, R2    ; add to sum
+0x0408         ADDI R3, R3, 4     ; next element
+0x040C         ADDI R1, R1, -1    ; decrement count
+0x0410         BNE  R1, R0, Inner ; T, T, N per run
+\end{lstlisting}
+  With a 64-entry BHT (index bits 7--2) the five instructions use BHT
+  entries 0 to~4; the \texttt{BNE} uses entry~4.  With an 8-entry BTB (bits
+  4--2) the \texttt{BNE} uses BTB entry~4, which it shares with the
+  instruction at \texttt{0x03F0}, eight instructions earlier.  If that
+  instruction is not a branch, its BHT entry (entry~60) stays~0, so the BTB
+  entry is used only by the branch.  \Cref{tab:l04-1bp-trace} follows the
+  \texttt{BNE} over two runs of the loop, starting with all tables cleared.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{One-bit prediction of the \texttt{BNE} of
+    \cref{ex:l04-1bp-trace} (BHT entry~4) over two runs of the loop.}
+  \label{tab:l04-1bp-trace}
+  \begin{tabular}{@{}lcccccc@{}}
+    \toprule
+    Execution         & 1 & 2 & 3 & 4 & 5 & 6 \\
+    \midrule
+    BHT[4] before     & 0 & 1 & 1 & 0 & 1 & 1 \\
+    Predicted next PC & \texttt{0x414} & \texttt{0x400} & \texttt{0x400} & \texttt{0x414} & \texttt{0x400} & \texttt{0x400} \\
+    Outcome           & T & T & N & T & T & N \\
+    Correct?          & no & yes & no & no & yes & no \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The first execution also writes \texttt{0x400} into BTB entry~4; from then
+on the target is always right, but the direction is wrong in four of the six
+executions.
+
+\section{The two-bit predictor}
+\label{sec:l04-2bp}
+
+The one-bit predictor works well for branches that always go the same way,
+but it has two weaknesses.\source{Lesson 4, videos 22--26; H\&P §C.2;
+\cite{smith1981}.}
+\begin{itemize}
+  \item A branch that almost always goes one way suffers \emph{two}
+    mispredictions per exception: one on the exception itself, and one on
+    the next normal outcome, because the exception has flipped the bit.
+  \item A branch whose direction changes often is predicted badly.  An
+    alternating branch (T,~N,~T,~N,~\ldots) is mispredicted every time, and
+    the short loop of \cref{tab:l04-1bp-trace} two times out of three.
+\end{itemize}
+
+\begin{definition}[Two-bit predictor]
+  A \term{two-bit predictor}[2 ビット予測器]
+  \index{2BP|see{two-bit predictor}}\index{2BC|see{two-bit predictor}}(2BP,
+  also called a two-bit counter, 2BC) stores in each BHT
+  entry a two-bit counter that is incremented when the branch is taken and
+  decremented when it is not taken.
+\end{definition}
+
+The counter is a \term{saturating counter}[飽和カウンタ]: it stays at 11 when
+incremented and at 00 when decremented.  Its more significant bit is the
+\emph{prediction bit}, taken if~1.  The less significant bit is the
+\emph{hysteresis bit}.  Together with the prediction bit it records how
+strongly the counter believes its prediction: the counter is in a strong
+state when the two bits are equal and in a weak state when they differ, so
+the four states are strong not taken (00), weak not taken (01), weak taken
+(10) and strong taken (11) (\cref{fig:l04-2bc}).  From a
+strong state, two consecutive outcomes against the prediction are needed to
+change it, so a single exception costs a single misprediction.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l04-2bc}
+  \caption{State diagram of the two-bit saturating counter.  T (taken)
+    moves right, N (not taken) moves left; the upper bit is the prediction.}
+  \label{fig:l04-2bc}
+\end{figure}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{The loop branch of \cref{ex:l04-1bp-trace} over three runs of the
+    loop with a two-bit counter starting at 00.  Mispredictions are marked
+    $\times$.}
+  \label{tab:l04-2bc-trace}
+  \setlength{\tabcolsep}{4.5pt}
+  \begin{tabular}{@{}lccccccccc@{}}
+    \toprule
+    Execution       & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 \\
+    \midrule
+    Outcome         & T & T & N & T & T & N & T & T & N \\
+    Counter before  & 00 & 01 & 10 & 01 & 10 & 11 & 10 & 11 & 11 \\
+    Prediction      & N & N & T & N & T & T & T & T & T \\
+    2BP             & $\times$ & $\times$ & $\times$ & $\times$ & & $\times$ & & & $\times$ \\
+    1BP (for comparison) & $\times$ & & $\times$ & $\times$ & & $\times$ & $\times$ & & $\times$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\Cref{tab:l04-2bc-trace} shows the effect on the short loop.  Once the
+counter has reached strong taken (11, before execution~6), a single loop
+exit only moves it down to weak taken (10) and the next taken outcome
+restores it, so only the exit is mispredicted: one misprediction per run of
+the loop instead of two.
+
+\subsection{Initialization and more bits}
+
+A counter initialized to a strong state costs two mispredictions if the
+branch actually goes the other way; one initialized to a weak state costs
+only one.  The weak states, however, are also where the counter is most
+vulnerable: an alternating branch T,~N,~T,~N,~\ldots{} that starts in 01
+moves between 01 and 10 and is mispredicted every time, whereas starting in
+00 it is mispredicted only on every other execution.  Neither choice is
+best for every branch: each initial state has outcome sequences for which it
+does worse.  Counters are therefore simply reset to the simplest state,
+00.\margin{No
+predictor is immune: for any predictor there is an outcome sequence that
+always goes against its current prediction.}
+
+Counters with three or more bits add hysteresis: more consecutive exceptions
+are needed to change the prediction.  This helps only for branches whose
+exceptions come in runs, it makes the counter slower to follow a branch that
+really changes its behaviour, and it costs more bits.  The step from one to
+two bits is a large improvement; further bits gain little, which is why the
+two-bit counter is the standard building block.
+
+\section{History-based predictors}
+\label{sec:l04-history}
+
+Some branches follow a regular pattern that counters cannot capture, because
+counters only track which direction is more frequent.\source{Lesson 4, videos
+27--33; H\&P §3.3; \cite{yeh1991}.}  A branch that tests whether a loop index
+is even alternates T,~N,~T,~N; the loop branch of \cref{ex:l04-1bp-trace}
+repeats T,~T,~N.  Both are perfectly predictable once the most recent
+outcomes are known.
+
+\begin{definition}[History-based predictor]
+  A \term{history-based predictor}[履歴ベース予測器] records the most recent
+  outcomes of a branch (its history) and uses them to select one of several
+  counters, each of which learns what the branch does after one particular
+  history.
+\end{definition}
+
+\subsection{One-bit history}
+
+The simplest version stores in each BHT entry one history bit, the last
+outcome of the branch, and two two-bit counters: one used when the last
+outcome was N, one when it was T.  To predict, the history bit selects a
+counter and the counter's upper bit is the prediction.  To update, the
+selected counter is incremented or decremented with the actual outcome, and
+the outcome becomes the new history bit.  An entry needs $1 + 2\times 2 = 5$
+bits.
+
+For the alternating branch, the counter selected after N sees only T and the
+counter selected after T sees only N.  After each has been trained, the
+branch is predicted correctly every time.  For the pattern T,~T,~N this is not
+enough: after a T the branch is sometimes taken and sometimes not, so the
+counter selected after T keeps mispredicting.
+
+\subsection{Two-bit and \texorpdfstring{$N$}{N}-bit history}
+
+With two history bits and four counters (10 bits per entry,
+\cref{fig:l04-history}), each of the four possible histories NN, NT, TN and
+TT has its own counter.  For T,~T,~N the history TT is always followed by N,
+while TN and NT are always followed by T.  \Cref{tab:l04-history-trace}
+traces the loop branch: after the counters have been trained, every
+execution is predicted correctly.  The counter for NN is never used again.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l04-history}
+  \caption{An entry of a two-bit history predictor.  The history bits select
+    one of four two-bit counters; after the branch resolves, the selected
+    counter is updated and the outcome is shifted into the history.}
+  \label{fig:l04-history}
+\end{figure}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Two-bit history predictor on the loop branch of
+    \cref{ex:l04-1bp-trace}, starting with history NN and all counters at
+    00.  The history is written oldest outcome first; mispredictions are
+    marked $\times$.}
+  \label{tab:l04-history-trace}
+  \setlength{\tabcolsep}{3.6pt}
+  \begin{tabular}{@{}lcccccccccccc@{}}
+    \toprule
+    Execution      & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & 11 & 12 \\
+    \midrule
+    History        & NN & NT & TT & TN & NT & TT & TN & NT & TT & TN & NT & TT \\
+    Counter used   & 00 & 00 & 00 & 00 & 01 & 00 & 01 & 10 & 00 & 10 & 11 & 00 \\
+    Prediction     & N & N & N & N & N & N & N & T & N & T & T & N \\
+    Outcome        & T & T & N & T & T & N & T & T & N & T & T & N \\
+    Mispredicted   & $\times$ & $\times$ & & $\times$ & $\times$ & & $\times$ & & & & & \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{definition}[$N$-bit history predictor]
+  An \term[N-bit history predictor]{$N$-bit history predictor}[N ビット履歴予測器]
+  keeps the last $N$ outcomes of each branch and $2^N$ two-bit counters per
+  entry, one for each possible history.  An entry costs
+  \begin{equation}
+    N + 2 \cdot 2^N \ \text{bits}.
+    \label{eq:l04-history-cost}
+  \end{equation}
+\end{definition}
+
+After training, an $N$-bit history predictor predicts every repeating
+pattern whose period is at most $N+1$, because within such a pattern the
+last $N$ outcomes determine the next one.  The price grows exponentially
+with~$N$, and most of it is wasted: a branch with period $p$ uses at most $p$
+of its $2^N$ counters.  Longer histories also take longer to train, since
+every counter that is used has to be trained separately.
+
+\begin{example}
+  \label{ex:l04-history-cost}
+  A loop that always runs 10 iterations has a branch with the pattern
+  T\,T\,T\,T\,T\,T\,T\,T\,T\,N, of period~10.  Predicting it perfectly requires
+  $N = 9$, i.e.\ $9 + 2\cdot 512 = 1033$ bits per BHT entry, of which the
+  branch uses 10 of the 512 counters.  A BHT of 1024 such entries takes more
+  than a megabit.
+\end{example}
+
+\begin{keypoint}
+  History lets a predictor learn patterns, not only biases.  Giving every
+  branch its own set of $2^N$ counters, however, makes long histories
+  prohibitively expensive, and nearly all of those counters are never used.
+\end{keypoint}
+
+\section{Shared counters: PShare and GShare}
+\label{sec:l04-share}
+
+The waste disappears if the counters are not private to a
+branch.\source{Lesson 4, videos 34--39; H\&P §3.3; \cite{mcfarling1993}.}
+The BHT keeps only an $N$-bit history per entry, and all branches share one
+large table of two-bit counters.
+
+\begin{definition}[Pattern history table]
+  A \term{pattern history table}[パターン履歴テーブル]
+  \index{PHT|see{pattern history table}}(PHT) is a table of two-bit counters shared by all
+  branches and indexed by a combination of the branch's history and its PC,
+  typically their bitwise XOR.
+\end{definition}
+
+A branch now occupies only as many counters as it has distinct histories.
+An always-taken branch has the history T\,T\,\ldots\,T and uses a single
+counter, an alternating branch uses two, and the 10-iteration loop branch of
+\cref{ex:l04-history-cost} uses ten.  Mixing in the PC bits sends different
+branches with the same history to different counters.  Collisions remain
+possible, but with a large PHT they are rare.
+
+\begin{example}
+  A BHT of 1024 entries holding 12-bit histories takes \num{12288} bits, and
+  a PHT of $2^{12} = 4096$ counters takes \num{8192} bits: \num{20480} bits
+  in total.  A 1024-entry predictor with 12-bit history and private counters
+  would need $1024 \times (12 + 2\cdot 4096) = \num{8400896}$ bits, about
+  410 times as much.
+\end{example}
+
+\subsection{Private and global history}
+
+The history that indexes the PHT can be chosen in two ways
+(\cref{fig:l04-pshare-gshare}).
+
+\begin{definition}[PShare]
+  The \term{private branch history}[ローカル分岐履歴] of a branch is the
+  sequence of its own most recent outcomes, kept in its BHT entry.  A
+  \term{PShare predictor}[PShare 予測器] indexes the shared PHT with the
+  private history XORed with the PC.
+\end{definition}
+
+\begin{definition}[GShare]
+  The \term{global branch history}[グローバル分岐履歴] is the sequence of the
+  most recent outcomes of all branches, kept in a single shift register into
+  which every resolved branch shifts its outcome.  A \term{GShare
+  predictor}[GShare 予測器] indexes the shared PHT with the global history
+  XORed with the PC.
+\end{definition}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l04-pshare-gshare}
+  \caption{Predictors with shared counters.  (a) PShare combines the
+    branch's own history with the PC; (b) GShare combines the global history
+    of all branches with the PC.}
+  \label{fig:l04-pshare-gshare}
+\end{figure}
+
+PShare is suited to branches with patterns of their own: alternating
+branches and short loops.  GShare is suited to \emph{correlated} branches,
+whose outcome depends on the outcomes of other branches executed just before.
+
+\needspace{9\baselineskip}
+\begin{example}
+  In the fragment below the second branch is taken exactly when the first is
+  not.
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+        BNE  R1, R0, Skip1   ; skip unless R1 == 0
+        ADDI R2, R2, 1       ; count zeros
+Skip1:  BEQ  R1, R0, Skip2   ; skip if R1 == 0
+        ADD  R3, R3, R1      ; sum nonzero values
+Skip2:  ...
+\end{lstlisting}
+  If the value in R1 depends on the data, the private history of either
+  branch looks random, and PShare predicts it poorly.  The global history
+  seen by the second branch contains the outcome of the first, so once the
+  PHT counters for these histories have been trained, GShare predicts the
+  second branch perfectly, barring aliasing in the PHT.
+\end{example}
+
+Neither is better for all branches.  GShare can in principle learn a branch's
+own pattern as well, but the outcomes of the other branches executed in
+between are interleaved in the global history, so the same pattern needs a
+considerably longer history---and a larger PHT---than in PShare.  Since
+programs contain both kinds of branches, the natural next step is to use both
+predictors.
+
+\section{Tournament and hierarchical predictors}
+\label{sec:l04-hybrid}
+
+Since different branches are best served by different predictors, a
+processor can combine several predictors and use, for each branch, the one
+that suits it.\source{Lesson 4, videos 40--43; H\&P §3.3;
+\cite{mcfarling1993}.}  The combination can be symmetric or layered.
+
+\subsection{Tournament predictors}
+
+A \term{tournament predictor}[トーナメント予測器] runs two predictors, for
+example GShare and PShare, side by side and decides separately for each
+branch which of them to trust.
+
+\begin{definition}[Meta-predictor]
+  The \term{meta-predictor}[メタ予測器] of a tournament predictor is a
+  table of two-bit counters, indexed by the PC, whose counter for a branch
+  predicts which of the two component predictors will be right
+  (\cref{fig:l04-tournament}).
+\end{definition}
+
+Both component predictors are trained on every branch as usual.  The
+meta-predictor counter changes only when the components disagree in
+correctness: it moves towards the component that was right.  When both are
+right or both are wrong, it stays unchanged.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l04-tournament}
+  \caption{A tournament predictor.  The meta-predictor selects, per branch,
+    the component predictor whose prediction is used.}
+  \label{fig:l04-tournament}
+\end{figure}
+
+\subsection{Hierarchical predictors}
+
+A tournament predictor combines two good---and therefore expensive---predictors
+and updates both on every branch.  Most branches, however, are easy to
+predict.
+
+\begin{definition}[Hierarchical predictor]
+  A \term{hierarchical predictor}[階層型予測器] combines a cheap predictor,
+  which handles all branches, with one or more better and more expensive
+  predictors that are used and trained only for the branches the cheap
+  predictor handles poorly.
+\end{definition}
+
+Because the expensive predictor has far fewer branches to learn, it can be
+much smaller than in a tournament predictor for the same accuracy, or more
+accurate for the same size.
+
+A typical arrangement has three levels (\cref{fig:l04-hierarchical}).  A large
+table of two-bit counters indexed by the PC predicts every branch.  Above it,
+a small local-history predictor and a small global-history predictor hold
+entries only for selected branches.  Their entries are \emph{tagged} with
+bits of the PC, so that a lookup can tell whether the branch has an entry.
+The prediction comes from the highest level with a matching entry.  The
+counter table is always updated, and a local or global entry that matches
+the branch is updated as well; a branch that the counter table mispredicts
+is given an entry in the local predictor, and a branch that the local
+predictor mispredicts is given one in the global predictor.  Branches that
+the counters predict well take entries in the expensive levels only rarely,
+so those small tables are left for the branches that need them.\margin{Commercial processors have used predictors of this layered
+kind, for example Intel's Pentium~M.}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l04-hierarchical}
+  \caption{A hierarchical predictor.  Tagged upper levels override the
+    two-bit counter table for the branches they hold.}
+  \label{fig:l04-hierarchical}
+\end{figure}
+
+\Cref{tab:l04-which} summarizes which kind of predictor handles which kind of
+branch.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Branch behaviour and the simplest predictor that handles it well.}
+  \label{tab:l04-which}
+  \begin{tabular}{@{}p{0.52\linewidth}p{0.4\linewidth}@{}}
+    \toprule
+    Branch behaviour & Predictor \\
+    \midrule
+    Almost always the same direction & Two-bit counter \\
+    Own repeating pattern (alternation, short loop) & Private history (PShare) \\
+    Correlated with preceding branches & Global history (GShare) \\
+    Mixture of the above in one program & Tournament or hierarchical \\
+    Function return & Return address stack (next section) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{The return address stack}
+\label{sec:l04-ras}
+
+A function return (\texttt{RET}) is an unconditional branch, so its direction
+is trivially predicted as taken.\source{Lesson 4, videos 44--47; H\&P §3.9;
+\cite{kaeli1991}.}  Its target, however, depends on where the function was
+called from.  The BTB remembers only the most recent target, so when a
+function is called from different places in turn, every return is
+mispredicted.
+
+\begin{example}
+  A function is called from two places:
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+0x1000         CALL Func    ; return address 0x1004
+  ...
+0x1040         CALL Func    ; return address 0x1044
+  ...
+0x2000  Func:  ...
+0x2030         RET          ; to 0x1004, then to 0x1044
+\end{lstlisting}
+  When the first return resolves, the BTB entry of the \texttt{RET}
+  receives \texttt{0x1004}; that return is itself mispredicted, since the
+  entry was still empty.  The second return, which goes to \texttt{0x1044},
+  is mispredicted and overwrites the entry.  If calls from the two places
+  alternate, every return is mispredicted.
+\end{example}
+
+\begin{definition}[Return address stack]
+  A \term{return address stack}[リターンアドレススタック]
+  \index{RAS|see{return address stack}}(RAS) is a small hardware stack in the fetch stage.  When a
+  call is fetched, its return address (PC+4) is pushed; when a return is
+  fetched, the top entry is popped and used as the predicted target.
+\end{definition}
+
+Since calls and returns nest, the RAS predicts returns almost perfectly
+(\cref{fig:l04-ras}).  Being small, it can fill up when calls nest deeply.
+When a call finds the RAS full, the push wraps around and overwrites the
+oldest entry.  Returns occur in reverse order of the calls, so the entries
+needed soonest are the most recent ones, and most calls and returns happen
+deep in the call tree.  Overwriting the oldest entry loses only the
+predictions for returns from the outermost functions, which are rare, whereas
+discarding the new return address would lose the predictions for the
+frequent calls at the deepest level.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l04-ras}
+  \caption{A four-entry return address stack.  Calls push, returns pop; when
+    the stack is full, a push wraps around and overwrites the oldest entry.}
+  \label{fig:l04-ras}
+\end{figure}
+
+\subsection{Recognizing a return}
+
+The RAS has to be used while the \texttt{RET} is being fetched, before it has
+been decoded.  There are two ways to know that the instruction is a return.
+\begin{itemize}
+  \item \textbf{Predict it.}  The predictor tables store, per PC, whether the
+    instruction is a return; the entry is set the first time the instruction
+    is decoded.  Since the instruction at a given address does not change,
+    this prediction is almost always right.
+  \item \textbf{Predecode it.}  With \term{predecoding}[プリデコード], the
+    processor partially decodes each instruction when it is brought from
+    main memory into the processor's cache, and stores a few extra bits with
+    the cached instruction, for example whether it is a branch or a return.  The fetch
+    stage reads these bits together with the instruction and knows its kind
+    immediately.
+\end{itemize}
+
+\begin{keypoint}[Lesson summary]
+  Every fetch is a prediction.  A misprediction wastes the work of every
+  instruction it flushes (\cref{eq:l04-relative}), and the number of flushed
+  instructions grows with pipeline depth and width.  Predict not taken is
+  free but inaccurate.  A BTB predicts
+  targets and a BHT predicts directions, best with two-bit saturating
+  counters.  History-based predictors learn patterns; sharing their counters
+  in a PHT makes long histories affordable, with private history (PShare)
+  for self-repeating branches and global history (GShare) for correlated
+  ones.  Tournament and hierarchical predictors combine several predictors,
+  and a return address stack predicts function returns.
+\end{keypoint}
+
+\end{document}

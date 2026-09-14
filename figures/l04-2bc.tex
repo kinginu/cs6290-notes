@@ -1,0 +1,25 @@
+% Two-bit saturating counter: T increments, N decrements.
+\begin{tikzpicture}[font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  s/.style={circle, draw, minimum size=0.95cm, inner sep=1pt},
+  nt/.style={s, fill=ln-box}, tk/.style={s, fill=ln-accent!15}]
+  \node[nt] (s0) at (0,0)   {00};
+  \node[nt] (s1) at (2.5,0) {01};
+  \node[tk] (s2) at (5.0,0) {10};
+  \node[tk] (s3) at (7.5,0) {11};
+  \draw[->] (s0) to[bend left=30] node[above] {T} (s1);
+  \draw[->] (s1) to[bend left=30] node[above] {T} (s2);
+  \draw[->] (s2) to[bend left=30] node[above] {T} (s3);
+  \draw[->] (s3) to[bend left=30] node[below] {N} (s2);
+  \draw[->] (s2) to[bend left=30] node[below] {N} (s1);
+  \draw[->] (s1) to[bend left=30] node[below] {N} (s0);
+  \draw[->] (s0) to[out=150,in=210,looseness=6] node[left] {N} (s0);
+  \draw[->] (s3) to[out=30,in=-30,looseness=6] node[right] {T} (s3);
+  \foreach \n/\lab in {s0/{\iflangja{強い不成立}{strong N}},s1/{\iflangja{弱い不成立}{weak N}},
+                       s2/{\iflangja{弱い成立}{weak T}},s3/{\iflangja{強い成立}{strong T}}} {
+    \node[font=\scriptsize, text=ln-muted, below=5mm of \n] {\lab};
+  }
+  \draw[ln-rule] (-0.6,-1.35) -- (3.1,-1.35);
+  \draw[ln-rule] (4.4,-1.35) -- (8.1,-1.35);
+  \node[font=\scriptsize, below] at (1.25,-1.35) {\iflangja{予測: 不成立}{predict not taken}};
+  \node[font=\scriptsize, below] at (6.25,-1.35) {\iflangja{予測: 成立}{predict taken}};
+\end{tikzpicture}

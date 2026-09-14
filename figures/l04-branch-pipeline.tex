@@ -1,0 +1,18 @@
+% A branch in the five-stage pipeline: the two instructions fetched while the
+% branch is in ID and EX are predictions, checked when the branch resolves.
+\begin{tikzpicture}[x=0.95cm,y=0.55cm, font=\footnotesize\sffamily,
+  st/.style={draw, minimum width=0.9cm, minimum height=0.5cm, inner sep=0pt, fill=ln-box},
+  pr/.style={st, fill=ln-accent!15}]
+  \foreach \c in {1,...,6} { \node at (\c,0.8) {\c}; }
+  \node[anchor=east] at (0.5,0.8) {\iflangja{サイクル}{cycle}};
+  \node[anchor=east] at (0.5,0) {\texttt{BEQ R1,R2,L}};
+  \foreach \s/\lab in {0/IF,1/ID,2/EX,3/MEM,4/WB} { \node[st] at (\s+1,0) {\lab}; }
+  \node[anchor=east] at (0.5,-1) {\iflangja{予測した命令 1}{predicted instr.\ 1}};
+  \node[pr] at (2,-1) {IF}; \node[pr] at (3,-1) {ID};
+  \node[anchor=east] at (0.5,-2) {\iflangja{予測した命令 2}{predicted instr.\ 2}};
+  \node[pr] at (3,-2) {IF};
+  \draw[ln-caution, thick, dashed] (3.5,1.15) -- (3.5,-2.6)
+    node[below, font=\scriptsize] {\iflangja{分岐解決（EX の終わり）}{branch resolved (end of EX)}};
+  \node[anchor=west, align=left, font=\scriptsize, text=ln-muted] at (3.75,-1.5)
+    {\iflangja{予測が正しい: 両命令とも続行\\予測ミス: 両命令をフラッシュ}{correct prediction: both continue\\misprediction: both are flushed}};
+\end{tikzpicture}

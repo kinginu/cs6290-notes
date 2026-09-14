@@ -96,6 +96,8 @@ and how it connects to the previous lesson.>
   `sec:l04-btb`, `fig:l04-btb`, `tab:l04-…`, `eq:l04-…`, `def:l04-…`,
   `ex:l04-…`.  (Lessons 1–3 of cs6290 predate this rule and are unprefixed.)
   EN and JA use the **same** labels.
+- Plain `\label{…}` inside `example`/`note` is enough — `\cref` prints
+  "Example"/"Note" (no `\label[example]{…}` needed).
 - Cross-references: `\cref{…}`; to another chapter in prose: "Lesson 7"
   (EN) / "第7章" (JA), numbers from the chapter list.
 - Figures shared by both editions: `figures/lNN-<name>.tex`, pure TikZ,
@@ -113,6 +115,8 @@ and how it connects to the previous lesson.>
   examples (MIPS-style mnemonics), `numbers=none` for short snippets.
 - CS6200: `lstlisting` with `language=C`.
 - Lines ≤ 60 characters (body is 120 mm wide).
+- `\end{lstlisting}` must start at column 0 (no indentation), even inside
+  `example`: leading spaces before it add an empty last line to the listing.
 
 ## 6. Japanese edition
 
