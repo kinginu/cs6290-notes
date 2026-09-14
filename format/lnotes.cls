@@ -145,6 +145,8 @@
   \AtBeginDocument{%
     \renewcommand*{\chapterformat}{第\thechapter 章}%
     \renewcommand*{\chaptermarkformat}{第\thechapter 章\enskip}%
+    \renewcommand*{\partformat}{第\thepart 部}%
+    \renewcommand*{\partname}{部}%
     \renewcommand*{\contentsname}{目次}%
     \renewcommand*{\listfigurename}{図目次}%
     \renewcommand*{\listtablename}{表目次}%
@@ -219,6 +221,11 @@
 %% .latexmkrc, because latexmk -- not imakeidx -- runs the index processor.
 \RequirePackage{imakeidx}
 \makeindex[intoc,columns=2]
+%% Cross-references inside the index: \index{BTB|see{branch target buffer}}
+\ifln@ja
+  \renewcommand*{\seename}{→}
+  \renewcommand*{\alsoname}{→ 関連:}
+\fi
 
 %% How a term looks in the body text: italics in English, bold gothic in
 %% Japanese (Japanese fonts have no italics).
@@ -380,6 +387,7 @@
   \crefname{note}{注}{注}            \Crefname{note}{注}{注}
   \crefname{sidenote}{注}{注}        \Crefname{sidenote}{注}{注}
   \crefname{page}{ページ}{ページ}    \Crefname{page}{ページ}{ページ}
+  \crefformat{part}{第#2#1#3部}      \Crefformat{part}{第#2#1#3部}
 \else
   \crefname{definition}{Definition}{Definitions}
   \crefname{example}{Example}{Examples}

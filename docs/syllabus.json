@@ -1,0 +1,2312 @@
+{
+ "course": "CS 6290 High Performance Computer Architecture",
+ "source": "Canvas module list, Fall 2026 (quiz answer pages and duplicate quiz items omitted; videos numbered in lecture order)",
+ "lessons": [
+  {
+   "number": 1,
+   "slug": "01-introduction",
+   "title": "Introduction",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Lesson 1 Introduction"
+    },
+    {
+     "n": 2,
+     "title": "What is Computer Architecture?"
+    },
+    {
+     "n": 3,
+     "title": "Why Do We Need Computer Architectures"
+    },
+    {
+     "n": 4,
+     "title": "Computer Architecture Quiz"
+    },
+    {
+     "n": 5,
+     "title": "Computer Architecture & Tech Trends"
+    },
+    {
+     "n": 6,
+     "title": "Moore's Law"
+    },
+    {
+     "n": 7,
+     "title": "Speed Doubling Quiz"
+    },
+    {
+     "n": 8,
+     "title": "Memory Wall"
+    },
+    {
+     "n": 9,
+     "title": "Processor Speed - Cost - Power"
+    },
+    {
+     "n": 10,
+     "title": "Speed vs Power vs Weight vs Cost Quiz"
+    },
+    {
+     "n": 11,
+     "title": "Power Consumption"
+    },
+    {
+     "n": 12,
+     "title": "Active Power"
+    },
+    {
+     "n": 13,
+     "title": "Static Power"
+    },
+    {
+     "n": 14,
+     "title": "Active Power Quiz"
+    },
+    {
+     "n": 15,
+     "title": "Fabrication Cost 1"
+    },
+    {
+     "n": 16,
+     "title": "Fabrication Yield"
+    },
+    {
+     "n": 17,
+     "title": "Fabrication Cost 2"
+    },
+    {
+     "n": 18,
+     "title": "Manufacturing Cost Quiz"
+    },
+    {
+     "n": 19,
+     "title": "Lesson 1 Outro"
+    }
+   ]
+  },
+  {
+   "number": 2,
+   "slug": "02-metrics-and-evaluation",
+   "title": "Metrics and Evaluation",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Measurement Evaluation Intro"
+    },
+    {
+     "n": 2,
+     "title": "Performance"
+    },
+    {
+     "n": 3,
+     "title": "Latency and Throughput Quiz"
+    },
+    {
+     "n": 4,
+     "title": "Comparing Performance"
+    },
+    {
+     "n": 5,
+     "title": "Performance Comparison Quiz"
+    },
+    {
+     "n": 6,
+     "title": "Performance Comparison Quiz 2"
+    },
+    {
+     "n": 7,
+     "title": "Speedup"
+    },
+    {
+     "n": 8,
+     "title": "Measuring Performance"
+    },
+    {
+     "n": 9,
+     "title": "Benchmarks"
+    },
+    {
+     "n": 10,
+     "title": "Types of Benchmarks"
+    },
+    {
+     "n": 11,
+     "title": "Performance Reporting Quiz"
+    },
+    {
+     "n": 12,
+     "title": "Benchmark Standards"
+    },
+    {
+     "n": 13,
+     "title": "Summarizing Performance"
+    },
+    {
+     "n": 14,
+     "title": "Speedup Averaging Quiz"
+    },
+    {
+     "n": 15,
+     "title": "Iron Law of Performance"
+    },
+    {
+     "n": 16,
+     "title": "Iron Law Quiz"
+    },
+    {
+     "n": 17,
+     "title": "Iron Law for Unequal Instruction Times"
+    },
+    {
+     "n": 18,
+     "title": "Iron Law Quiz 2"
+    },
+    {
+     "n": 19,
+     "title": "Amdahl's Law"
+    },
+    {
+     "n": 20,
+     "title": "Amdahl's Law Quiz"
+    },
+    {
+     "n": 21,
+     "title": "Amdahl's Law Implications"
+    },
+    {
+     "n": 22,
+     "title": "Amdahl's Law Quiz 2"
+    },
+    {
+     "n": 23,
+     "title": "Lhadma's Law"
+    },
+    {
+     "n": 24,
+     "title": "Diminishing Returns"
+    },
+    {
+     "n": 25,
+     "title": "Measurement Evaluation Outro"
+    }
+   ]
+  },
+  {
+   "number": 3,
+   "slug": "03-pipelining",
+   "title": "Pipelining",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Pipelining Intro"
+    },
+    {
+     "n": 2,
+     "title": "Pipelining"
+    },
+    {
+     "n": 3,
+     "title": "Pipelining in a Processor"
+    },
+    {
+     "n": 4,
+     "title": "Laundry Pipelining Quiz"
+    },
+    {
+     "n": 5,
+     "title": "Instruction Pipelining Quiz"
+    },
+    {
+     "n": 6,
+     "title": "Pipeline CPI"
+    },
+    {
+     "n": 7,
+     "title": "Processor Pipeline Stalls"
+    },
+    {
+     "n": 8,
+     "title": "Processor Pipeline Stalls and Flushes"
+    },
+    {
+     "n": 9,
+     "title": "Control Dependencies"
+    },
+    {
+     "n": 10,
+     "title": "Control Dependence Quiz"
+    },
+    {
+     "n": 11,
+     "title": "Data Dependencies"
+    },
+    {
+     "n": 12,
+     "title": "Data Dependencies Quiz"
+    },
+    {
+     "n": 13,
+     "title": "Dependencies and Hazards"
+    },
+    {
+     "n": 14,
+     "title": "Dependencies and Hazards Quiz"
+    },
+    {
+     "n": 15,
+     "title": "Handling of Hazards"
+    },
+    {
+     "n": 16,
+     "title": "Flushes - Stalls - and Forwarding Quiz"
+    },
+    {
+     "n": 17,
+     "title": "How Many Stages"
+    },
+    {
+     "n": 18,
+     "title": "Pipelining Outro"
+    }
+   ]
+  },
+  {
+   "number": 4,
+   "slug": "04-branches",
+   "title": "Branches",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Branches Intro"
+    },
+    {
+     "n": 2,
+     "title": "Branch in a Pipeline"
+    },
+    {
+     "n": 3,
+     "title": "Branch Prediction Requirements"
+    },
+    {
+     "n": 4,
+     "title": "Branch Prediction Accuracy"
+    },
+    {
+     "n": 5,
+     "title": "Branch Prediction Benefit Quiz"
+    },
+    {
+     "n": 6,
+     "title": "Performance With Not Taken Prediction"
+    },
+    {
+     "n": 7,
+     "title": "Multiple Predictions Quiz"
+    },
+    {
+     "n": 8,
+     "title": "Predict Not Taken"
+    },
+    {
+     "n": 9,
+     "title": "Why We Need Better Prediction"
+    },
+    {
+     "n": 10,
+     "title": "Predictor Impact Quiz"
+    },
+    {
+     "n": 11,
+     "title": "Why We Need Better Prediction Part 2"
+    },
+    {
+     "n": 12,
+     "title": "Better Prediction How"
+    },
+    {
+     "n": 13,
+     "title": "BTB Branch Target Buffer"
+    },
+    {
+     "n": 14,
+     "title": "Realistic BTB"
+    },
+    {
+     "n": 15,
+     "title": "BTB Quiz"
+    },
+    {
+     "n": 16,
+     "title": "Direction Predictor"
+    },
+    {
+     "n": 17,
+     "title": "BTB and BHT Quiz"
+    },
+    {
+     "n": 18,
+     "title": "BTB and BHT Quiz 2"
+    },
+    {
+     "n": 19,
+     "title": "BTB and BHT Quiz 3"
+    },
+    {
+     "n": 20,
+     "title": "BTB and BHT Quiz 4"
+    },
+    {
+     "n": 21,
+     "title": "BTB and BHT Quiz 5"
+    },
+    {
+     "n": 22,
+     "title": "Problems With 1 Bit Predictions"
+    },
+    {
+     "n": 23,
+     "title": "2 Bit Predictor"
+    },
+    {
+     "n": 24,
+     "title": "2 Bit Predictor Initialization"
+    },
+    {
+     "n": 25,
+     "title": "2BP Quiz"
+    },
+    {
+     "n": 26,
+     "title": "1BP - 2BP"
+    },
+    {
+     "n": 27,
+     "title": "History Based Predictors"
+    },
+    {
+     "n": 28,
+     "title": "1 Bit History With 2 Bit Count"
+    },
+    {
+     "n": 29,
+     "title": "1 Bit History Quiz"
+    },
+    {
+     "n": 30,
+     "title": "2 Bit History Predictor"
+    },
+    {
+     "n": 31,
+     "title": "2 Bit History Predictor 2"
+    },
+    {
+     "n": 32,
+     "title": "N Bit History Predictor Quiz"
+    },
+    {
+     "n": 33,
+     "title": "History Predictor Quiz"
+    },
+    {
+     "n": 34,
+     "title": "History With Shared Counters part 1"
+    },
+    {
+     "n": 35,
+     "title": "History With Shared Counters part 2"
+    },
+    {
+     "n": 36,
+     "title": "History With Shared Counters part 3"
+    },
+    {
+     "n": 37,
+     "title": "PShare"
+    },
+    {
+     "n": 38,
+     "title": "PShare vs GShare Quiz"
+    },
+    {
+     "n": 39,
+     "title": "GShare or PShare"
+    },
+    {
+     "n": 40,
+     "title": "Tournament Predictor"
+    },
+    {
+     "n": 41,
+     "title": "Hierarchical Predictors"
+    },
+    {
+     "n": 42,
+     "title": "Hierarchical Predictor Example"
+    },
+    {
+     "n": 43,
+     "title": "Multi Predictor Quiz"
+    },
+    {
+     "n": 44,
+     "title": "Return Address Stack (RAS)"
+    },
+    {
+     "n": 45,
+     "title": "RAS"
+    },
+    {
+     "n": 46,
+     "title": "RAS Full Quiz"
+    },
+    {
+     "n": 47,
+     "title": "But How Do We Know It's A RET"
+    },
+    {
+     "n": 48,
+     "title": "Branches Outro"
+    }
+   ]
+  },
+  {
+   "number": 5,
+   "slug": "05-predication",
+   "title": "Predication",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Predication Intro"
+    },
+    {
+     "n": 2,
+     "title": "Predication"
+    },
+    {
+     "n": 3,
+     "title": "If Conversion"
+    },
+    {
+     "n": 4,
+     "title": "Conditional Move"
+    },
+    {
+     "n": 5,
+     "title": "MovZ MovN"
+    },
+    {
+     "n": 6,
+     "title": "MovZ MovN Performance"
+    },
+    {
+     "n": 7,
+     "title": "MovZ MovN Performance Quiz"
+    },
+    {
+     "n": 8,
+     "title": "MOVc Summary"
+    },
+    {
+     "n": 9,
+     "title": "Full Predication HW Support"
+    },
+    {
+     "n": 10,
+     "title": "Full Predication Example"
+    },
+    {
+     "n": 11,
+     "title": "Full Predication Quiz"
+    },
+    {
+     "n": 12,
+     "title": "Predication Outro"
+    }
+   ]
+  },
+  {
+   "number": 6,
+   "slug": "06-ilp",
+   "title": "ILP",
+   "videos": [
+    {
+     "n": 1,
+     "title": "ILP Intro"
+    },
+    {
+     "n": 2,
+     "title": "ILP All in the Same Cycle"
+    },
+    {
+     "n": 3,
+     "title": "The Execute Stage"
+    },
+    {
+     "n": 4,
+     "title": "RAW Dependencies"
+    },
+    {
+     "n": 5,
+     "title": "WAW Dependencies"
+    },
+    {
+     "n": 6,
+     "title": "Dependency Quiz"
+    },
+    {
+     "n": 7,
+     "title": "Removing False Dependencies"
+    },
+    {
+     "n": 8,
+     "title": "Duplicating Register Values"
+    },
+    {
+     "n": 9,
+     "title": "Register Renaming"
+    },
+    {
+     "n": 10,
+     "title": "RAT Example"
+    },
+    {
+     "n": 11,
+     "title": "Register Renaming Quiz"
+    },
+    {
+     "n": 12,
+     "title": "False Dependencies After Renaming"
+    },
+    {
+     "n": 13,
+     "title": "Instruction Level Parallelism (ILP)"
+    },
+    {
+     "n": 14,
+     "title": "ILP Example"
+    },
+    {
+     "n": 15,
+     "title": "ILP Quiz"
+    },
+    {
+     "n": 16,
+     "title": "ILP with Control Dependencies"
+    },
+    {
+     "n": 17,
+     "title": "ILP vs IPC"
+    },
+    {
+     "n": 18,
+     "title": "IPC & ILP Quiz"
+    },
+    {
+     "n": 19,
+     "title": "ILP & IPC Discussion"
+    },
+    {
+     "n": 20,
+     "title": "ILP Outro"
+    }
+   ]
+  },
+  {
+   "number": 7,
+   "slug": "07-instruction-scheduling",
+   "title": "Instruction Scheduling",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Tomasulo Intro"
+    },
+    {
+     "n": 2,
+     "title": "Improving IPC"
+    },
+    {
+     "n": 3,
+     "title": "Tomasulo's Algorithm"
+    },
+    {
+     "n": 4,
+     "title": "The Picture"
+    },
+    {
+     "n": 5,
+     "title": "Issue"
+    },
+    {
+     "n": 6,
+     "title": "Issue Example"
+    },
+    {
+     "n": 7,
+     "title": "Issue Quiz"
+    },
+    {
+     "n": 8,
+     "title": "Dispatch"
+    },
+    {
+     "n": 9,
+     "title": "More Than 1 Instruction Ready"
+    },
+    {
+     "n": 10,
+     "title": "Dispatch Quiz"
+    },
+    {
+     "n": 11,
+     "title": "Write Result (Broadcast)"
+    },
+    {
+     "n": 12,
+     "title": "More Than 1 Broadcast"
+    },
+    {
+     "n": 13,
+     "title": "Broadcast Stale Result"
+    },
+    {
+     "n": 14,
+     "title": "Review Part 1"
+    },
+    {
+     "n": 15,
+     "title": "Review Part 2"
+    },
+    {
+     "n": 16,
+     "title": "One Cycle Quiz Part 1"
+    },
+    {
+     "n": 17,
+     "title": "One Cycle Quiz Part 2"
+    },
+    {
+     "n": 18,
+     "title": "One Cycle Quiz Part 3"
+    },
+    {
+     "n": 19,
+     "title": "Tomasulo's Algorithm Quiz"
+    },
+    {
+     "n": 20,
+     "title": "Load and Store Instructions"
+    },
+    {
+     "n": 21,
+     "title": "Long Example Introduction"
+    },
+    {
+     "n": 22,
+     "title": "Long Example Cycles 1-2"
+    },
+    {
+     "n": 23,
+     "title": "Long Example Cycles 3-4"
+    },
+    {
+     "n": 24,
+     "title": "Long Example Cycles 5-6"
+    },
+    {
+     "n": 25,
+     "title": "Long Example Cycles 7-9"
+    },
+    {
+     "n": 26,
+     "title": "Long Example Cycles 10-end"
+    },
+    {
+     "n": 27,
+     "title": "Timing Example"
+    },
+    {
+     "n": 28,
+     "title": "Tomasulo Timing Quiz Part 1"
+    },
+    {
+     "n": 29,
+     "title": "Tomasulo Timing Quiz Part 2"
+    },
+    {
+     "n": 30,
+     "title": "Tomasulo Outro"
+    }
+   ]
+  },
+  {
+   "number": 8,
+   "slug": "08-reorder-buffer",
+   "title": "ReOrder Buffer",
+   "videos": [
+    {
+     "n": 1,
+     "title": "ROB Intro"
+    },
+    {
+     "n": 2,
+     "title": "Exceptions in Out Of Order Execution"
+    },
+    {
+     "n": 3,
+     "title": "Branch Misprediction"
+    },
+    {
+     "n": 4,
+     "title": "Correct Out of Order Execution"
+    },
+    {
+     "n": 5,
+     "title": "ROB Part 1"
+    },
+    {
+     "n": 6,
+     "title": "ROB Part 2"
+    },
+    {
+     "n": 7,
+     "title": "Free Reservation Stations Quiz"
+    },
+    {
+     "n": 8,
+     "title": "ROB Part 3"
+    },
+    {
+     "n": 9,
+     "title": "Hardware Organization with ROB"
+    },
+    {
+     "n": 10,
+     "title": "ROB Quiz"
+    },
+    {
+     "n": 11,
+     "title": "Branch Misprediction Recovery Part 1"
+    },
+    {
+     "n": 12,
+     "title": "Branch Misprediction Recovery Part 2"
+    },
+    {
+     "n": 13,
+     "title": "ROB and Exceptions"
+    },
+    {
+     "n": 14,
+     "title": "Outside View of Executed"
+    },
+    {
+     "n": 15,
+     "title": "Exceptions with ROB Quiz"
+    },
+    {
+     "n": 16,
+     "title": "RAT Updates on Commit"
+    },
+    {
+     "n": 17,
+     "title": "ROB Example Cycles 1 2"
+    },
+    {
+     "n": 18,
+     "title": "ROB Example Cycles 3 4"
+    },
+    {
+     "n": 19,
+     "title": "ROB Example Cycles 5 & 6"
+    },
+    {
+     "n": 20,
+     "title": "ROB Example Cycles 13-24"
+    },
+    {
+     "n": 21,
+     "title": "ROB Example Cycles 25-43"
+    },
+    {
+     "n": 22,
+     "title": "ROB Example Cycles 44-48"
+    },
+    {
+     "n": 23,
+     "title": "ROB Quiz 1"
+    },
+    {
+     "n": 24,
+     "title": "ROB Quiz 2"
+    },
+    {
+     "n": 25,
+     "title": "ROB Quiz 3"
+    },
+    {
+     "n": 26,
+     "title": "ROB Quiz 4"
+    },
+    {
+     "n": 27,
+     "title": "ROB Quiz 5"
+    },
+    {
+     "n": 28,
+     "title": "ROB Quiz 6"
+    },
+    {
+     "n": 29,
+     "title": "ROB Quiz 7"
+    },
+    {
+     "n": 30,
+     "title": "ROB Quiz 8"
+    },
+    {
+     "n": 31,
+     "title": "ROB Timing Example"
+    },
+    {
+     "n": 32,
+     "title": "ROB Timing Quiz 1"
+    },
+    {
+     "n": 33,
+     "title": "ROB Timing Quiz 2"
+    },
+    {
+     "n": 34,
+     "title": "ROB Timing Quiz 3"
+    },
+    {
+     "n": 35,
+     "title": "Unified Reservation Stations"
+    },
+    {
+     "n": 36,
+     "title": "Superscalar"
+    },
+    {
+     "n": 37,
+     "title": "Terminology Confusion"
+    },
+    {
+     "n": 38,
+     "title": "Out of Order"
+    },
+    {
+     "n": 39,
+     "title": "In Order vs Out of Order Quiz"
+    },
+    {
+     "n": 40,
+     "title": "ROB Outro"
+    }
+   ]
+  },
+  {
+   "number": 9,
+   "slug": "09-memory-ordering",
+   "title": "Memory Ordering",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Memory Ordering Intro"
+    },
+    {
+     "n": 2,
+     "title": "Memory Access Ordering"
+    },
+    {
+     "n": 3,
+     "title": "When does Memory Write Happen"
+    },
+    {
+     "n": 4,
+     "title": "Load Store Queue Part 1"
+    },
+    {
+     "n": 5,
+     "title": "Load Store Queue Part 2"
+    },
+    {
+     "n": 6,
+     "title": "Out of Order Load Store Execution"
+    },
+    {
+     "n": 7,
+     "title": "In Order Load Store Execution"
+    },
+    {
+     "n": 8,
+     "title": "Memory Ordering Quiz 0"
+    },
+    {
+     "n": 9,
+     "title": "Store to Load Forwarding"
+    },
+    {
+     "n": 10,
+     "title": "LSQ Example"
+    },
+    {
+     "n": 11,
+     "title": "LSQ - ROB - and RS"
+    },
+    {
+     "n": 12,
+     "title": "Memory Ordering Quiz"
+    },
+    {
+     "n": 13,
+     "title": "Memory Ordering Quiz 2"
+    },
+    {
+     "n": 14,
+     "title": "Memory Ordering Outro"
+    }
+   ]
+  },
+  {
+   "number": 10,
+   "slug": "10-compiler-ilp",
+   "title": "Compiler ILP",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Compiler ILP Intro"
+    },
+    {
+     "n": 2,
+     "title": "Can Compilers Help Improve IPC"
+    },
+    {
+     "n": 3,
+     "title": "Tree Height Reduction"
+    },
+    {
+     "n": 4,
+     "title": "Tree Height Reduction Quiz"
+    },
+    {
+     "n": 5,
+     "title": "Make Independent Instructions Easier to Find"
+    },
+    {
+     "n": 6,
+     "title": "Instruction Scheduling"
+    },
+    {
+     "n": 7,
+     "title": "Instruction Scheduling Quiz"
+    },
+    {
+     "n": 8,
+     "title": "Scheduling and If Conversion"
+    },
+    {
+     "n": 9,
+     "title": "If Convert a Loop"
+    },
+    {
+     "n": 10,
+     "title": "Loop Unrolling"
+    },
+    {
+     "n": 11,
+     "title": "Loop Unrolling Benefits ILP"
+    },
+    {
+     "n": 12,
+     "title": "Loop Unrolling Benefits CPI Part 1"
+    },
+    {
+     "n": 13,
+     "title": "Loop Unrolling Benefits CPI Part 2"
+    },
+    {
+     "n": 14,
+     "title": "Loop Unrolling Quiz"
+    },
+    {
+     "n": 15,
+     "title": "Unrolling Downside"
+    },
+    {
+     "n": 16,
+     "title": "Function Call Inlining"
+    },
+    {
+     "n": 17,
+     "title": "Function Call Inlining Downside"
+    },
+    {
+     "n": 18,
+     "title": "Function Inlining Quiz"
+    },
+    {
+     "n": 19,
+     "title": "Other IPC Enhancing Compiler Stuff"
+    },
+    {
+     "n": 20,
+     "title": "Compiler ILP Outro"
+    }
+   ]
+  },
+  {
+   "number": 11,
+   "slug": "11-vliw",
+   "title": "VLIW",
+   "videos": [
+    {
+     "n": 1,
+     "title": "VLIW Intro"
+    },
+    {
+     "n": 2,
+     "title": "Superscalar vs VLIW"
+    },
+    {
+     "n": 3,
+     "title": "Superscalar vs VLIW Quiz"
+    },
+    {
+     "n": 4,
+     "title": "The Good and the Bad"
+    },
+    {
+     "n": 5,
+     "title": "VLIW Backward Compatibility Quiz"
+    },
+    {
+     "n": 6,
+     "title": "VLIW Instructions"
+    },
+    {
+     "n": 7,
+     "title": "VLIW Examples"
+    },
+    {
+     "n": 8,
+     "title": "VLIW Target Market Quiz"
+    },
+    {
+     "n": 9,
+     "title": "VLIW Outro"
+    }
+   ]
+  },
+  {
+   "number": 12,
+   "slug": "12-cache-review",
+   "title": "Cache Review",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Cache Review Intro"
+    },
+    {
+     "n": 2,
+     "title": "Locality Principle"
+    },
+    {
+     "n": 3,
+     "title": "Locality Quiz"
+    },
+    {
+     "n": 4,
+     "title": "Memory References"
+    },
+    {
+     "n": 5,
+     "title": "Temporal Locality Quiz"
+    },
+    {
+     "n": 6,
+     "title": "Spatial Locality Quiz"
+    },
+    {
+     "n": 7,
+     "title": "Locality and Data Accesses"
+    },
+    {
+     "n": 8,
+     "title": "Cache Quiz"
+    },
+    {
+     "n": 9,
+     "title": "Cache Lookups"
+    },
+    {
+     "n": 10,
+     "title": "Cache Performance"
+    },
+    {
+     "n": 11,
+     "title": "Hit Time Quiz"
+    },
+    {
+     "n": 12,
+     "title": "Miss Rate Quiz"
+    },
+    {
+     "n": 13,
+     "title": "Cache Size in Real Processors"
+    },
+    {
+     "n": 14,
+     "title": "Cache Organization"
+    },
+    {
+     "n": 15,
+     "title": "Block Size Quiz"
+    },
+    {
+     "n": 16,
+     "title": "Cache Block Start Address"
+    },
+    {
+     "n": 17,
+     "title": "Blocks in Cache and Memory"
+    },
+    {
+     "n": 18,
+     "title": "Cache Line Sizes Quiz"
+    },
+    {
+     "n": 19,
+     "title": "Block Offset and Block Number"
+    },
+    {
+     "n": 20,
+     "title": "Block Number Quiz"
+    },
+    {
+     "n": 21,
+     "title": "Cache Tags"
+    },
+    {
+     "n": 22,
+     "title": "Cache Tag Quiz"
+    },
+    {
+     "n": 23,
+     "title": "Valid Bit"
+    },
+    {
+     "n": 24,
+     "title": "Types of Caches"
+    },
+    {
+     "n": 25,
+     "title": "Direct Mapped Cache"
+    },
+    {
+     "n": 26,
+     "title": "Upside and Downside Direct Mapped Cache"
+    },
+    {
+     "n": 27,
+     "title": "Direct Mapped Cache Quiz"
+    },
+    {
+     "n": 28,
+     "title": "Direct Mapped Cache Quiz 2"
+    },
+    {
+     "n": 29,
+     "title": "Set Associative Caches"
+    },
+    {
+     "n": 30,
+     "title": "Offset - Index - Tag for Set Associative"
+    },
+    {
+     "n": 31,
+     "title": "2 Way Set Associative Quiz"
+    },
+    {
+     "n": 32,
+     "title": "Fully Associative Cache"
+    },
+    {
+     "n": 33,
+     "title": "Direct Mapped and Fully Associative"
+    },
+    {
+     "n": 34,
+     "title": "Cache Replacement"
+    },
+    {
+     "n": 35,
+     "title": "Implementing LRU"
+    },
+    {
+     "n": 36,
+     "title": "LRU Quiz"
+    },
+    {
+     "n": 37,
+     "title": "Write Policy"
+    },
+    {
+     "n": 38,
+     "title": "Write Back Caches"
+    },
+    {
+     "n": 39,
+     "title": "Write Back Cache Example"
+    },
+    {
+     "n": 40,
+     "title": "Write Back Cache Quiz"
+    },
+    {
+     "n": 41,
+     "title": "Cache Summary Part 1"
+    },
+    {
+     "n": 42,
+     "title": "Cache Summary Part 2"
+    },
+    {
+     "n": 43,
+     "title": "Cache Summary Quiz 1"
+    },
+    {
+     "n": 44,
+     "title": "Cache Summary Quiz 2"
+    },
+    {
+     "n": 45,
+     "title": "Cache Review Outro"
+    }
+   ]
+  },
+  {
+   "number": 13,
+   "slug": "13-virtual-memory",
+   "title": "Virtual Memory",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Virtual Memory Intro"
+    },
+    {
+     "n": 2,
+     "title": "Why Virtual Memory"
+    },
+    {
+     "n": 3,
+     "title": "Virtual Memory Quiz"
+    },
+    {
+     "n": 4,
+     "title": "Processor's View of Memory"
+    },
+    {
+     "n": 5,
+     "title": "Program's View of Memory"
+    },
+    {
+     "n": 6,
+     "title": "Mapping Virtual Physical Memory"
+    },
+    {
+     "n": 7,
+     "title": "Page Table Quiz"
+    },
+    {
+     "n": 8,
+     "title": "Where Is the Missing Memory"
+    },
+    {
+     "n": 9,
+     "title": "Virtual To Physical Translation"
+    },
+    {
+     "n": 10,
+     "title": "Address Translation Quiz"
+    },
+    {
+     "n": 11,
+     "title": "Size of Flat Page Table"
+    },
+    {
+     "n": 12,
+     "title": "Flat Page Table Size Quiz"
+    },
+    {
+     "n": 13,
+     "title": "Multi Level Page Tables"
+    },
+    {
+     "n": 14,
+     "title": "Multi Level Page Table Structure"
+    },
+    {
+     "n": 15,
+     "title": "Two Level Page Table Example"
+    },
+    {
+     "n": 16,
+     "title": "Two Level Page Table Size"
+    },
+    {
+     "n": 17,
+     "title": "4 Level PT Quiz"
+    },
+    {
+     "n": 18,
+     "title": "Choosing The Page Size"
+    },
+    {
+     "n": 19,
+     "title": "Memory Access Time With V-P Translation"
+    },
+    {
+     "n": 20,
+     "title": "V P Translation Quiz"
+    },
+    {
+     "n": 21,
+     "title": "V P Translation Quiz 2"
+    },
+    {
+     "n": 22,
+     "title": "Translation Look Aside Buffer (TLB)"
+    },
+    {
+     "n": 23,
+     "title": "What If We Have A TLB Miss"
+    },
+    {
+     "n": 24,
+     "title": "TLB Size Quiz"
+    },
+    {
+     "n": 25,
+     "title": "TLB Organization"
+    },
+    {
+     "n": 26,
+     "title": "TLB Performance Quiz"
+    },
+    {
+     "n": 27,
+     "title": "Virtual Memory Outro"
+    }
+   ]
+  },
+  {
+   "number": 14,
+   "slug": "14-advanced-caches",
+   "title": "Advanced Caches",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Advanced Caches Intro"
+    },
+    {
+     "n": 2,
+     "title": "Improving Cache Performance"
+    },
+    {
+     "n": 3,
+     "title": "Reduce Hit Time"
+    },
+    {
+     "n": 4,
+     "title": "Pipelined Caches"
+    },
+    {
+     "n": 5,
+     "title": "TLB And Cache Hit"
+    },
+    {
+     "n": 6,
+     "title": "Virtually Accessed Cache"
+    },
+    {
+     "n": 7,
+     "title": "Virtually Indexed Physically Tagged"
+    },
+    {
+     "n": 8,
+     "title": "Aliasing in Virtually Accessed Caches"
+    },
+    {
+     "n": 9,
+     "title": "VIPT Cache Aliasing"
+    },
+    {
+     "n": 10,
+     "title": "VIPT Aliasing Avoidance"
+    },
+    {
+     "n": 11,
+     "title": "Real VIPT Caches"
+    },
+    {
+     "n": 12,
+     "title": "Associativity and Hit Time"
+    },
+    {
+     "n": 13,
+     "title": "Way Prediction"
+    },
+    {
+     "n": 14,
+     "title": "Way Prediction Performance"
+    },
+    {
+     "n": 15,
+     "title": "Way Prediction Quiz"
+    },
+    {
+     "n": 16,
+     "title": "Replacement Policy and Hit Time"
+    },
+    {
+     "n": 17,
+     "title": "NMRU Replacement"
+    },
+    {
+     "n": 18,
+     "title": "PLRU Replacement"
+    },
+    {
+     "n": 19,
+     "title": "NMRU Quiz"
+    },
+    {
+     "n": 20,
+     "title": "Reducing the Miss Rate"
+    },
+    {
+     "n": 21,
+     "title": "Larger Cache Blocks"
+    },
+    {
+     "n": 22,
+     "title": "Miss Rate Quiz"
+    },
+    {
+     "n": 23,
+     "title": "Prefetching"
+    },
+    {
+     "n": 24,
+     "title": "Prefetch Instructions"
+    },
+    {
+     "n": 25,
+     "title": "Prefetch Instructions Quiz"
+    },
+    {
+     "n": 26,
+     "title": "Hardware Prefetching"
+    },
+    {
+     "n": 27,
+     "title": "Loop Interchange"
+    },
+    {
+     "n": 28,
+     "title": "Overlap Misses"
+    },
+    {
+     "n": 29,
+     "title": "Miss Under Miss Support in Caches"
+    },
+    {
+     "n": 30,
+     "title": "Miss Under Miss Quiz"
+    },
+    {
+     "n": 31,
+     "title": "Cache Hierarchies"
+    },
+    {
+     "n": 32,
+     "title": "AMAT With Cache Hierarchies"
+    },
+    {
+     "n": 33,
+     "title": "L1 Vs L2"
+    },
+    {
+     "n": 34,
+     "title": "Multilevel Cache Performance"
+    },
+    {
+     "n": 35,
+     "title": "Hit Rate"
+    },
+    {
+     "n": 36,
+     "title": "Global VS Local Hit Rate"
+    },
+    {
+     "n": 37,
+     "title": "Global and Local Miss Rate Quiz"
+    },
+    {
+     "n": 38,
+     "title": "Inclusion Property"
+    },
+    {
+     "n": 39,
+     "title": "Inclusion Quiz"
+    },
+    {
+     "n": 40,
+     "title": "Advanced Caches Outro"
+    }
+   ]
+  },
+  {
+   "number": 15,
+   "slug": "15-memory",
+   "title": "Memory",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Memory Intro"
+    },
+    {
+     "n": 2,
+     "title": "How Memory Works"
+    },
+    {
+     "n": 3,
+     "title": "Memory Technology SRAM and DRAM"
+    },
+    {
+     "n": 4,
+     "title": "One Memory Bit SRAM"
+    },
+    {
+     "n": 5,
+     "title": "One Memory Bit DRAM"
+    },
+    {
+     "n": 6,
+     "title": "DRAM Technology Quiz"
+    },
+    {
+     "n": 7,
+     "title": "Memory Chip Organization Part 1"
+    },
+    {
+     "n": 8,
+     "title": "Memory Chip Organization Part 2"
+    },
+    {
+     "n": 9,
+     "title": "Memory Refresh Quiz"
+    },
+    {
+     "n": 10,
+     "title": "Memory Chip Organization Part 3"
+    },
+    {
+     "n": 11,
+     "title": "Fast Page Mode"
+    },
+    {
+     "n": 12,
+     "title": "DRAM Access Scheduling Quiz"
+    },
+    {
+     "n": 13,
+     "title": "Connecting DRAM To The Processor"
+    },
+    {
+     "n": 14,
+     "title": "Memory Outro"
+    }
+   ]
+  },
+  {
+   "number": 16,
+   "slug": "16-storage",
+   "title": "Storage",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Storage Intro"
+    },
+    {
+     "n": 2,
+     "title": "Storage"
+    },
+    {
+     "n": 3,
+     "title": "Magnetic Disks"
+    },
+    {
+     "n": 4,
+     "title": "Access Time For Magnetic Disks"
+    },
+    {
+     "n": 5,
+     "title": "Disk Access Time Quiz"
+    },
+    {
+     "n": 6,
+     "title": "Trends For Magnetic Disks"
+    },
+    {
+     "n": 7,
+     "title": "Optical Disks"
+    },
+    {
+     "n": 8,
+     "title": "Magnetic Tape"
+    },
+    {
+     "n": 9,
+     "title": "Disks And Tape Quiz"
+    },
+    {
+     "n": 10,
+     "title": "Using RAM For Storage"
+    },
+    {
+     "n": 11,
+     "title": "Hybrid Magnetic Flash"
+    },
+    {
+     "n": 12,
+     "title": "Flash vs Disk vs Both Quiz"
+    },
+    {
+     "n": 13,
+     "title": "Connecting IO Devices"
+    },
+    {
+     "n": 14,
+     "title": "Storage Outro"
+    }
+   ]
+  },
+  {
+   "number": 17,
+   "slug": "17-fault-tolerance",
+   "title": "Fault Tolerance",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Fault Tolerance Intro"
+    },
+    {
+     "n": 2,
+     "title": "Dependability"
+    },
+    {
+     "n": 3,
+     "title": "Faults - Errors - and Failures"
+    },
+    {
+     "n": 4,
+     "title": "Fault - Error - and Failure Example"
+    },
+    {
+     "n": 5,
+     "title": "Laptop Falls Down Quiz"
+    },
+    {
+     "n": 6,
+     "title": "Reliability - Availability"
+    },
+    {
+     "n": 7,
+     "title": "Reliability and Availability Quiz"
+    },
+    {
+     "n": 8,
+     "title": "Kinds of Faults"
+    },
+    {
+     "n": 9,
+     "title": "Fault Classification Quiz"
+    },
+    {
+     "n": 10,
+     "title": "Improving Reliability and Availability"
+    },
+    {
+     "n": 11,
+     "title": "Fault Tolerance Techniques"
+    },
+    {
+     "n": 12,
+     "title": "N Module Redundancy"
+    },
+    {
+     "n": 13,
+     "title": "N Module Quiz"
+    },
+    {
+     "n": 14,
+     "title": "Fault Tolerance for Memory and Storage"
+    },
+    {
+     "n": 15,
+     "title": "RAID"
+    },
+    {
+     "n": 16,
+     "title": "RAID 0"
+    },
+    {
+     "n": 17,
+     "title": "RAID 0 Reliability"
+    },
+    {
+     "n": 18,
+     "title": "RAID 0 Quiz"
+    },
+    {
+     "n": 19,
+     "title": "RAID 1 Mirroring"
+    },
+    {
+     "n": 20,
+     "title": "RAID 1 Reliability"
+    },
+    {
+     "n": 21,
+     "title": "RAID 1 Reliability if Failed Disks Replaced"
+    },
+    {
+     "n": 22,
+     "title": "RAID 1 Quiz"
+    },
+    {
+     "n": 23,
+     "title": "RAID 4"
+    },
+    {
+     "n": 24,
+     "title": "RAID 4 Performance and Reliability"
+    },
+    {
+     "n": 25,
+     "title": "RAID 4 Write"
+    },
+    {
+     "n": 26,
+     "title": "RAID 4 Quiz"
+    },
+    {
+     "n": 27,
+     "title": "Parity Quiz"
+    },
+    {
+     "n": 28,
+     "title": "RAID 5"
+    },
+    {
+     "n": 29,
+     "title": "RAID 5 Quiz"
+    },
+    {
+     "n": 30,
+     "title": "RAID 6"
+    },
+    {
+     "n": 31,
+     "title": "RAID 6 Is An Overkill"
+    },
+    {
+     "n": 32,
+     "title": "Fault Tolerance Outro"
+    }
+   ]
+  },
+  {
+   "number": 18,
+   "slug": "18-multi-processing",
+   "title": "Multi-Processing",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Multi Processing Intro"
+    },
+    {
+     "n": 2,
+     "title": "Flynn's Taxonomy of Parallel Machines"
+    },
+    {
+     "n": 3,
+     "title": "Why Multiprocessors"
+    },
+    {
+     "n": 4,
+     "title": "Multicore Vs Single Core Quiz"
+    },
+    {
+     "n": 5,
+     "title": "Multiprocessor Needs Parallel Programs!"
+    },
+    {
+     "n": 6,
+     "title": "Centralized Shared Memory"
+    },
+    {
+     "n": 7,
+     "title": "Multicore Quiz"
+    },
+    {
+     "n": 8,
+     "title": "Centralized Main Memory Problems"
+    },
+    {
+     "n": 9,
+     "title": "Distributed Shared Memory"
+    },
+    {
+     "n": 10,
+     "title": "NUMA Memory Allocation Quiz"
+    },
+    {
+     "n": 11,
+     "title": "A Message Passing Program"
+    },
+    {
+     "n": 12,
+     "title": "A Shared Memory Program"
+    },
+    {
+     "n": 13,
+     "title": "Message Passing Vs Shared Memory"
+    },
+    {
+     "n": 14,
+     "title": "Message Passing Vs Shared Memory Quiz"
+    },
+    {
+     "n": 15,
+     "title": "Shared Memory Hardware"
+    },
+    {
+     "n": 16,
+     "title": "Multi Threading Performance"
+    },
+    {
+     "n": 17,
+     "title": "SMT Vs Dual Core Quiz"
+    },
+    {
+     "n": 18,
+     "title": "SMT Hardware Changes"
+    },
+    {
+     "n": 19,
+     "title": "SMT - D$ - TLB"
+    },
+    {
+     "n": 20,
+     "title": "SMT and Cache Performance"
+    },
+    {
+     "n": 21,
+     "title": "SMT and Cache Quiz"
+    },
+    {
+     "n": 22,
+     "title": "Multi Processing Outro"
+    }
+   ]
+  },
+  {
+   "number": 19,
+   "slug": "19-cache-coherence",
+   "title": "Cache Coherence",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Coherence Intro"
+    },
+    {
+     "n": 2,
+     "title": "Cache Coherence Problem"
+    },
+    {
+     "n": 3,
+     "title": "Cache Incoherence Quiz"
+    },
+    {
+     "n": 4,
+     "title": "Coherence Definition"
+    },
+    {
+     "n": 5,
+     "title": "Coherence Definition Quiz"
+    },
+    {
+     "n": 6,
+     "title": "How to Get Coherence"
+    },
+    {
+     "n": 7,
+     "title": "Write Update Snooping Coherence"
+    },
+    {
+     "n": 8,
+     "title": "Write Update Coherence Quiz"
+    },
+    {
+     "n": 9,
+     "title": "Write Update Optimization"
+    },
+    {
+     "n": 10,
+     "title": "Write Update Optimization 2 Bus Writes"
+    },
+    {
+     "n": 11,
+     "title": "Write Update Optimization Quiz"
+    },
+    {
+     "n": 12,
+     "title": "Write Invalidate Snooping Coherence"
+    },
+    {
+     "n": 13,
+     "title": "Write Update vs Write Invalidate Quiz"
+    },
+    {
+     "n": 14,
+     "title": "Write Update vs Write Invalidate Quiz 2"
+    },
+    {
+     "n": 15,
+     "title": "Update VS Invalidate Coherence"
+    },
+    {
+     "n": 16,
+     "title": "MSI Coherence"
+    },
+    {
+     "n": 17,
+     "title": "Cache To Cache Transfers"
+    },
+    {
+     "n": 18,
+     "title": "MSI Quiz"
+    },
+    {
+     "n": 19,
+     "title": "MSI Quiz 2"
+    },
+    {
+     "n": 20,
+     "title": "Avoiding Memory Writes On Cache to Cache Transfers"
+    },
+    {
+     "n": 21,
+     "title": "MOSI Coherence"
+    },
+    {
+     "n": 22,
+     "title": "M(O)SI Inefficiency"
+    },
+    {
+     "n": 23,
+     "title": "The E State"
+    },
+    {
+     "n": 24,
+     "title": "MOESI Quiz"
+    },
+    {
+     "n": 25,
+     "title": "MESI - MOSI - MOESI Quiz"
+    },
+    {
+     "n": 26,
+     "title": "Directory Based Coherence"
+    },
+    {
+     "n": 27,
+     "title": "Directory"
+    },
+    {
+     "n": 28,
+     "title": "Directory Entry"
+    },
+    {
+     "n": 29,
+     "title": "Directory Example"
+    },
+    {
+     "n": 30,
+     "title": "Directory MOESI Quiz"
+    },
+    {
+     "n": 31,
+     "title": "Cache Misses With Coherence"
+    },
+    {
+     "n": 32,
+     "title": "False Sharing Quiz"
+    },
+    {
+     "n": 33,
+     "title": "Coherence Outro"
+    }
+   ]
+  },
+  {
+   "number": 20,
+   "slug": "20-synchronization",
+   "title": "Synchronization",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Synchronization Intro"
+    },
+    {
+     "n": 2,
+     "title": "Synchronization Example"
+    },
+    {
+     "n": 3,
+     "title": "Synchronization Example Lock"
+    },
+    {
+     "n": 4,
+     "title": "Lock Variable Quiz"
+    },
+    {
+     "n": 5,
+     "title": "Lock Synchronization"
+    },
+    {
+     "n": 6,
+     "title": "Implementing Lock"
+    },
+    {
+     "n": 7,
+     "title": "Atomic Instructions Quiz"
+    },
+    {
+     "n": 8,
+     "title": "Atomic Instructions"
+    },
+    {
+     "n": 9,
+     "title": "Test And Set Quiz"
+    },
+    {
+     "n": 10,
+     "title": "Atomic Instructions 2"
+    },
+    {
+     "n": 11,
+     "title": "Load Linked Store Conditional"
+    },
+    {
+     "n": 12,
+     "title": "How is LL SC Atomic"
+    },
+    {
+     "n": 13,
+     "title": "LL SC Lock Quiz"
+    },
+    {
+     "n": 14,
+     "title": "Locks and Performance"
+    },
+    {
+     "n": 15,
+     "title": "Test and Atomic OP Lock"
+    },
+    {
+     "n": 16,
+     "title": "Test and Atomic OP Quiz"
+    },
+    {
+     "n": 17,
+     "title": "Unlock Quiz"
+    },
+    {
+     "n": 18,
+     "title": "Barrier Synchronization"
+    },
+    {
+     "n": 19,
+     "title": "Simple Barrier Implementation"
+    },
+    {
+     "n": 20,
+     "title": "Simple Barrier Implementation Doesn't Work"
+    },
+    {
+     "n": 21,
+     "title": "Simple Barrier Quiz"
+    },
+    {
+     "n": 22,
+     "title": "Reusable Barrier"
+    },
+    {
+     "n": 23,
+     "title": "Synchronization Outro"
+    }
+   ]
+  },
+  {
+   "number": 21,
+   "slug": "21-memory-consistency",
+   "title": "Memory Consistency",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Consistency Intro"
+    },
+    {
+     "n": 2,
+     "title": "Memory Consistency"
+    },
+    {
+     "n": 3,
+     "title": "Consistency Matters"
+    },
+    {
+     "n": 4,
+     "title": "Consistency Matters Quiz"
+    },
+    {
+     "n": 5,
+     "title": "Why We Need Consistency"
+    },
+    {
+     "n": 6,
+     "title": "Sequential Consistency"
+    },
+    {
+     "n": 7,
+     "title": "Simple Implementation of SC Quiz"
+    },
+    {
+     "n": 8,
+     "title": "Better Implementation of SC"
+    },
+    {
+     "n": 9,
+     "title": "Relaxed Consistency"
+    },
+    {
+     "n": 10,
+     "title": "Relaxed Consistency (2)"
+    },
+    {
+     "n": 11,
+     "title": "MSYNC Quiz"
+    },
+    {
+     "n": 12,
+     "title": "Data Races and Consistency"
+    },
+    {
+     "n": 13,
+     "title": "Consistency Models"
+    },
+    {
+     "n": 14,
+     "title": "Consistency Outro"
+    }
+   ]
+  },
+  {
+   "number": 22,
+   "slug": "22-many-cores",
+   "title": "Many Cores",
+   "videos": [
+    {
+     "n": 1,
+     "title": "Many Cores Intro"
+    },
+    {
+     "n": 2,
+     "title": "Many Core Challenges"
+    },
+    {
+     "n": 3,
+     "title": "Network On Chip"
+    },
+    {
+     "n": 4,
+     "title": "Mesh vs Bus Throughput Quiz"
+    },
+    {
+     "n": 5,
+     "title": "Many Core Challenges 2"
+    },
+    {
+     "n": 6,
+     "title": "Distributed LLC"
+    },
+    {
+     "n": 7,
+     "title": "Distributed LLC Quiz"
+    },
+    {
+     "n": 8,
+     "title": "Many Core Challenges 2 (continued)"
+    },
+    {
+     "n": 9,
+     "title": "On Chip Directory"
+    },
+    {
+     "n": 10,
+     "title": "On Chip Directory Quiz"
+    },
+    {
+     "n": 11,
+     "title": "On Chip Directory 2"
+    },
+    {
+     "n": 12,
+     "title": "Many Core Challenges 3"
+    },
+    {
+     "n": 13,
+     "title": "Multi Core Power and Performance"
+    },
+    {
+     "n": 14,
+     "title": "Performance vs Number of Cores Quiz"
+    },
+    {
+     "n": 15,
+     "title": "No Parallelism to Boost Frequency"
+    },
+    {
+     "n": 16,
+     "title": "Many Core Challenges 4"
+    },
+    {
+     "n": 17,
+     "title": "SMT - Cores - Chips"
+    },
+    {
+     "n": 18,
+     "title": "Many Core Challenges 5"
+    },
+    {
+     "n": 19,
+     "title": "Many Cores Outro"
+    }
+   ]
+  }
+ ]
+}
