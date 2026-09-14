@@ -9,7 +9,9 @@ textbook-style summary of what the lectures cover.  Built with
   `lessons/`, one chapter per lesson.
 - `figures/` and `references.bib` are shared by both editions.
 - **Read the latest PDFs in the browser** (rebuilt by CI on every push):
-  [English](../../blob/pdf/notes-en.pdf) · [日本語](../../blob/pdf/notes-ja.pdf)
+  <https://kinginu.github.io/cs6290-notes/> —
+  [English](https://kinginu.github.io/cs6290-notes/notes-en.pdf) ·
+  [日本語](https://kinginu.github.io/cs6290-notes/notes-ja.pdf)
 - Local build: `make docker-all` → `en/build/main.pdf`, `ja/build/main.pdf`.
 
 ## Status

@@ -20,15 +20,19 @@ jobs:
       - name: Build PDFs (en, ja)
         run: make dist
 
+      - name: Generate index.html for GitHub Pages
+        run: sh .github/scripts/pdf-index.sh "${{ github.event.repository.name }}" "${{ github.server_url }}/${{ github.repository }}" "${{ github.sha }}"
+
       - uses: actions/upload-artifact@v4
         with:
           name: notes-pdf
-          path: dist/*.pdf
+          path: dist/
           if-no-files-found: error
 
-      # Publish the PDFs to the orphan branch `pdf` (one commit, force-pushed)
-      # so they can be read in the browser without downloading:
-      #   https://github.com/<owner>/<repo>/blob/pdf/notes-en.pdf
+      # Publish the PDFs to the orphan branch `pdf` (one commit, force-pushed).
+      # Readable at https://github.com/<owner>/<repo>/blob/pdf/notes-en.pdf, or,
+      # with GitHub Pages enabled on that branch, at
+      #   https://<owner>.github.io/<repo>/  (index.html links to both PDFs)
       - name: Publish PDFs to the pdf branch
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@v4
