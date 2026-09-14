@@ -1,0 +1,23 @@
+# build outputs
+build/
+dist/
+# latexmk / TeX intermediates outside build/
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.idx
+*.ilg
+*.ind
+*.log
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.pdf
+# editor / OS
+.DS_Store

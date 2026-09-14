@@ -1,0 +1,25 @@
+% !TEX program = lualatex
+% 日本語版．構成は en/main.tex と同一に保つ．
+\documentclass[ja]{lnotes}
+
+\addbibresource{\subfix{../references.bib}}
+
+\title{講義名}
+\subtitle{講義ノート}
+\author{氏名}
+\date{\today}
+\subject{COURSE-0000 --- 所属}
+
+\begin{document}
+\frontmatter
+\maketitle
+\tableofcontents
+
+\mainmatter
+\subfile{lessons/01-using-this-template}
+\subfile{lessons/02-lesson-skeleton}
+
+\backmatter
+\printbibliography
+\printindex
+\end{document}

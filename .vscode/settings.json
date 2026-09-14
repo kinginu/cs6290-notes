@@ -1,0 +1,32 @@
+{
+  // LaTeX Workshop: always build through latexmk with the repo's .latexmkrc
+  "latex-workshop.latex.tools": [
+    {
+      "name": "latexmk",
+      "command": "latexmk",
+      "args": [
+        "-r", "%WORKSPACE_FOLDER%/.latexmkrc",
+        "%DOC%"
+      ]
+    }
+  ],
+  "latex-workshop.latex.recipes": [
+    { "name": "latexmk (lualatex)", "tools": ["latexmk"] }
+  ],
+  "latex-workshop.latex.recipe.default": "first",
+  "latex-workshop.latex.outDir": "%DIR%/build",
+  // Chapter-only builds: when the active file is a subfile (lessons/*.tex)
+  // it is compiled on its own instead of the whole book.
+  "latex-workshop.latex.rootFile.useSubFile": true,
+  "latex-workshop.latex.autoBuild.run": "never",
+  "latex-workshop.latex.autoClean.run": "never",
+  "latex-workshop.view.pdf.viewer": "tab",
+  "latex-workshop.message.latexlog.exclude": [
+    "Overfull",
+    "Underfull"
+  ],
+  "files.exclude": {
+    "**/build": true
+  },
+  "editor.wordWrap": "on"
+}

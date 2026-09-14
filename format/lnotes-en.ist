@@ -1,0 +1,9 @@
+% upmendex style for lnotes.cls (English)
+headings_flag 1
+heading_prefix "{\\bfseries\\sffamily "
+heading_suffix "}\\nopagebreak"
+symhead_positive "Symbols"
+numhead_positive "Numbers"
+delim_0 ", "
+delim_1 ", "
+delim_2 ", "

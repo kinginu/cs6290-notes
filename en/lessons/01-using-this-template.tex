@@ -1,0 +1,133 @@
+% Standalone build: open this file in VS Code and run the build, or
+%   latexmk -cd en/lessons/01-using-this-template.tex
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Using this template}
+\lessoninfo{
+  video={Lesson 1 (Introduction)},
+  textbook={H\&P \cite{hennessy2017} §1.1--1.3},
+  keywords={sidenotes, index, bilingual build},
+}
+
+This chapter is a showcase of every macro the class provides.  Delete it
+when you start a real course, but keep \texttt{02-lesson-skeleton.tex} as a
+starting point for new lessons.
+
+\section{Margin notes}
+
+The right-hand column is for anything that supports the main text without
+interrupting it.  Numbered remarks use \verb|\sidenote|\sidenote{Like this
+one.  Numbers restart at every chapter.} and unnumbered remarks use
+\verb|\margin|.\margin{An unnumbered margin note.}
+
+Three labelled variants make the \emph{kind} of side content visible at a
+glance:
+\source{Amdahl's original paper~\cite{amdahl1967}; H\&P §1.9.}
+\tip{Use \texttt{\string\tip} for exam-relevant advice or mnemonics.}
+\caution{Use \texttt{\string\caution} for common misconceptions.}
+\begin{itemize}
+  \item \verb|\source{...}| --- where the material comes from (lecture, textbook section, paper);
+  \item \verb|\tip{...}| --- practical advice;
+  \item \verb|\caution{...}| --- pitfalls and misconceptions.
+\end{itemize}
+
+\section{Terms and the index}
+
+A \term{pipeline}[パイプライン] is introduced with \verb|\term|, which
+emphasizes the word, adds it to the index, and optionally prints a gloss in
+the margin (here: the Japanese term).  Later mentions of a
+\term*{pipeline} use \verb|\term*| so the index does not fill up with
+repeated page numbers.  Terms can be nested: \term{speedup} and
+\term{Amdahl's law}[Amdahl1967@Amdahl's law] both go to the index.
+
+\begin{definition}[Speedup]
+  For a change that makes a fraction $f$ of the execution time $s$ times
+  faster, the overall speedup is
+  \begin{equation}
+    S = \frac{1}{(1-f) + f/s}.
+    \label{eq:amdahl}
+  \end{equation}
+\end{definition}
+
+\begin{example}
+  If $f = 0.9$ and $s \to \infty$, \cref{eq:amdahl} gives $S = 10$: the
+  untouched \SI{10}{\percent} bounds the achievable speedup.
+\end{example}
+
+\begin{note}
+  \verb|definition|, \verb|example| and \verb|note| share one counter per
+  chapter, so they can be cross-referenced with \verb|\cref|.
+\end{note}
+
+\begin{keypoint}[Amdahl's law]
+  Optimize the common case; the part you do not touch limits the gain.
+  Margin macros work inside this box too.\margin{From inside a key point.}
+\end{keypoint}
+
+\section{Figures, tables and code}
+
+\begin{marginfigure}
+  \begin{tikzpicture}[scale=0.6]
+    \draw[->] (0,0) -- (4,0) node[right,font=\tiny] {$f$};
+    \draw[->] (0,0) -- (0,3) node[above,font=\tiny] {$S$};
+    \draw[thick,ln-accent] plot[domain=0:3.6,samples=40] (\x,{1/(1-\x/4+0.001)*0.7});
+  \end{tikzpicture}
+  \caption{A figure in the margin (\texttt{marginfigure}).}
+  \label{fig:margin}
+\end{marginfigure}
+
+Small figures go in the margin (\cref{fig:margin}); normal figures use the
+standard \verb|figure| environment; wide figures use \verb|widefigure|,
+which spans the body and the margin column (\cref{fig:wide}).  Figures shared
+between the two editions live in \texttt{figures/} and switch their labels
+with \verb|\iflangja|.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/pipeline-stages}
+  \caption{A classic five-stage pipeline (shared TikZ source).}
+  \label{fig:pipeline}
+\end{figure}
+
+\begin{widefigure}[htbp]
+  \begin{tabular}{@{}lccccccc@{}}
+    \toprule
+    Cycle & 1 & 2 & 3 & 4 & 5 & 6 & 7 \\
+    \midrule
+    \texttt{add}  & IF & ID & EX & MEM & WB &    &    \\
+    \texttt{sub}  &    & IF & ID & EX  & MEM & WB &   \\
+    \texttt{lw}   &    &    & IF & ID  & EX  & MEM & WB \\
+    \bottomrule
+  \end{tabular}
+  \caption{A wide float spanning body and margin (\texttt{widefigure}).}
+  \label{fig:wide}
+\end{widefigure}
+
+Code uses \verb|listings|:
+\begin{lstlisting}[language={[x86masm]Assembler}, caption={A loop in assembly.}]
+loop:   add   r1, r1, r2      ; accumulate
+        addi  r3, r3, -1
+        bne   r3, r0, loop    ; branch if not done
+\end{lstlisting}
+
+Pseudocode uses \verb|algorithmicx|:
+\begin{algorithm}[htbp]
+  \caption{Two-bit saturating counter update}
+  \begin{algorithmic}[1]
+    \If{taken}
+      \State $c \gets \min(c+1, 3)$
+    \Else
+      \State $c \gets \max(c-1, 0)$
+    \EndIf
+  \end{algorithmic}
+\end{algorithm}
+
+\section{Bilingual writing}
+
+Both editions share \texttt{format/}, \texttt{figures/} and
+\texttt{references.bib}; only the prose under \texttt{en/} and \texttt{ja/}
+differs.  Inside shared files use \verb|\iflangja{japanese}{english}| or the
+shorthands \verb|\ja{...}| and \verb|\en{...}|.
+
+\end{document}

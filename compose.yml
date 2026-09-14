@@ -1,0 +1,11 @@
+services:
+  tex:
+    build: .
+    image: latex-lecture-notes:tl2025
+    # Files written into the mounted repo are owned by your host user.
+    user: "${UID:-1000}:${GID:-1000}"
+    environment:
+      HOME: /home/texlive
+    volumes:
+      - .:/work
+    working_dir: /work

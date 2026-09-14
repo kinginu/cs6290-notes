@@ -1,0 +1,22 @@
+% Shared TikZ figure.  Labels switch with the document language.
+% Usage: \input{figures/pipeline-stages}
+\begin{tikzpicture}[
+  stage/.style={draw, rounded corners=1pt, minimum width=1.6cm, minimum height=0.8cm,
+                font=\sffamily\small, fill=ln-box},
+  >={Stealth[length=2mm]}, node distance=4mm,
+]
+  \node[stage] (if)  {IF};
+  \node[stage, right=of if]  (id)  {ID};
+  \node[stage, right=of id]  (ex)  {EX};
+  \node[stage, right=of ex]  (mem) {MEM};
+  \node[stage, right=of mem] (wb)  {WB};
+  \draw[->] (if) -- (id);
+  \draw[->] (id) -- (ex);
+  \draw[->] (ex) -- (mem);
+  \draw[->] (mem) -- (wb);
+  \node[below=1mm of if,  font=\footnotesize\color{ln-muted}] {\iflangja{命令フェッチ}{fetch}};
+  \node[below=1mm of id,  font=\footnotesize\color{ln-muted}] {\iflangja{デコード}{decode}};
+  \node[below=1mm of ex,  font=\footnotesize\color{ln-muted}] {\iflangja{実行}{execute}};
+  \node[below=1mm of mem, font=\footnotesize\color{ln-muted}] {\iflangja{メモリ}{memory}};
+  \node[below=1mm of wb,  font=\footnotesize\color{ln-muted}] {\iflangja{書き戻し}{write back}};
+\end{tikzpicture}

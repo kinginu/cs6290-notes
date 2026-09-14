@@ -1,0 +1,132 @@
+% 単体ビルド: VS Code でこのファイルを開いてビルド，または
+%   latexmk -cd ja/lessons/01-using-this-template.tex
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{このテンプレートの使い方}
+\lessoninfo{
+  video={Lesson 1 (Introduction)},
+  textbook={H\&P \cite{hennessy2017} §1.1--1.3},
+  keywords={サイドノート, 索引, 二言語ビルド},
+}
+
+この章はクラスが提供する全マクロの見本である．実際の講義ノートを書き
+始めるときは削除してよいが，\texttt{02-lesson-skeleton.tex} は新しい章の
+雛形として残しておくとよい．
+
+\section{余白ノート}
+
+右側の余白は，本文の流れを妨げずに補足したい内容のための領域である．
+番号付きの補足には \verb|\sidenote|\sidenote{このように表示される．番号は
+章ごとに振り直される．}を，番号なしの補足には \verb|\margin| を
+使う．\margin{番号なしの余白ノート．}
+
+補足の\emph{種類}が一目でわかるように，ラベル付きの変種を3つ用意している．
+\source{Amdahl の原論文~\cite{amdahl1967}，H\&P §1.9．}
+\tip{試験に関係する助言や覚え方には \texttt{\string\tip} を使う．}
+\caution{よくある誤解には \texttt{\string\caution} を使う．}
+\begin{itemize}
+  \item \verb|\source{...}| --- 出典（講義，教科書の節，論文）
+  \item \verb|\tip{...}| --- 実用的な助言
+  \item \verb|\caution{...}| --- 落とし穴・誤解
+\end{itemize}
+
+\section{用語と索引}
+
+\term[ぱいぷらいん]{パイプライン}[pipeline]のような用語は \verb|\term| で
+導入する．語を強調し，索引に登録し，必要なら余白に対訳（ここでは英語）を
+表示する．日本語の索引は読みで並べ替えるため，漢字を含む語には
+\verb|\term[よみ]{語}| のように読みを与える（カタカナ語は省略できる）．
+2回目以降の\term*{パイプライン}には \verb|\term*| を使い，索引にページ番号が
+並びすぎないようにする．\term[こうそくか]{高速化率}[speedup]と
+\term[あむだーるのほうそく]{Amdahl の法則}[Amdahl's law]も索引に載る．
+
+\begin{definition}[高速化率]
+  実行時間のうち割合 $f$ の部分を $s$ 倍速くしたとき，全体の高速化率は
+  \begin{equation}
+    S = \frac{1}{(1-f) + f/s}
+    \label{eq:amdahl}
+  \end{equation}
+  で与えられる．
+\end{definition}
+
+\begin{example}
+  $f = 0.9$，$s \to \infty$ のとき，\cref{eq:amdahl} より $S = 10$ となる．
+  手を付けなかった \SI{10}{\percent} が達成可能な高速化の上限を決める．
+\end{example}
+
+\begin{note}
+  \verb|definition|，\verb|example|，\verb|note| は章ごとに1つのカウンタを
+  共有するので，\verb|\cref| で相互参照できる．
+\end{note}
+
+\begin{keypoint}[Amdahl の法則]
+  頻出ケースを最適化せよ．手を付けなかった部分が利得の上限を決める．
+  余白マクロはこのボックスの中でも使える．\margin{要点ボックスの中から．}
+\end{keypoint}
+
+\section{図・表・コード}
+
+\begin{marginfigure}
+  \begin{tikzpicture}[scale=0.6]
+    \draw[->] (0,0) -- (4,0) node[right,font=\tiny] {$f$};
+    \draw[->] (0,0) -- (0,3) node[above,font=\tiny] {$S$};
+    \draw[thick,ln-accent] plot[domain=0:3.6,samples=40] (\x,{1/(1-\x/4+0.001)*0.7});
+  \end{tikzpicture}
+  \caption{余白に置いた図（\texttt{marginfigure}）．}
+  \label{fig:margin}
+\end{marginfigure}
+
+小さな図は余白に置く（\cref{fig:margin}）．通常の図は標準の \verb|figure|
+環境を，幅の広い図は本文と余白にまたがる \verb|widefigure| を使う
+（\cref{fig:wide}）．日英で共有する図は \texttt{figures/} に置き，
+ラベルは \verb|\iflangja| で切り替える．
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/pipeline-stages}
+  \caption{古典的な5段パイプライン（共有 TikZ ソース）．}
+  \label{fig:pipeline}
+\end{figure}
+
+\begin{widefigure}[htbp]
+  \begin{tabular}{@{}lccccccc@{}}
+    \toprule
+    サイクル & 1 & 2 & 3 & 4 & 5 & 6 & 7 \\
+    \midrule
+    \texttt{add}  & IF & ID & EX & MEM & WB &    &    \\
+    \texttt{sub}  &    & IF & ID & EX  & MEM & WB &   \\
+    \texttt{lw}   &    &    & IF & ID  & EX  & MEM & WB \\
+    \bottomrule
+  \end{tabular}
+  \caption{本文と余白にまたがる幅広フロート（\texttt{widefigure}）．}
+  \label{fig:wide}
+\end{widefigure}
+
+コードには \verb|listings| を使う．
+\begin{lstlisting}[language={[x86masm]Assembler}, caption={アセンブリのループ．}]
+loop:   add   r1, r1, r2      ; accumulate
+        addi  r3, r3, -1
+        bne   r3, r0, loop    ; branch if not done
+\end{lstlisting}
+
+擬似コードには \verb|algorithmicx| を使う．
+\begin{algorithm}[htbp]
+  \caption{2ビット飽和カウンタの更新}
+  \begin{algorithmic}[1]
+    \If{taken}
+      \State $c \gets \min(c+1, 3)$
+    \Else
+      \State $c \gets \max(c-1, 0)$
+    \EndIf
+  \end{algorithmic}
+\end{algorithm}
+
+\section{二言語での執筆}
+
+両言語版は \texttt{format/}，\texttt{figures/}，\texttt{references.bib} を
+共有し，\texttt{en/} と \texttt{ja/} 以下の本文だけが異なる．共有ファイルの
+中では \verb|\iflangja{日本語}{英語}| か，省略形の \verb|\ja{...}|，
+\verb|\en{...}| を使う．
+
+\end{document}

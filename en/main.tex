@@ -1,0 +1,25 @@
+% !TEX program = lualatex
+% English edition.  Keep the structure identical to ja/main.tex.
+\documentclass[en]{lnotes}
+
+\addbibresource{\subfix{../references.bib}}
+
+\title{Course Title}
+\subtitle{Lecture Notes}
+\author{Your Name}
+\date{\today}
+\subject{COURSE-0000 --- Institution}
+
+\begin{document}
+\frontmatter
+\maketitle
+\tableofcontents
+
+\mainmatter
+\subfile{lessons/01-using-this-template}
+\subfile{lessons/02-lesson-skeleton}
+
+\backmatter
+\printbibliography
+\printindex
+\end{document}
