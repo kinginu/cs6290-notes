@@ -10,6 +10,11 @@ on:
 permissions:
   contents: write
 
+# A newer push supersedes a build still running for the same branch.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   pdf:
     runs-on: ubuntu-latest

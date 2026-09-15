@@ -35,28 +35,30 @@
 \tableofcontents
 
 \mainmatter
-\subfile{lessons/01-introduction}
-\subfile{lessons/02-metrics-and-evaluation}
-\subfile{lessons/03-pipelining}
-\subfile{lessons/04-branches}
-\subfile{lessons/05-predication}
-\subfile{lessons/06-ilp}
-\subfile{lessons/07-instruction-scheduling}
-\subfile{lessons/08-reorder-buffer}
-\subfile{lessons/09-memory-ordering}
-\subfile{lessons/10-compiler-ilp}
-\subfile{lessons/11-vliw}
-\subfile{lessons/12-cache-review}
-\subfile{lessons/13-virtual-memory}
-\subfile{lessons/14-advanced-caches}
-\subfile{lessons/15-memory}
-\subfile{lessons/16-storage}
-\subfile{lessons/17-fault-tolerance}
-\subfile{lessons/18-multi-processing}
-\subfile{lessons/19-cache-coherence}
-\subfile{lessons/20-synchronization}
-\subfile{lessons/21-memory-consistency}
-\subfile{lessons/22-many-cores}
+% Chapters are included only once they exist, so the book builds while
+% lessons are still being written.
+\IfFileExists{lessons/01-introduction.tex}{\subfile{lessons/01-introduction}}{}
+\IfFileExists{lessons/02-metrics-and-evaluation.tex}{\subfile{lessons/02-metrics-and-evaluation}}{}
+\IfFileExists{lessons/03-pipelining.tex}{\subfile{lessons/03-pipelining}}{}
+\IfFileExists{lessons/04-branches.tex}{\subfile{lessons/04-branches}}{}
+\IfFileExists{lessons/05-predication.tex}{\subfile{lessons/05-predication}}{}
+\IfFileExists{lessons/06-ilp.tex}{\subfile{lessons/06-ilp}}{}
+\IfFileExists{lessons/07-instruction-scheduling.tex}{\subfile{lessons/07-instruction-scheduling}}{}
+\IfFileExists{lessons/08-reorder-buffer.tex}{\subfile{lessons/08-reorder-buffer}}{}
+\IfFileExists{lessons/09-memory-ordering.tex}{\subfile{lessons/09-memory-ordering}}{}
+\IfFileExists{lessons/10-compiler-ilp.tex}{\subfile{lessons/10-compiler-ilp}}{}
+\IfFileExists{lessons/11-vliw.tex}{\subfile{lessons/11-vliw}}{}
+\IfFileExists{lessons/12-cache-review.tex}{\subfile{lessons/12-cache-review}}{}
+\IfFileExists{lessons/13-virtual-memory.tex}{\subfile{lessons/13-virtual-memory}}{}
+\IfFileExists{lessons/14-advanced-caches.tex}{\subfile{lessons/14-advanced-caches}}{}
+\IfFileExists{lessons/15-memory.tex}{\subfile{lessons/15-memory}}{}
+\IfFileExists{lessons/16-storage.tex}{\subfile{lessons/16-storage}}{}
+\IfFileExists{lessons/17-fault-tolerance.tex}{\subfile{lessons/17-fault-tolerance}}{}
+\IfFileExists{lessons/18-multi-processing.tex}{\subfile{lessons/18-multi-processing}}{}
+\IfFileExists{lessons/19-cache-coherence.tex}{\subfile{lessons/19-cache-coherence}}{}
+\IfFileExists{lessons/20-synchronization.tex}{\subfile{lessons/20-synchronization}}{}
+\IfFileExists{lessons/21-memory-consistency.tex}{\subfile{lessons/21-memory-consistency}}{}
+\IfFileExists{lessons/22-many-cores.tex}{\subfile{lessons/22-many-cores}}{}
 
 \backmatter
 \printbibliography

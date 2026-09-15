@@ -385,6 +385,13 @@
   \crefname{sidenote}{注}{注}        \Crefname{sidenote}{注}{注}
   \crefname{page}{ページ}{ページ}    \Crefname{page}{ページ}{ページ}
   \crefformat{part}{第#2#1#3部}      \Crefformat{part}{第#2#1#3部}
+  %% list conjunctions: 図 1.1，表 1.2 / 式 (1.1)〜(1.3)
+  %% (cleveref sets its English defaults at \begin{document})
+  \AtBeginDocument{%
+    \def\crefpairconjunction{，}\def\crefmiddleconjunction{，}%
+    \def\creflastconjunction{，}\def\crefpairgroupconjunction{，}%
+    \def\crefmiddlegroupconjunction{，}\def\creflastgroupconjunction{，}%
+    \def\crefrangeconjunction{〜}}
 \else
   \crefname{definition}{Definition}{Definitions}
   \crefname{example}{Example}{Examples}
