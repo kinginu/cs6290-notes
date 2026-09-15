@@ -1,0 +1,46 @@
+% Timing of the running example: issue, waiting in the reservation station,
+% execution, completed result waiting for the CDB, and write result.
+\begin{tikzpicture}[x=0.52cm,y=0.5cm, font=\scriptsize\sffamily,
+  c/.style={minimum width=0.52cm, minimum height=0.5cm, inner sep=0pt, draw=ln-rule},
+  iss/.style={c, fill=white, draw=black},
+  ex/.style={c, fill=ln-accent!25, draw=black},
+  wt/.style={c, fill=ln-caution!20, draw=black},
+  wr/.style={c, fill=ln-accent, draw=black, text=white, font=\scriptsize\bfseries\sffamily},
+  q/.style={c, fill=ln-muted!30, draw=black}]
+  \foreach \c in {1,...,19} { \node[text=ln-muted] at (\c,1) {\c}; }
+  \node[anchor=east, text=ln-muted] at (0.4,1) {\iflangja{サイクル}{cycle}};
+  \foreach \c in {1,...,19} { \draw[ln-rule, very thin] (\c-0.5,0.6) -- (\c-0.5,-6.5); }
+  \draw[ln-rule, very thin] (19.5,0.6) -- (19.5,-6.5);
+  % name, issue, first execution cycle, last execution cycle, write result
+  \foreach \n/\op/\i/\ea/\eb/\w [count=\r from 0] in
+    {1/MUL/1/2/5/6, 2/ADD/2/7/8/9, 3/SUB/3/4/5/7, 4/ADD/4/9/10/11,
+     5/DIV/5/8/11/12, 6/MUL/7/12/15/16, 7/SUB/8/17/18/19} {
+    \node[anchor=east] at (0.4,-\r) {I\n\enskip\texttt{\op}};
+    \node[iss] at (\i,-\r) {I};
+    \pgfmathtruncatemacro{\wa}{\i+1}
+    \pgfmathtruncatemacro{\wb}{\ea-1}
+    \ifnum\wa<\ea
+      \draw[ln-muted, thick] (\wa-0.5,-\r) -- (\wb+0.5,-\r);
+    \fi
+    \foreach \e in {\ea,...,\eb} { \node[ex] at (\e,-\r) {}; }
+    \node[wr] at (\w,-\r) {W};
+  }
+  % I3: result complete in cycle 5, bus taken by I1 in cycle 6
+  \node[wt] at (6,-2) {};
+  % I6: no free multiplier station in cycle 6
+  \node[q] at (6,-5) {};
+  % ---- legend
+  \begin{scope}[shift={(0,-7.6)}]
+    \node[iss] at (1,0) {I}; \node[anchor=west] at (1.5,0) {\iflangja{発行}{issue}};
+    \draw[ln-muted, thick] (3.9,0) -- (4.9,0);
+    \node[anchor=west] at (5,0) {\iflangja{RS で待機}{waiting in RS}};
+    \node[ex] at (9.4,0) {}; \node[anchor=west] at (9.9,0) {\iflangja{実行}{execution}};
+    \node[wr] at (13.3,0) {W}; \node[anchor=west] at (13.8,0) {\iflangja{結果書き込み}{write result}};
+  \end{scope}
+  \begin{scope}[shift={(0,-8.7)}]
+    \node[wt] at (1,0) {};
+    \node[anchor=west] at (1.5,0) {\iflangja{実行済み，CDB 待ち}{done, waiting for the CDB}};
+    \node[q] at (9.4,0) {};
+    \node[anchor=west] at (9.9,0) {\iflangja{空き RS なし（命令キュー）}{no free RS (in queue)}};
+  \end{scope}
+\end{tikzpicture}

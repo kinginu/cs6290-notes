@@ -1,0 +1,31 @@
+% Thread-aware TLB of an SMT core: every entry records the thread it
+% belongs to, and a lookup must match both the thread and the VPN.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  cell/.style={draw, minimum height=0.42cm, inner sep=1pt, font=\footnotesize\ttfamily},
+  hd/.style={inner sep=1pt, font=\scriptsize\sffamily, text=ln-muted}]
+  % ---- lookup key
+  \node[cell, fill=ln-accent!15, minimum width=0.8cm] (kt) at (0,0.21) {1};
+  \node[cell, fill=ln-accent!15, minimum width=1.2cm, anchor=west] (kv) at (kt.east) {0x12};
+  \node[hd, anchor=south] at (kt.north) {\iflangja{スレッド}{thread}};
+  \node[hd, anchor=south] at (kv.north) {VPN};
+  % ---- TLB entries: thread | VPN | frame
+  \foreach \r/\t/\v/\f in {0/0/0x12/0x3A, 1/1/0x12/0x07, 2/0/0x40/0x15, 3/1/0x2C/0x51} {
+    \ifnum\r=1 \def\lnfill{ln-tip!25}\else \def\lnfill{white}\fi
+    \node[cell, fill=\lnfill, minimum width=0.8cm] (t\r) at (4.2,{0.63-\r*0.42}) {\t};
+    \node[cell, fill=\lnfill, minimum width=1.2cm, anchor=west] (v\r) at (t\r.east) {\v};
+    \node[cell, fill=\lnfill, minimum width=1.2cm, anchor=west] (f\r) at (v\r.east) {\f};
+  }
+  \node[hd, anchor=south] at (t0.north) {\iflangja{スレッド}{thread}};
+  \node[hd, anchor=south] at (v0.north) {VPN};
+  \node[hd, anchor=south] at (f0.north) {\iflangja{フレーム}{frame}};
+  \node[font=\footnotesize, anchor=north] at (v3.south) {TLB};
+  % ---- lookup and result
+  \draw[->] (kv.east) -- (t1.west |- kv.east)
+    node[midway, above, font=\scriptsize, align=center]
+    {\iflangja{スレッドと VPN が}{thread and VPN}\\\iflangja{ともに一致}{must both match}};
+  \node[cell, fill=ln-tip!25, minimum width=1.2cm] (res) at (9.2,0.21) {0x07};
+  \node[hd, anchor=south] at (res.north) {\iflangja{物理フレーム}{physical frame}};
+  \draw[->] (f1.east) -- (res.west);
+  \node[hd, anchor=north west, align=left] at (3.8,-1.35)
+    {\iflangja{同じ VPN 0x12 でもスレッド 0 はフレーム 0x3A に対応する}{VPN 0x12 of thread 0 maps to frame 0x3A instead}};
+\end{tikzpicture}

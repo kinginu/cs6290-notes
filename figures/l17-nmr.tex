@@ -1,0 +1,38 @@
+% N-module redundancy: (a) two modules and a comparator detect an error;
+% (b) three modules and a majority voter mask the error of one module.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  mod/.style={draw, fill=ln-box, minimum width=1.1cm, minimum height=0.55cm, inner sep=2pt},
+  lab/.style={font=\scriptsize, text=ln-muted, align=center}]
+  % ---------------- (a) dual
+  \node[anchor=west, font=\footnotesize\bfseries] at (-0.5,1.55) {(a) $N=2$};
+  \draw (-0.5,0) node[left, lab] {\iflangja{入力}{in}} -- (0.3,0);
+  \fill (0.3,0) circle (1.2pt);
+  \node[mod] (a1) at (1.3,0.55) {M1};
+  \node[mod] (a2) at (1.3,-0.55) {M2};
+  \draw[->] (0.3,0) |- (a1.west);
+  \draw[->] (0.3,0) |- (a2.west);
+  \node[draw, circle, fill=ln-accent!15, minimum size=0.7cm, inner sep=0pt] (cmp) at (3.1,0) {$=$};
+  \draw[->] (a1.east) -| (cmp.north);
+  \draw[->] (a2.east) -| (cmp.south);
+  \draw[->] (cmp.east) -- (4.0,0) node[right, lab] {\iflangja{出力}{out}};
+  \node[lab, anchor=north] at (3.1,-0.9)
+    {\iflangja{一致: 結果は有効\\不一致: エラー検出}{equal: result valid\\differ: error detected}};
+  % ---------------- (b) triple
+  \begin{scope}[xshift=6.0cm]
+  \node[anchor=west, font=\footnotesize\bfseries] at (-0.5,1.55) {(b) $N=3$};
+  \draw (-0.5,0) node[left, lab] {\iflangja{入力}{in}} -- (0.3,0);
+  \fill (0.3,0) circle (1.2pt);
+  \node[mod] (b1) at (1.3,0.8) {M1};
+  \node[mod] (b2) at (1.3,0) {M2};
+  \node[mod] (b3) at (1.3,-0.8) {M3};
+  \draw[->] (0.3,0) |- (b1.west);
+  \draw[->] (0.3,0) -- (b2.west);
+  \draw[->] (0.3,0) |- (b3.west);
+  \node[draw, fill=ln-accent!15, minimum width=0.9cm, minimum height=2.1cm, align=center, inner sep=1pt] (vote) at (3.0,0)
+    {\iflangja{多数\\決}{vote}};
+  \draw[->] (b1.east) -- (b1.east -| vote.west);
+  \draw[->] (b2.east) -- (vote.west);
+  \draw[->] (b3.east) -- (b3.east -| vote.west);
+  \draw[->] (vote.east) -- (4.1,0) node[right, lab] {\iflangja{出力}{out}};
+  \end{scope}
+\end{tikzpicture}

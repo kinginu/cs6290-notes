@@ -1,0 +1,32 @@
+% RAW dependences of the ILP example, instructions placed in the cycle in
+% which the ideal processor executes them.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  ins/.style={draw, fill=ln-box, rounded corners=2pt, align=center,
+    minimum width=2.4cm, minimum height=0.75cm, inner sep=1pt,
+    font=\scriptsize\sffamily},
+  dep/.style={->, thick, ln-accent},
+  reg/.style={font=\scriptsize\sffamily, fill=white, inner sep=1pt}]
+  \foreach \c/\x in {1/0,2/3.9,3/7.8} {
+    \node[font=\footnotesize\bfseries\sffamily, text=ln-muted] at (\x,0.75)
+      {\iflangja{サイクル \c}{cycle \c}};
+  }
+  \draw[ln-rule] (1.95,0.95) -- (1.95,-3.4);
+  \draw[ln-rule] (5.85,0.95) -- (5.85,-3.4);
+  % cycle 1
+  \node[ins] (i1) at (0,0)    {I1\\\texttt{ADD R1,R2,R3}};
+  \node[ins] (i6) at (0,-1)   {I6\\\texttt{OR~~R2,R8,R3}};
+  \node[ins] (i3) at (0,-2)   {I3\\\texttt{SUB R6,R2,R7}};
+  \node[ins] (i8) at (0,-3)   {I8\\\texttt{ADD R5,R3,R8}};
+  % cycle 2
+  \node[ins] (i2) at (3.9,0)  {I2\\\texttt{MUL R4,R1,R5}};
+  \node[ins] (i4) at (3.9,-2) {I4\\\texttt{ADD R1,R6,R8}};
+  % cycle 3
+  \node[ins] (i7) at (7.8,-0.5) {I7\\\texttt{XOR R7,R4,R2}};
+  \node[ins] (i5) at (7.8,-2)   {I5\\\texttt{AND R9,R1,R8}};
+  % RAW dependences, labelled with the register
+  \draw[dep] (i1) -- node[reg] {R1} (i2);
+  \draw[dep] (i3) -- node[reg] {R6} (i4);
+  \draw[dep] (i4) -- node[reg] {R1} (i5);
+  \draw[dep] (i2.east) -- node[reg] {R4} (i7.north west);
+  \draw[dep] (i6.east) -- node[reg, pos=0.3] {R2} (i7.south west);
+\end{tikzpicture}

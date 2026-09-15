@@ -1,0 +1,50 @@
+% Organization of a DRAM chip: the row decoder activates one word line
+% (row address or refresh counter), the sense amplifiers read the whole row
+% into the row latch, the column multiplexer selects one bit, and the latch
+% is written back to the row over the bit lines.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted},
+  blk/.style={draw, fill=ln-box}]
+  % ---- cell array: one cell at every crossing of a word line and a bit line
+  \fill[ln-accent!15] (3.3,2.55) rectangle (9.3,3.05);
+  \foreach \i in {0,...,5} {
+    \draw[ln-accent] (3.3,{4.0-0.6*\i}) -- (9.3,{4.0-0.6*\i});
+  }
+  \foreach \j in {0,...,7} {
+    \draw[ln-muted] ({3.9+0.7*\j},4.4) -- ({3.9+0.7*\j},0.3);
+    \foreach \i in {0,...,5} {
+      \draw[fill=white] ({3.9+0.7*\j-0.11},{4.0-0.6*\i-0.11}) rectangle ({3.9+0.7*\j+0.11},{4.0-0.6*\i+0.11});
+    }
+  }
+  \node[lab, anchor=south] at (6.35,4.4) {\iflangja{メモリセルの配列}{array of memory cells}};
+  \node[lab, anchor=west] at (9.35,4.0) {\iflangja{ワード線}{word line}};
+  \node[lab, anchor=south] at (8.8,4.4) {\iflangja{ビット線}{bit line}};
+  % ---- row decoder with address / refresh counter selection
+  \draw[blk] (2.6,0.6) rectangle (3.3,4.4);
+  \node[rotate=90] at (2.95,2.5) {\iflangja{行デコーダ}{row decoder}};
+  \draw[fill=white] (1.7,1.75) -- (2.2,2.05) -- (2.2,2.95) -- (1.7,3.25) -- cycle;
+  \draw[->] (2.2,2.5) -- (2.6,2.5);
+  \draw[->] (0,2.9) node[above right, inner sep=1pt] {\iflangja{行アドレス}{row address}} -- (1.7,2.9);
+  \node[blk, align=center, font=\scriptsize\sffamily, inner sep=2pt] (cnt) at (0.65,1.6)
+    {\iflangja{リフレッシュ}{refresh}\\\iflangja{カウンタ}{counter}};
+  \draw[->] (cnt.east) -- (1.45,1.6) -- (1.45,2.1) -- (1.7,2.1);
+  % ---- sense amplifiers and row latch
+  \draw[blk] (3.6,-0.2) rectangle (9.2,0.3);
+  \node at (6.4,0.05) {\iflangja{センスアンプ}{sense amplifiers}};
+  \draw[blk] (3.6,-1.3) rectangle (9.2,-0.8);
+  \node at (6.4,-1.05) {\iflangja{行ラッチ}{row latch}};
+  % read into the latch and write back over the same bit lines
+  \foreach \j in {0,...,7} {
+    \draw[<->, >={Stealth[length=1.5mm]}] ({3.9+0.7*\j},-0.2) -- ({3.9+0.7*\j},-0.8);
+  }
+  \node[lab, anchor=west, align=left] at (9.25,-0.5)
+    {\iflangja{読み出し／}{read /}\\\iflangja{書き戻し}{write back}};
+  % ---- column multiplexer
+  \foreach \j in {0,...,7} {
+    \draw ({3.9+0.7*\j},-1.3) -- ({3.9+0.7*\j},-1.6);
+  }
+  \draw[fill=white] (3.7,-1.6) -- (9.1,-1.6) -- (7.15,-2.3) -- (5.65,-2.3) -- cycle;
+  \node at (6.4,-1.92) {\iflangja{列マルチプレクサ}{column multiplexer}};
+  \draw[->] (0.8,-1.95) node[above right, inner sep=1pt] {\iflangja{列アドレス}{column address}} -- (4.68,-1.95);
+  \draw[->] (6.4,-2.3) -- (6.4,-2.8) node[below] {\iflangja{データ}{data}};
+\end{tikzpicture}

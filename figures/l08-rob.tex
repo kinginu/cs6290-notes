@@ -1,0 +1,35 @@
+% The reorder buffer as a circular buffer: entries from the commit pointer
+% up to the issue pointer are in use, in program order, and wrap around from
+% the last entry to the first.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  hd/.style={font=\footnotesize\bfseries\sffamily},
+  used/.style={draw, fill=ln-accent!12, minimum height=0.45cm, inner sep=0pt},
+  free/.style={draw, fill=white, minimum height=0.45cm, inner sep=0pt, text=ln-muted}]
+  % column headings
+  \node[hd] at (0.45,0.45) {Reg};
+  \node[hd] at (1.55,0.45) {Value};
+  \node[hd] at (2.65,0.45) {Done};
+  % rows: entry / reg / value / done / used?
+  \foreach \r/\reg/\val/\done/\st in {1/R2/{}/0/used, 2/R5/8/1/used,
+      3/{}/{}/{}/free, 4/{}/{}/{}/free, 5/{}/{}/{}/free,
+      6/R3/{}/0/used, 7/R1/17/1/used, 8/R3/25/1/used} {
+    \pgfmathsetmacro{\y}{-(\r-1)*0.45}
+    \node[\st, minimum width=0.9cm] at (0.45,\y) {\reg};
+    \node[\st, minimum width=1.3cm] at (1.55,\y) {\val};
+    \node[\st, minimum width=0.9cm] at (2.65,\y) {\done};
+    \node[anchor=east, font=\scriptsize\sffamily, text=ln-muted] at (-0.05,\y) {ROB\r};
+  }
+  % pointers
+  \draw[<-, thick, ln-accent] (3.15,-2.25) -- (4.0,-2.25)
+    node[right, text=ln-accent] {\iflangja{コミットポインタ}{commit pointer}};
+  \draw[<-, thick, ln-accent] (3.15,-0.9) -- (4.0,-0.9)
+    node[right, text=ln-accent] {\iflangja{発行ポインタ}{issue pointer}};
+  % wrap-around
+  \draw[->, ln-muted] (-0.85,-3.15) -- (-1.15,-3.15) -- (-1.15,0.0) -- (-0.85,0.0);
+  \node[rotate=90, font=\scriptsize\sffamily, text=ln-muted] at (-1.4,-1.57)
+    {\iflangja{循環}{wrap around}};
+  % program order of the entries in use
+  \node[anchor=west, align=left, font=\scriptsize\sffamily, text=ln-muted] at (4.0,-3.15)
+    {\iflangja{使用中のエントリ（プログラム順）：\\ROB6, ROB7, ROB8, ROB1, ROB2}%
+              {entries in use, in program order:\\ROB6, ROB7, ROB8, ROB1, ROB2}};
+\end{tikzpicture}

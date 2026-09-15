@@ -1,0 +1,25 @@
+% Two service states and a timeline alternating between them.  Up-times are
+% times to failure, down-times are times to repair.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  st/.style={draw, rounded corners=3pt, minimum height=0.65cm, inner sep=3pt},
+  lab/.style={font=\scriptsize, text=ln-muted, align=center}]
+  % states
+  \node[st, fill=ln-accent!15] (up) at (2.6,2.3) {\iflangja{サービス遂行}{service accomplishment}};
+  \node[st, fill=ln-caution!15] (down) at (8.4,2.3) {\iflangja{サービス中断}{service interruption}};
+  \draw[->] (up) to[bend left=12] node[lab, above] {\iflangja{故障}{failure}} (down);
+  \draw[->] (down) to[bend left=12] node[lab, below] {\iflangja{修復}{restoration}} (up);
+  % timeline
+  \foreach \a/\b/\n in {0/3.1/1, 3.6/6.4/2, 7.2/10.6/3} {
+    \fill[ln-accent!15] (\a,0) rectangle (\b,0.45);
+    \draw[|<->|, ln-muted] (\a,0.7) -- node[above, font=\scriptsize] {$U_\n$} (\b,0.7);
+  }
+  \foreach \a/\b/\n in {3.1/3.6/1, 6.4/7.2/2, 10.6/11.1/3} {
+    \fill[ln-caution!40] (\a,0) rectangle (\b,0.45);
+    \node[font=\scriptsize, below] at ({(\a+\b)/2},-0.05) {$D_\n$};
+  }
+  \draw (0,0) rectangle (11.1,0.45);
+  \draw[->] (0,-0.55) -- (11.4,-0.55) node[pos=1, below left, lab] {\iflangja{時間}{time}};
+  \node[lab, anchor=north] at (5.55,-0.75)
+    {MTTF $=$ \iflangja{$U_i$ の平均}{mean of $U_i$}\qquad
+     MTTR $=$ \iflangja{$D_i$ の平均}{mean of $D_i$}};
+\end{tikzpicture}

@@ -1,0 +1,49 @@
+% Access patterns exploited by three hardware prefetchers.  Numbers give
+% the order of the accesses; P marks the block that is prefetched.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.5mm]}]
+  \def\lnw{0.58}
+  % \lnrow{y}{label}
+  \def\lnrow#1#2{%
+    \node[anchor=east, align=right] at (3.2,#1-0.29) {#2};
+    \foreach \b in {0,...,11} {
+      \draw[ln-rule, fill=white] ({3.4+\b*\lnw},#1) rectangle ++(\lnw,-0.58);
+    }
+  }
+  % \lnacc{y}{block}{order}  accessed block
+  \def\lnacc#1#2#3{%
+    \draw[fill=ln-accent!25] ({3.4+#2*\lnw},#1) rectangle ++(\lnw,-0.58);
+    \node at ({3.4+(#2+0.5)*\lnw},#1-0.29) {#3};
+  }
+  % \lnpre{y}{block}  prefetched block
+  \def\lnpre#1#2{%
+    \draw[fill=ln-tip!30] ({3.4+#2*\lnw},#1) rectangle ++(\lnw,-0.58);
+    \node at ({3.4+(#2+0.5)*\lnw},#1-0.29) {P};
+  }
+  % block numbers
+  \foreach \b in {0,...,11} {
+    \node[font=\scriptsize\sffamily, text=ln-muted] at ({3.4+(\b+0.5)*\lnw},0.3) {\b};
+  }
+  \node[anchor=east, font=\scriptsize\sffamily, text=ln-muted] at (3.2,0.3) {\iflangja{ブロック}{block}};
+  % (1) stream buffer: sequential
+  \lnrow{0}{\iflangja{ストリームバッファ}{stream buffer}}
+  \lnacc{0}{2}{1}\lnacc{0}{3}{2}\lnacc{0}{4}{3}
+  \lnpre{0}{5}\lnpre{0}{6}
+  \node[anchor=west, font=\scriptsize\sffamily, text=ln-muted] at (10.45,-0.29) {\iflangja{次のブロック}{next blocks}};
+  % (2) stride prefetcher
+  \lnrow{-1.0}{\iflangja{ストライド\\プリフェッチャ}{stride\\prefetcher}}
+  \lnacc{-1.0}{1}{1}\lnacc{-1.0}{4}{2}\lnacc{-1.0}{7}{3}
+  \lnpre{-1.0}{10}
+  \node[anchor=west, font=\scriptsize\sffamily, text=ln-muted] at (10.45,-1.29) {\iflangja{ストライド 3}{stride 3}};
+  % (3) correlating prefetcher
+  \lnrow{-2.0}{\iflangja{相関\\プリフェッチャ}{correlating\\prefetcher}}
+  \lnacc{-2.0}{8}{1}\lnacc{-2.0}{2}{2}\lnacc{-2.0}{5}{3}
+  \draw[->, ln-accent] ({3.4+8.5*\lnw},-2.62) to[bend left=28] ({3.4+2.5*\lnw},-2.62);
+  \draw[->, ln-accent] ({3.4+2.5*\lnw},-2.62) to[bend right=22] ({3.4+5.5*\lnw},-2.62);
+  \node[anchor=west, font=\scriptsize\sffamily, text=ln-muted, align=left] at (10.45,-2.29)
+    {\iflangja{8$\to$2，2$\to$5 を\\記録}{records\\8$\to$2, 2$\to$5}};
+  % legend
+  \draw[fill=ln-accent!25] (3.4,-3.55) rectangle ++(0.3,-0.3);
+  \node[anchor=west, font=\scriptsize\sffamily] at (3.75,-3.7) {\iflangja{アクセス（数字は順序）}{accessed (number = order)}};
+  \draw[fill=ln-tip!30] (7.4,-3.55) rectangle ++(0.3,-0.3);
+  \node[anchor=west, font=\scriptsize\sffamily] at (7.75,-3.7) {\iflangja{プリフェッチ}{prefetched}};
+\end{tikzpicture}

@@ -1,0 +1,32 @@
+% MOESI state machine: MOSI plus the exclusive state E.  Solid edges: access
+% by this core; dashed edges: access by another core, observed on the bus.
+% A write by another core takes every valid state to I (edges not drawn).
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  st/.style={circle, draw, minimum size=0.9cm, inner sep=1pt, fill=ln-box},
+  dirty/.style={st, fill=ln-accent!15},
+  lab/.style={font=\scriptsize, inner sep=2pt},
+  other/.style={dashed, ln-accent}]
+  \node[st]    (I) at (0,0)      {I};
+  \node[st]    (E) at (3.4,1.8)  {E};
+  \node[st]    (S) at (3.4,-1.8) {S};
+  \node[dirty] (M) at (6.8,0)    {M};
+  \node[dirty] (O) at (9.8,0)    {O};
+  % this core
+  \draw[->] (I) -- node[lab, above, sloped]
+    {\iflangja{R，他にコピーなし}{R, no other copy}} (E);
+  \draw[->] (I) -- node[lab, below, sloped]
+    {\iflangja{R，他にコピーあり}{R, other copies}} (S);
+  \draw[->] (I) -- node[lab, above, pos=0.74, align=center]
+    {\iflangja{W / バス読み出し\\＋無効化}{W / bus read\\+ invalidate}} (M);
+  \draw[->] (E) -- node[lab, above, sloped] {W} (M);
+  \draw[->] (S) -- node[lab, below, sloped]
+    {\iflangja{W / 無効化}{W / invalidate}} (M);
+  \draw[->] (O) to[bend left=30] node[lab, below]
+    {\iflangja{W / 無効化}{W / invalidate}} (M);
+  % other cores
+  \draw[->, other] (E) -- node[lab, right, pos=0.25] {R$'$} (S);
+  \draw[->, other] (M) to[bend left=30] node[lab, above]
+    {\iflangja{R$'$ / ブロックを供給}{R$'$ / supply block}} (O);
+  \draw[->, other] (O) to[out=-60, in=-120, looseness=5] node[lab, below]
+    {\iflangja{R$'$ / ブロックを供給}{R$'$ / supply block}} (O);
+\end{tikzpicture}

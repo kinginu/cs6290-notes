@@ -1,0 +1,66 @@
+% Hardware organization of Tomasulo's algorithm: instruction queue, RAT and
+% register file, reservation stations, execution units, common data bus, and
+% the separate path of loads and stores (address adder, load and store
+% buffers, memory).
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  blk/.style={draw, fill=ln-box, minimum height=0.6cm, inner sep=2pt, align=center},
+  rs/.style={draw, fill=white, minimum width=1.5cm, minimum height=0.36cm, inner sep=0pt,
+    font=\scriptsize\sffamily},
+  qc/.style={draw, fill=white, minimum width=0.4cm, minimum height=0.5cm, inner sep=0pt},
+  stp/.style={font=\scriptsize\bfseries\sffamily, text=ln-accent},
+  bus/.style={line width=1.6pt, draw=ln-accent}]
+  % ---- fetch and instruction queue
+  \node[blk, minimum width=1.1cm] (fetch) at (0.55,0) {\iflangja{フェッチ}{fetch}};
+  \foreach \i in {0,...,5} { \node[qc] (q\i) at ({1.75+0.4*\i},0) {}; }
+  \foreach \i in {2,...,5} { \node[qc, fill=ln-accent!15] at ({1.75+0.4*\i},0) {}; }
+  \node[anchor=south, font=\scriptsize] at (2.75,0.28) {\iflangja{命令キュー}{instruction queue}};
+  \draw[->] (fetch.east) -- (q0.west);
+  % ---- issue: head of the queue to the stations, with the RAT
+  \draw[->] (q5.east) -- (4.6,0) -- (4.6,-0.75);
+  \node[stp, anchor=west] at (4.65,-0.3) {\iflangja{発行}{issue}};
+  \draw (0.55,-0.75) -- (9.3,-0.75);
+  \fill (4.6,-0.75) circle (1.3pt);
+  % ---- RAT and register file
+  \node[blk, fill=ln-accent!15, minimum width=1.1cm] (rat) at (0.55,-1.45) {RAT};
+  \node[blk, minimum width=1.1cm, font=\scriptsize\sffamily] (regs) at (0.55,-2.35) {\iflangja{レジスタ}{register\\file}};
+  \draw[<->] (rat.north) -- (0.55,-0.75);
+  \draw (rat.south) -- (regs.north);
+  % ---- reservation stations
+  \foreach \n/\y in {1/-1.25,2/-1.61,3/-1.97} { \node[rs] (ad\n) at (2.9,\y) {AD\n}; }
+  \foreach \n/\y in {1/-1.25,2/-1.61} { \node[rs] (ml\n) at (6.1,\y) {ML\n}; }
+  \draw[->] (2.9,-0.75) -- (ad1.north);
+  \draw[->] (6.1,-0.75) -- (ml1.north);
+  \node[anchor=west, font=\scriptsize, text=ln-muted, align=left] at (6.95,-1.43)
+    {\iflangja{リザベーション\\ステーション}{reservation\\stations}};
+  % ---- load/store path: address adder, load and store buffers
+  \node[blk, minimum width=1.6cm, minimum height=0.5cm] (aadd) at (9.3,-1.35) {\iflangja{アドレス加算器}{address adder}};
+  \draw[->] (9.3,-0.75) -- (aadd.north);
+  \node[anchor=south east, font=\scriptsize, text=ln-muted] at (9.3,-0.75) {LW, SW};
+  \node[blk, minimum width=1.1cm, font=\scriptsize\sffamily] (sb) at (8.7,-2.3) {\iflangja{ストア\\バッファ}{store\\buffers}};
+  \node[blk, minimum width=1.1cm, font=\scriptsize\sffamily] (lb) at (9.9,-2.3) {\iflangja{ロード\\バッファ}{load\\buffers}};
+  \draw (aadd.south) -- (9.3,-1.8);
+  \draw[->] (9.3,-1.8) -| (sb.north);
+  \draw[->] (9.3,-1.8) -| (lb.north);
+  % ---- execution units
+  \node[blk, minimum width=1.5cm] (adder) at (2.9,-3.3) {\iflangja{加減算器}{adder}};
+  \node[blk, minimum width=1.5cm] (mult) at (6.1,-3.3) {\iflangja{乗除算器}{multiplier}};
+  \node[blk, minimum width=2.3cm] (mem) at (9.3,-3.3) {\iflangja{メモリ}{memory}};
+  \draw[->] (ad3.south) -- (adder.north);
+  \draw[->] (ml2.south) -- (mult.north);
+  \draw[->] (sb.south) -- (sb.south |- mem.north);
+  \draw[->] (lb.south) -- (lb.south |- mem.north);
+  \node[stp, anchor=west] at (2.95,-2.6) {\iflangja{ディスパッチ}{dispatch}};
+  \node[stp, anchor=west] at (6.15,-2.6) {\iflangja{ディスパッチ}{dispatch}};
+  % ---- common data bus and its destinations
+  \draw[bus] (0.55,-4.3) -- (10.6,-4.3);
+  \node[anchor=north east, font=\scriptsize\bfseries\sffamily, text=ln-accent] at (10.6,-4.38)
+    {CDB\enskip(\iflangja{結果書き込み}{write result})};
+  \draw[->] (adder.south) -- (2.9,-4.3);
+  \draw[->] (mult.south) -- (6.1,-4.3);
+  \draw[->] (mem.south) -- (9.3,-4.3);
+  \draw[->, draw=ln-accent] (0.55,-4.3) -- (regs.south);
+  \draw[->, draw=ln-accent] (1.65,-4.3) -- (1.65,-1.61) -- ([xshift=-0.75cm]ad2.center);
+  \draw[->, draw=ln-accent] (4.9,-4.3) -- (4.9,-1.43) -- ([xshift=-0.75cm]6.1,-1.43);
+  \draw[->, draw=ln-accent] (1.65,-2.9) -- (1.25,-2.9) |- (rat.east);
+  \draw[->, draw=ln-accent] (7.8,-4.3) -- (7.8,-2.3) -- (sb.west);
+\end{tikzpicture}

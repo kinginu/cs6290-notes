@@ -1,0 +1,37 @@
+% A many-core chip of eight tiles connected by a mesh.  Each tile holds a
+% core, its private L1 and L2 caches, one slice of the distributed LLC, the
+% part of the on-chip directory kept in that tile, and a router (R).  An L2
+% miss of core 1 on a block of a set whose number ends in 110 goes to LLC
+% slice 6.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\scriptsize\sffamily, >={Stealth[length=1.8mm]},
+  tile/.style={draw=ln-rule, rounded corners=2pt},
+  core/.style={draw, fill=ln-accent!15, minimum width=1.5cm, minimum height=0.34cm, inner sep=0pt},
+  box/.style={draw, fill=ln-box, minimum height=0.34cm, inner sep=0pt},
+  rt/.style={draw, circle, fill=white, minimum size=0.36cm, inner sep=0pt, font=\tiny\sffamily},
+  lk/.style={ln-muted, line width=0.6pt},
+  hot/.style={ln-caution, line width=1.5pt}]
+  \foreach \i in {0,...,7} {
+    \pgfmathtruncatemacro{\col}{mod(\i,4)}
+    \pgfmathtruncatemacro{\row}{div(\i,4)}
+    \begin{scope}[shift={(\col*2.65,-\row*2.6)}]
+      \draw[tile] (-1.1,-1.35) rectangle (1.2,0.95);
+      \node[core] (core\i) at (-0.2,0.62) {\iflangja{コア}{core}~\i};
+      \node[box, minimum width=0.72cm] (l1\i) at (-0.59,0.18) {L1};
+      \node[box, minimum width=0.72cm] (l2\i) at (0.19,0.18) {L2};
+      \node[box, minimum width=1.5cm] (llc\i) at (-0.2,-0.26) {LLC~\i};
+      \node[box, minimum width=1.5cm] (dir\i) at (-0.2,-0.70) {\iflangja{ディレクトリ}{directory}~\i};
+      \coordinate (rp\i) at (0.95,-1.12);
+    \end{scope}
+  }
+  % mesh links between routers (drawn before the routers)
+  \foreach \i/\j in {0/1,1/2,2/3,4/5,5/6,6/7,0/4,1/5,2/6,3/7}
+    \draw[lk] (rp\i) -- (rp\j);
+  % route of the request: R1 -> R2 -> R6
+  \draw[hot] (rp1) -- (rp2) -- (rp6);
+  \fill[ln-caution!20] (llc6.south west) rectangle (llc6.north east);
+  \draw (llc6.south west) rectangle (llc6.north east);
+  \node at (llc6) {LLC~6};
+  \foreach \i in {0,...,7} \node[rt] (r\i) at (rp\i) {R};
+  \draw[->, hot, line width=0.9pt] (l21.east) -| (r1.north);
+  \draw[->, hot, line width=0.9pt] (r6.west) -| ([xshift=0.2cm]llc6.east) -- (llc6.east);
+\end{tikzpicture}

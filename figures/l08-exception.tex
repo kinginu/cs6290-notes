@@ -1,0 +1,35 @@
+% Tomasulo's algorithm and an exception: two later instructions write their
+% results into the register file long before the division reports the
+% division by zero.
+\begin{tikzpicture}[x=0.56cm,y=0.72cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  cell/.style={draw, fill=ln-box, minimum width=0.56cm, minimum height=0.44cm,
+    inner sep=0pt, font=\scriptsize\sffamily},
+  wr/.style={cell, draw=ln-caution, fill=ln-caution!15}]
+  % cycle axis
+  \foreach \c in {1,...,11} {
+    \node[font=\scriptsize\sffamily, text=ln-muted] at (\c,0.68) {\c};
+  }
+  \node[anchor=east, font=\scriptsize\sffamily, text=ln-muted] at (0.4,0.68)
+    {\iflangja{サイクル}{cycle}};
+  % instruction labels
+  \node[anchor=east] at (0.4,0)  {I1\enspace\texttt{DIV R1,R2,R3}};
+  \node[anchor=east] at (0.4,-1) {I2\enspace\texttt{ADD R2,R4,R5}};
+  \node[anchor=east] at (0.4,-2) {I3\enspace\texttt{ADD R6,R6,R7}};
+  % I1: issue, long division, exception
+  \node[cell] at (1,0) {I};
+  \draw[fill=ln-box] (1.5,-0.22) rectangle (10.5,0.22);
+  \node[font=\scriptsize\sffamily] at (6,0) {E\enspace(\iflangja{除算}{division})};
+  \node[cell, draw=ln-caution, fill=ln-caution, text=white, font=\scriptsize\bfseries\sffamily]
+    (exc) at (11,0) {!};
+  % I2 and I3: short, independent
+  \node[cell] at (2,-1) {I}; \node[cell] at (3,-1) {E}; \node[wr] (w2) at (4,-1) {W};
+  \node[cell] at (3,-2) {I}; \node[cell] at (4,-2) {E}; \node[wr] (w3) at (5,-2) {W};
+  % annotations
+  \node[anchor=west, font=\scriptsize\sffamily, text=ln-caution] at (4.55,-1) {R2};
+  \node[anchor=west, font=\scriptsize\sffamily, text=ln-caution] at (5.55,-2) {R6};
+  \draw[ln-caution, thick, dashed] (11,-0.3) -- (11,-2.35);
+  \node[anchor=north east, align=right, font=\scriptsize\sffamily, text=ln-caution]
+    at (11.35,-2.35)
+    {\iflangja{0 除算を報告：R2 と R6 はすでに上書き済み}%
+              {division by zero reported: R2 and R6 already overwritten}};
+\end{tikzpicture}

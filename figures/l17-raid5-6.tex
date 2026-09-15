@@ -1,0 +1,57 @@
+% (a) RAID 5 with five disks: the parity block rotates among the disks; two
+% writes to different stripes use disjoint disks.  (b) RAID 6 with two check
+% blocks (P and Q) per stripe.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily]
+  \def\blkw{0.86}\def\blkh{0.45}\def\blkgap{0.94}
+  % ---------------- (a) RAID 5
+  \node[anchor=west, font=\footnotesize\bfseries] at (-0.5,0.95) {(a) RAID 5};
+  \node[font=\scriptsize, text=ln-muted, anchor=east] at (-0.05,0.3) {\iflangja{ディスク}{Disk}};
+  \foreach \d in {0,...,4} {
+    \node[font=\scriptsize, text=ln-muted] at ({\d*\blkgap+\blkw/2},0.3) {\d};
+  }
+  % stripe letter / parity disk
+  \foreach \S/\p [count=\r from 0] in {A/4,B/3,C/2,D/1,E/0} {
+    \node[font=\scriptsize, text=ln-muted, anchor=east] at (-0.05,{-\r*\blkh-\blkh/2}) {\S};
+    \foreach \d in {0,...,4} {
+      \pgfmathtruncatemacro{\i}{\d<\p ? \d : \d-1}
+      \ifnum\d=\p
+        \draw[fill=ln-accent!15] ({\d*\blkgap},{-\r*\blkh}) rectangle ++(\blkw,-\blkh);
+        \node at ({\d*\blkgap+\blkw/2},{-\r*\blkh-\blkh/2}) {$P_\S$};
+      \else
+        \draw[fill=white] ({\d*\blkgap},{-\r*\blkh}) rectangle ++(\blkw,-\blkh);
+        \node at ({\d*\blkgap+\blkw/2},{-\r*\blkh-\blkh/2}) {$\S_\i$};
+      \fi
+    }
+  }
+  % write to A0 (disks 0, 4) and to C1 (disks 1, 2)
+  \draw[ln-caution, very thick] (0,0) rectangle ++(\blkw,-\blkh);
+  \draw[ln-caution, very thick] ({4*\blkgap},0) rectangle ++(\blkw,-\blkh);
+  \draw[ln-tip, very thick] ({1*\blkgap},{-2*\blkh}) rectangle ++(\blkw,-\blkh);
+  \draw[ln-tip, very thick] ({2*\blkgap},{-2*\blkh}) rectangle ++(\blkw,-\blkh);
+  % ---------------- (b) RAID 6
+  \begin{scope}[xshift=6.3cm]
+  \node[anchor=west, font=\footnotesize\bfseries] at (-0.5,0.95) {(b) RAID 6};
+  \node[font=\scriptsize, text=ln-muted, anchor=east] at (-0.05,0.3) {\iflangja{ディスク}{Disk}};
+  \foreach \d in {0,...,4} {
+    \node[font=\scriptsize, text=ln-muted] at ({\d*\blkgap+\blkw/2},0.3) {\d};
+  }
+  % stripe letter / P disk / Q disk
+  \foreach \S/\p/\q [count=\r from 0] in {A/3/4,B/2/3,C/1/2,D/0/1,E/4/0} {
+    \node[font=\scriptsize, text=ln-muted, anchor=east] at (-0.05,{-\r*\blkh-\blkh/2}) {\S};
+    \foreach \d in {0,...,4} {
+      \pgfmathtruncatemacro{\i}{(\d>\p ? 1 : 0) + (\d>\q ? 1 : 0)}
+      \pgfmathtruncatemacro{\i}{\d-\i}
+      \ifnum\d=\p
+        \draw[fill=ln-accent!15] ({\d*\blkgap},{-\r*\blkh}) rectangle ++(\blkw,-\blkh);
+        \node at ({\d*\blkgap+\blkw/2},{-\r*\blkh-\blkh/2}) {$P_\S$};
+      \else\ifnum\d=\q
+        \draw[fill=ln-accent!30] ({\d*\blkgap},{-\r*\blkh}) rectangle ++(\blkw,-\blkh);
+        \node at ({\d*\blkgap+\blkw/2},{-\r*\blkh-\blkh/2}) {$Q_\S$};
+      \else
+        \draw[fill=white] ({\d*\blkgap},{-\r*\blkh}) rectangle ++(\blkw,-\blkh);
+        \node at ({\d*\blkgap+\blkw/2},{-\r*\blkh-\blkh/2}) {$\S_\i$};
+      \fi\fi
+    }
+  }
+  \end{scope}
+\end{tikzpicture}

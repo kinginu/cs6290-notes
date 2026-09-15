@@ -1,0 +1,43 @@
+% Hierarchy of buses (logical view): processor and northbridge with main
+% memory; the mezzanine bus (PCI Express) connects the graphics adapter
+% directly and the SATA and USB controllers, which provide the slower buses
+% (two point-to-point SATA links; a USB bus fanning out to its devices).
+% In PC chipsets the two controllers form the southbridge (dashed box).
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.6mm]},
+  box/.style={draw, fill=ln-box, align=center, inner sep=3pt, minimum height=0.7cm},
+  ctl/.style={draw, fill=ln-box, align=center, inner sep=2pt, minimum height=0.6cm, minimum width=2.1cm, font=\scriptsize\sffamily},
+  dev/.style={draw, fill=white, align=center, inner sep=2pt, minimum height=0.6cm, font=\scriptsize\sffamily},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted}]
+  \node[box, minimum width=2.4cm] (cpu) at (5.0,3.3) {\iflangja{プロセッサ}{processor}};
+  \node[box, minimum width=2.4cm, fill=ln-accent!20] (nb) at (5.0,2.05) {\iflangja{ノースブリッジ}{northbridge}};
+  \node[dev, minimum width=1.9cm] (mem) at (0.95,2.05) {\iflangja{メインメモリ}{main memory}};
+  \draw[<->, very thick, ln-accent] (cpu) -- node[lab, right] {FSB} (nb);
+  \draw[<->, very thick, ln-accent] (nb) -- node[lab, above] {\iflangja{メモリバス}{memory bus}} (mem);
+  % mezzanine bus
+  \coordinate (bus) at (0,1.0);
+  \draw[very thick, ln-accent] (nb.south) -- (nb.south |- bus);
+  \draw[very thick, ln-accent] (1.25,1.0) -- (8.0,1.0);
+  \node[lab, anchor=south west] at (5.12,1.02) {\iflangja{メザニンバス（PCI Express）}{mezzanine bus (PCI Express)}};
+  \node[dev, minimum width=1.9cm] (gfx) at (1.25,0.0) {\iflangja{グラフィックス}{graphics}};
+  \node[ctl] (sata) at (4.35,0.0) {\iflangja{SATA コントローラ}{SATA controller}};
+  \node[ctl] (usb) at (8.0,0.0) {\iflangja{USB コントローラ}{USB controller}};
+  \foreach \n in {gfx,sata,usb} {
+    \draw[very thick, ln-accent] (\n.north) -- (\n.north |- bus);
+  }
+  % southbridge: the controllers of the slower buses
+  \node[draw=ln-muted, dashed, rounded corners=2pt, fit=(sata)(usb), inner sep=4pt] (sb) {};
+  \node[lab, anchor=west] at (sb.east) {\iflangja{サウスブリッジ}{southbridge}};
+  % slower buses: two point-to-point SATA links, one USB bus
+  \node[dev, minimum width=1.6cm] (d1) at (3.3,-1.55) {\iflangja{磁気ディスク}{magnetic disk}};
+  \node[dev, minimum width=1.6cm] (d2) at (5.4,-1.55) {\iflangja{光ディスク装置}{optical drive}};
+  \node[dev, minimum width=1.3cm] (d3) at (7.25,-1.55) {\iflangja{キーボード}{keyboard}};
+  \node[dev, minimum width=1.3cm] (d4) at (8.75,-1.55) {\iflangja{USB メモリ}{flash drive}};
+  \draw[thick] ([xshift=-3mm]sata.south) -- node[lab, left] {SATA} (d1.north);
+  \draw[thick] ([xshift=3mm]sata.south) -- node[lab, right] {SATA} (d2.north);
+  \coordinate (uj) at (8.0,-0.8);
+  \draw[thick] (usb.south) -- (uj);
+  \draw[thick] (uj) -- (d3.north);
+  \draw[thick] (uj) -- (d4.north);
+  \fill (uj) circle[radius=0.05];
+  \node[lab, anchor=west] at (8.08,-0.6) {USB};
+\end{tikzpicture}

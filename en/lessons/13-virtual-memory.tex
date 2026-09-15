@@ -1,0 +1,665 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Virtual Memory}
+\lessoninfo{
+  video={Lesson 13, videos 1--27},
+  textbook={H\&P \cite{hennessy2017} §B.4--B.5},
+  keywords={virtual memory, physical memory, page, page frame, page table, page fault, virtual page number, page offset, multi-level page table, page size, internal fragmentation, TLB, TLB miss, page table walk},
+}
+
+Lesson 12 treated every address produced by the processor as a location in
+main memory.  In a real system the addresses that programs use are
+\emph{virtual}: every program sees a large address space of its own, and the
+operating system and the processor together map the parts of it that the
+program actually uses onto the memory that is installed.  This lesson explains
+why virtual memory is needed, how page tables translate virtual addresses into
+physical ones, how large these tables are and how multi-level page tables keep
+them small, and why translation would slow down every memory access if the
+processor did not cache recent translations in a translation lookaside buffer,
+which Lesson 14 combines with the caches of Lesson 12.
+
+\section{Why virtual memory}
+\label{sec:l13-why}
+
+Hardware and software see memory differently.\source{Lesson 13, videos 1--3;
+H\&P §B.4; \cite{kilburn1962}.}  To the hardware, memory is what is installed
+in the machine: an array of as many bytes as the memory modules provide.  To a
+program, memory is an address space of $2^{32}$ bytes on a 32-bit processor or
+$2^{64}$ bytes on a 64-bit processor, and all of it belongs to that program:
+code, data and stack are placed at whatever addresses the program and its
+compiler choose, regardless of how much memory is installed and of which other
+programs are running at the same time.
+
+The two views disagree in two respects.
+\begin{itemize}
+  \item The address space of a single program is much larger than the
+    installed memory.  A 32-bit address space is 4~GB, which a machine may or
+    may not have; a 64-bit address space is 16~EB (1~EB $= 2^{60}$ bytes),
+    many orders of magnitude more than any machine has.
+  \item Many programs run at the same time, and each of them uses the same
+    addresses, as if it owned the entire address space.
+\end{itemize}
+
+\begin{definition}[Virtual memory]
+  The mechanism that gives every program the view of a large memory of its
+  own, and maps the parts of that memory the program actually uses onto the
+  memory installed in the machine, is called \term{virtual memory}[仮想記憶].
+\end{definition}
+
+The operating system decides where each part of each program is kept, and the
+processor applies these decisions to every address on every memory access.
+Programs can thus be written without knowing the size of memory or the other
+programs they will run with, a program cannot access the memory of another
+unless the operating system arranges it, and together the programs can use
+more memory than is installed, the excess being kept on disk
+(\cref{sec:l13-page-faults}).
+
+\section{Physical memory and virtual address spaces}
+\label{sec:l13-views}
+
+The two views correspond to two kinds of addresses.\source{Lesson 13, videos
+4--5; H\&P §B.4.}
+
+\begin{definition}[Physical memory]
+  The memory actually installed in the machine is its
+  \term{physical memory}[物理メモリ].  Its bytes are numbered consecutively,
+  from 0 up to the size of physical memory minus one, and the number that
+  identifies a byte is its \term{physical address}[物理アドレス].
+\end{definition}
+
+The size of physical memory is determined by the installed modules, not by
+the width of the processor's addresses.  A 32-bit machine can address 4~GB
+but may have only 2~GB installed; a 64-bit machine has perhaps tens of
+gigabytes, a tiny fraction of the $2^{64}$ bytes it could address.  In the
+examples of this lesson a physical address has just as many bits as the
+installed memory requires: 31 bits for 2~GB.
+
+\begin{definition}[Virtual address space]
+  The \term{virtual address space}[仮想アドレス空間] of a program is the full
+  range of addresses the program can use, from 0 to $2^{n}-1$ on an $n$-bit
+  processor, independently of physical memory.  An address in it is a
+  \term{virtual address}[仮想アドレス].
+\end{definition}
+
+All addresses a program works with are virtual: the program counter, the
+pointers stored in its data, and the addresses the processor computes for
+loads and stores.  A program uses only a few regions of its virtual address
+space (\cref{fig:l13-mapping}, left and right):
+\begin{itemize}
+  \item its \emph{code} and its global \emph{data} at low addresses;
+  \item above them the \emph{heap}, which grows toward higher addresses as the
+    program allocates memory dynamically;
+  \item the \emph{stack} at the top of the address space, which grows toward
+    lower addresses.
+\end{itemize}
+Between the heap and the stack lies a huge range of addresses that the
+program never uses.  Every running program has its own virtual address space
+laid out in this way, so different programs use the same virtual addresses
+for entirely different contents.
+
+\section{Pages and page tables}
+\label{sec:l13-pages}
+
+A mapping recorded separately for every virtual address would need as many
+table entries as there are addresses.\source{Lesson 13, videos 6--7; H\&P
+§B.4.}  Virtual memory therefore maps fixed-size ranges of addresses, just as
+a cache moves blocks rather than individual bytes.
+
+\begin{definition}[Page, page frame]
+  The virtual address space is divided into consecutive ranges of equal size,
+  each called a \term{page}[ページ].  Physical memory is divided into ranges of
+  the same size, each called a \term{page frame}[ページフレーム], or frame for
+  short.  The size is a power of two, typically 4~KB, and any page fits
+  exactly into any frame.
+\end{definition}
+
+\begin{definition}[Page table]
+  The \term{page table}[ページテーブル] of a program records, for every page
+  of its virtual address space, whether the page is in physical memory and, if
+  it is, which frame holds it.
+\end{definition}
+
+The operating system maintains one page table for every running program and
+updates it whenever it places one of the program's pages into a frame or
+removes one.  The page table of the running program is found through a
+register set by the operating system and is read to translate the program's
+addresses, usually by the processor itself and in some systems by the
+operating system (\cref{sec:l13-tlb}).  \Cref{fig:l13-mapping} illustrates
+the resulting mapping for two programs.
+\begin{itemize}
+  \item Any page may be placed in any frame.  Pages that are adjacent in a
+    virtual address space need not be adjacent in physical memory, and the
+    frames of different programs are interleaved.
+  \item Pages that a program never uses are not mapped and occupy no frame;
+    only the used regions of the address space consume physical memory.
+  \item The page tables of two programs may map pages to the same frame.  This
+    lets programs share memory, for example a single copy of the code of a
+    program that is running twice.
+  \item Not every mapped page has to be in physical memory; the others are on
+    disk (\cref{sec:l13-page-faults}).
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l13-mapping}
+  \caption{The virtual address spaces of two programs (pages 0--7, low
+    addresses at the bottom) mapped onto six frames of physical memory.  Page~0
+    of both programs is mapped to the same frame; each program has one page on
+    disk (dashed); the unused pages 3--6 are not mapped.}
+  \label{fig:l13-mapping}
+\end{figure}
+
+A page table describes \emph{every} page of the virtual address space, used
+or not; in its simplest form (\cref{sec:l13-flat}) it has an entry for each.
+The number of pages it describes is therefore set by the size of the virtual
+address space and the size of a page; the size of physical memory only
+determines how many frames an entry can refer to.\caution{A page table is
+indexed by virtual page, not by frame.  With less physical memory there are
+fewer frames, but the page table must still describe just as many pages.}
+
+\section{Page faults}
+\label{sec:l13-page-faults}
+
+Together, the running programs usually map more pages than physical memory has
+frames.\source{Lesson 13, video 8; H\&P §B.4.}  The pages that do not fit are
+kept on disk, and physical memory holds the pages that have been used
+recently.
+
+\begin{definition}[Page fault]
+  An access to a page that the page table does not map to a frame causes a
+  \term{page fault}[ページフォールト]: an exception that transfers control to
+  the operating system.
+\end{definition}
+
+If the page is on disk, the operating system handles the page fault in three
+steps.
+\begin{enumerate}
+  \item It chooses a frame for the page.  If no frame is free, it evicts a page
+    that has not been used recently; if that page has been written since it
+    was loaded, it is first written back to disk.  The page table of the
+    evicted page is updated to show that the page is no longer in memory.
+  \item It reads the faulting page from disk into the frame and updates the
+    page table to map the page to this frame.
+  \item It restarts the instruction that caused the fault, which now finds its
+    page in memory; this requires precise exceptions (Lesson 8).
+\end{enumerate}
+
+A disk access takes milliseconds, i.e.\ millions of clock cycles, so a page
+fault is enormously more expensive than a cache miss.  Page faults must be
+rare, and it pays to let the operating system choose the page to evict with a
+careful algorithm in software.
+
+Not every page fault involves the disk: if the address lies outside every
+region that the program has been allocated, there is nothing to load, and the
+operating system treats the access as an error, usually by terminating the
+program.
+
+\begin{note}
+  Physical memory acts as a cache of the pages on disk.  Pages correspond to
+  the blocks of Lesson 12, frames to lines, page faults to cache misses, and
+  writing only modified pages back to disk to a write-back cache with a dirty
+  bit.  Placement is fully associative, since any page may be placed in any
+  frame, yet no tags have to be searched, because the page table is indexed
+  directly by the page.
+\end{note}
+
+\section{Address translation}
+\label{sec:l13-translation}
+
+Because pages start at multiples of the page size, a virtual address splits
+into two fields, just like the block number and block offset of a cache
+address.\source{Lesson 13, videos 9--10; H\&P §B.4.}
+
+\begin{definition}[Virtual page number, page offset]
+  With pages of $2^{k}$ bytes, the low-order $k$ bits of a virtual address form
+  its \term{page offset}[ページオフセット], the position of the byte within
+  its page.  The remaining high-order bits form its
+  \term{virtual page number}[仮想ページ番号] (VPN)%
+  \index{VPN|see{virtual page number}}, which identifies the page.
+\end{definition}
+
+Frames are numbered in the same way: the frame that starts at physical address
+$j \times 2^{k}$ has the \term{physical frame number}[物理フレーム番号]
+(PFN)\index{PFN|see{physical frame number}}~$j$.  The page table maps the VPN
+to the PFN, and translation replaces the one by the other while keeping the
+offset (\cref{fig:l13-translation}):
+\begin{equation}
+  \begin{aligned}
+    \text{VPN} &= \bigl\lfloor \mathit{VA} / 2^{k} \bigr\rfloor , &
+    \text{offset} &= \mathit{VA} \bmod 2^{k} , \\
+    \text{PFN} &= \text{page table}[\text{VPN}] , &
+    \mathit{PA} &= \text{PFN} \times 2^{k} + \text{offset} ,
+  \end{aligned}
+  \label{eq:l13-translation}
+\end{equation}
+where $\mathit{VA}$ and $\mathit{PA}$ are the virtual and physical addresses.
+The offset passes through unchanged because a page and its frame have the same
+size and the byte keeps its position within them; in binary, the physical
+address is the PFN bits followed by the offset bits.  The VPN has $k$ bits
+fewer than a virtual address and the PFN $k$ bits fewer than a physical
+address, so the two numbers differ in width whenever virtual and physical
+addresses do.  If the page table holds no PFN for the page, the access causes a
+page fault instead.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l13-translation}
+  \caption{Translation of the virtual address \texttt{0x0040A7C6} with 4~KB
+    pages and 30-bit physical addresses (\cref{ex:l13-translation}).  The VPN
+    selects a page table entry; its PFN replaces the VPN, and the offset is
+    copied.  An entry with V~$=0$ would cause a page fault.}
+  \label{fig:l13-translation}
+\end{figure}
+
+\begin{example}
+  \label{ex:l13-translation}
+  A 32-bit processor with 4~KB pages ($k = 12$) has 1~GB of physical memory,
+  hence 30-bit physical addresses.  The page offset is bits 11--0, the VPN
+  bits 31--12 (20 bits), and a PFN has 18 bits.  The virtual address
+  \texttt{0x0040A7C6} has VPN \texttt{0x0040A} and offset \texttt{0x7C6}.  The
+  page table of \cref{fig:l13-translation} maps page \texttt{0x0040A} to frame
+  \texttt{0x1F3C5}, so the physical address is
+  $\texttt{0x1F3C5} \times 2^{12} + \texttt{0x7C6} = \texttt{0x1F3C57C6}$.
+  The virtual address \texttt{0x000017FF} lies in page \texttt{0x00001}, which
+  the same page table marks as not in memory: an access to it causes a page
+  fault.
+\end{example}
+
+\tip{With 4~KB pages and addresses written in hexadecimal, the last three
+digits are the offset; translation replaces the digits in front of them.}
+
+\begin{keypoint}
+  Translation replaces the virtual page number by a physical frame number and
+  keeps the page offset.  The page table, maintained by the operating system,
+  supplies the frame number; if it holds none for the page, the access causes
+  a page fault.
+\end{keypoint}
+
+\section{The size of a flat page table}
+\label{sec:l13-flat}
+
+The simplest page table is a single array.\source{Lesson 13, videos 11--12;
+H\&P §B.4.}
+
+\begin{definition}[Flat page table]
+  A \term{flat page table}[単一レベルページテーブル] is an array with one
+  entry for every virtual page, indexed directly by the VPN; its element for a
+  page is the \term{page table entry}[ページテーブルエントリ]%
+  \index{PTE|see{page table entry}} (PTE) of that page.
+\end{definition}
+
+A PTE holds the PFN of its page and a few status bits: a valid bit that is set
+only if the page is in physical memory, and bits that record how the page may
+be accessed (read, write, execute).  A PTE is typically about as large as an
+address, 4 bytes on a 32-bit processor and 8 bytes on a 64-bit processor, which
+leaves room for the PFN and the status bits.  Since every virtual page has an entry,
+\begin{equation}
+  \text{size of a flat page table}
+  \;=\; \frac{\text{size of the virtual address space}}{\text{page size}}
+        \times \text{PTE size} .
+  \label{eq:l13-flat-size}
+\end{equation}
+Two quantities are absent from \cref{eq:l13-flat-size}.  The size of physical
+memory only affects how many bits of an entry the PFN occupies.  The amount of
+memory the program actually uses does not matter at all, because unused pages
+have entries too.  Every running program needs a page table of this size.
+
+\begin{example}
+  \label{ex:l13-flat-size}
+  With 32-bit virtual addresses, 4~KB pages and 4-byte entries, a flat page
+  table has $2^{32}/2^{12} = 2^{20}$ entries and occupies
+  $2^{20} \times 4$~bytes $= 4$~MB for each running program, even for a
+  program that uses only a few kilobytes.  With 64-bit virtual addresses,
+  4~KB pages and 8-byte entries it would have $2^{52}$ entries and occupy
+  $2^{55}$~bytes (32~PB), more than any memory or disk holds.  Even if only 48
+  of the 64 address bits are used, the flat page table occupies
+  $2^{36} \times 8 = 2^{39}$~bytes, i.e.\ 512~GB per program.
+\end{example}
+
+\section{Multi-level page tables}
+\label{sec:l13-multilevel}
+
+A flat page table is large because it has entries for the whole virtual
+address space, although programs use only the bottom and the top of
+it.\source{Lesson 13, videos 13--17; H\&P §B.4--B.5.}  A multi-level page
+table avoids storing entries for the unused range in between.
+
+\begin{definition}[Multi-level page table]
+  A \term{multi-level page table}[多段ページテーブル] is a tree of small
+  tables.  The VPN is split into one field per level.  The first field indexes
+  the outer page table, whose entries point to tables of the next level; the
+  entries of the tables of the last level, the inner page tables, hold PFNs.  An
+  entry whose part of the address space is not used at all is marked invalid,
+  and no tables exist below it.
+\end{definition}
+
+With two levels, a virtual address is split into an outer index $p_1$, an
+inner index $p_2$ and the page offset (\cref{fig:l13-two-level}), and the
+translation takes two steps:
+\begin{enumerate}
+  \item entry $p_1$ of the outer page table gives the location of an inner
+    page table;
+  \item entry $p_2$ of that inner page table gives the PFN, which is combined
+    with the offset as in \cref{eq:l13-translation}.
+\end{enumerate}
+If either entry is invalid, no PFN is found and the access causes a page
+fault.  The tables are usually sized so that each fits exactly into one
+page.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l13-two-level}
+  \caption{Two-level translation of the virtual address \texttt{0x0040A7C6}
+    (\cref{ex:l13-two-level}).  Outer entry~1 points to inner table~B.  Entries
+    A, C and D point to inner tables that are not drawn; invalid outer entries,
+    such as entry~3, have no inner table at all.}
+  \label{fig:l13-two-level}
+\end{figure}
+
+\begin{example}
+  \label{ex:l13-two-level}
+  The 20-bit VPN of \cref{ex:l13-translation} is split into a 10-bit outer
+  index (bits 31--22) and a 10-bit inner index (bits 21--12).  With 4-byte
+  entries every table has $2^{10}$ entries and occupies 4~KB, exactly one page.  The
+  virtual address \texttt{0x0040A7C6} has VPN
+  $\texttt{0x0040A} = 0000000001\,0000001010_2$, hence $p_1 = 1$ and
+  $p_2 = \texttt{0x00A} = 10$.  Outer entry~1 points to inner table~B, and
+  entry~10 of B holds PFN \texttt{0x1F3C5}.  The physical address is
+  \texttt{0x1F3C57C6}, as with the flat page table: a multi-level page table
+  stores the same mapping in a different form.
+\end{example}
+
+\subsection{Size of a multi-level page table}
+
+The outer page table always exists, but an inner page table exists only for a
+part of the address space in which at least one page is used.  With the
+organization of \cref{ex:l13-two-level}, each inner table covers $2^{10}$
+pages, i.e.\ 4~MB of the virtual address space.
+
+\begin{example}
+  \label{ex:l13-two-level-size}
+  A program uses 10~MB at the bottom of its 32-bit address space for code,
+  data and heap (addresses \texttt{0x00000000}--\texttt{0x009FFFFF}) and 1~MB
+  at the top for its stack (\texttt{0xFFF00000}--\texttt{0xFFFFFFFF}).  With
+  the two-level page table of \cref{ex:l13-two-level}, the bottom 10~MB lie in
+  the ranges of outer entries 0, 1 and 2, of 4~MB each, and the stack in the
+  range of outer entry 1023.  The page table consists of the outer table and
+  four inner tables, $5 \times 4~\text{KB} = 20$~KB, instead of the 4~MB of a
+  flat page table.
+\end{example}
+
+A two-level page table is larger than a flat one only if every outer entry
+needs an inner table, i.e.\ if at least one page is used in each of the 1024
+ranges of 4~MB.  It then occupies
+$4~\text{KB} + 1024 \times 4~\text{KB} \approx 4.004$~MB, more than the flat
+table by the size of the outer table.  Real programs use a few contiguous
+regions of their address space and need only a few inner tables.
+
+\subsection{More levels for 64-bit addresses}
+
+Two levels do not suffice for 64-bit address spaces.  A 4~KB table of 8-byte
+entries has $2^{9}$ entries, so each level of tables that fit into one page
+can consume only 9 bits of the VPN.  With 48-bit virtual addresses the VPN has
+36 bits.  A two-level page table with 9-bit inner tables would need a 27-bit
+outer index and an outer table of $2^{27} \times 8$~bytes $= 1$~GB for every
+program.  Splitting the 36 bits into four 9-bit fields instead yields a
+four-level page table in which every table fits into one page; x86-64
+processors use this organization.  Each further level makes room for 9 more
+bits of virtual address.
+
+\begin{example}
+  \label{ex:l13-four-level}
+  In such a four-level page table, a table of the last level covers $2^{9}$
+  pages, i.e.\ 2~MB of the address space; a table of the third level covers
+  $2^{9}$ times as much, 1~GB; a table of the second level 512~GB; and the
+  single table of the first level all $2^{48}$~bytes (256~TB).  A program that
+  uses 8~MB at the bottom and 8~MB at the top of its address space needs, for
+  each end, four tables of the last level and one of each of levels 3 and 2,
+  and all of them hang below the single first-level table:
+  $1 + 2 \times (4 + 1 + 1) = 13$ tables, or $13 \times 4~\text{KB} = 52$~KB,
+  whereas its flat page table would occupy 512~GB (\cref{ex:l13-flat-size}).
+\end{example}
+
+\begin{keypoint}
+  A page table must describe the entire virtual address space, but a
+  multi-level page table needs storage only for the parts that are used.  The
+  price is one table read per level on every translation.
+\end{keypoint}
+
+\section{Choosing the page size}
+\label{sec:l13-page-size}
+
+How large pages should be is a compromise between two
+effects.\source{Lesson 13, video 18; H\&P §B.4.}
+\begin{itemize}
+  \item \textbf{Larger pages} mean fewer pages: fewer PTEs and a smaller page
+    table, and, as \cref{sec:l13-tlb} shows, more memory covered by each
+    translation that the processor caches.
+  \item \textbf{Smaller pages} waste less memory in partly used pages.
+\end{itemize}
+The \term{page size}[ページサイズ], the number of bytes in a page and in a
+frame, must balance the two.
+
+\begin{definition}[Internal fragmentation]
+  Memory is mapped a whole page at a time.  A region whose size is not a
+  multiple of the page size therefore leaves part of its last page unused, and
+  no other program can use that part.  The memory lost in this way is
+  \term{internal fragmentation}[内部断片化].
+\end{definition}
+
+A region of arbitrary size leaves on average half a page unused, so internal
+fragmentation grows in proportion to the page size.
+
+\begin{example}
+  \label{ex:l13-page-size}
+  A program on a 32-bit processor with 4-byte PTEs has three regions (code and
+  data, heap, stack), each ending in a partly used page.
+  \Cref{tab:l13-page-size} compares three page sizes.  Going from 4~KB to 4~MB
+  pages shrinks the flat page table by a factor of $2^{10}$, from 4~MB to
+  4~KB, but raises the expected internal fragmentation by the same factor,
+  from 6~KB to 6~MB.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Page table size and expected internal fragmentation for the program
+    of \cref{ex:l13-page-size} (half a page per region).}
+  \label{tab:l13-page-size}
+  \begin{tabular}{@{}rrrr@{}}
+    \toprule
+    Page size & Pages & Flat page table & Internal fragmentation \\
+    \midrule
+    4~KB  & $2^{20}$ & 4~MB   & $3 \times 2~\text{KB} = 6$~KB \\
+    64~KB & $2^{16}$ & 256~KB & $3 \times 32~\text{KB} = 96$~KB \\
+    4~MB  & $2^{10}$ & 4~KB   & $3 \times 2~\text{MB} = 6$~MB \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Pages are much larger than cache blocks (Lesson 12), because every page needs
+its own PTE and every page brought in from disk costs a disk access.  The usual
+page size is 4~KB.  Processors also support much larger pages, such as 2~MB
+and 1~GB on x86-64, which the operating system can use for large regions that
+a program fills completely, so that internal fragmentation hardly matters.
+
+\section{Memory access time with translation}
+\label{sec:l13-access-time}
+
+Every memory access a program makes, whether it fetches an instruction, loads
+or stores, uses a virtual address, which must be translated before physical
+memory can be accessed.\source{Lesson 13, videos 19--21; H\&P §B.4.}  The page
+table is itself kept in memory, so translation consists of memory reads.  With
+a two-level page table, the processor performs a load such as
+\texttt{LW R1,4(R2)} in four steps.
+\begin{enumerate}
+  \item It adds 4 to R2 to obtain the virtual address and takes its VPN.
+  \item It computes the physical address of the outer PTE (the outer table
+    address plus $p_1$ times the PTE size) and reads the PTE.
+  \item It computes the address of the inner PTE in the same way from the
+    table address in the outer PTE and $p_2$, and reads the PTE.
+  \item It appends the offset to the PFN and accesses the data at this
+    physical address through the cache.
+\end{enumerate}
+Each PTE read is an ordinary memory access that goes through the caches and may
+hit or miss; if PTEs are not kept in the cache, each costs a full main-memory
+access.  With a page table of $L$ levels, every access of the program turns
+into $L + 1$ memory accesses.  If PTE reads have the same average memory
+access time (AMAT) as data accesses,
+\begin{equation}
+  \text{access time with translation} \;\approx\; (L + 1) \times \text{AMAT} .
+  \label{eq:l13-walk-time}
+\end{equation}
+
+\begin{example}
+  \label{ex:l13-access-time}
+  A cache has a hit time of 2 cycles, a miss rate of \SI{5}{\percent} and a
+  miss penalty of 40 cycles, so $\text{AMAT} = 2 + 0.05 \times 40 = 4$ cycles
+  (\cref{eq:l12-amat}).  Without translation a memory access takes 4 cycles on
+  average; with a flat page table it takes $2 \times 4 = 8$ cycles, and with a
+  four-level page table $5 \times 4 = 20$ cycles.  Individual accesses vary
+  widely: a load whose three upper-level PTEs hit ($3 \times 2$ cycles), whose
+  last-level PTE misses ($2 + 40$ cycles) and whose data hits (2 cycles) takes
+  50 cycles, 25 times as long as the cache hit it would be without
+  translation.
+\end{example}
+
+The few upper-level entries are read by every translation and are usually
+cached; the numerous last-level entries miss more often.  Either way, without
+a faster way to translate, virtual memory would slow down every instruction
+fetch, load and store by a large factor.
+
+\section{The translation lookaside buffer}
+\label{sec:l13-tlb}
+
+A program that accesses a page is likely to access the same page again soon,
+so the translations it needs at any time are few and are used over and
+over.\source{Lesson 13, videos 22--24; H\&P §B.4.}  The processor therefore
+caches them.
+
+\begin{definition}[Translation lookaside buffer]
+  A \term{translation lookaside buffer}[TLB]%
+  \index{TLB|see{translation lookaside buffer}} (TLB) is a small, fast cache of
+  recent translations.  Each entry holds a valid bit, a tag taken from the VPN
+  (the whole VPN in a fully associative TLB), the PFN to which that page is
+  mapped, and the access bits of its PTE.  If the VPN of an address matches a
+  valid entry, the PFN is taken from the entry and no page table is read.
+\end{definition}
+
+A TLB is a cache in the sense of Lesson 12, but it can be much smaller than
+the data cache, for three reasons.
+\begin{itemize}
+  \item It stores only translations, not data; an entry takes a few bytes.
+  \item One entry serves a whole page rather than a single cache block, so a
+    few entries cover the memory a program is actively using.
+  \item It stores the final result of the translation, not the entries of the
+    individual levels.  A TLB hit takes a single lookup, however many levels
+    the page table has.
+\end{itemize}
+
+\begin{example}
+  \label{ex:l13-tlb-size}
+  A 128~KB data cache with 64-byte blocks has 2048 lines.  With 4~KB pages,
+  $128/4 = 32$ TLB entries cover as much memory as the cache holds, and 2048
+  are needed if every cached block lies in a different page; spatial locality
+  keeps the actual need far below this upper bound.
+\end{example}
+
+\subsection{TLB misses}
+
+A \term{TLB miss}[TLB ミス] occurs when no valid TLB entry matches the VPN of
+an address.  The translation must then be obtained from the page table.
+
+\begin{definition}[Page table walk]
+  A \term{page table walk}[ページテーブルウォーク] reads the page table
+  entries of an address level by level, from the outer page table down to the
+  entry that holds the PFN, as described in \cref{sec:l13-multilevel}.
+\end{definition}
+
+After a TLB miss, the walk finds the PFN, the translation is written into the
+TLB, replacing an existing entry if the TLB is full, and the access proceeds
+(\cref{fig:l13-tlb-flow}).\caution{A TLB miss is not a page fault: the walk
+usually finds a valid PTE.}
+
+The TLB must agree with the page tables: when the operating system changes a
+mapping, e.g.\ by evicting a page, it invalidates the TLB entry of the page,
+and when the processor switches to another program, the entries of the
+previous program are invalidated or tagged with a program identifier.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l13-tlb-flow}
+  \caption{Translation on a memory access.  A TLB hit supplies the PFN at
+    once; a TLB miss requires a page table walk; an invalid PTE causes a page
+    fault; once the page is in memory, the instruction is restarted.}
+  \label{fig:l13-tlb-flow}
+\end{figure}
+
+The walk can be performed in two ways.
+\begin{description}
+  \item[In software] the TLB miss raises an exception, and a handler in the
+    operating system walks the page table and writes the translation into the
+    TLB.  The hardware is simple and the page tables may be organized in any
+    way, but every TLB miss pays for an exception.  MIPS processors handle TLB
+    misses this way.
+  \item[In hardware] the processor contains a page table walker, logic that
+    reads the PTEs and fills the TLB itself without involving the operating
+    system.  TLB misses are handled much faster, but the page table must have
+    exactly the format that the hardware expects.  High-performance processors,
+    such as those of the x86 family, walk the page table in hardware.
+\end{description}
+
+\needspace{6\baselineskip}
+\begin{keypoint}
+  Every memory access needs a translation.  The TLB makes the common case, a
+  TLB hit, a single fast lookup; a page table walk, in hardware or by the
+  operating system, is needed only on a TLB miss, and the page-fault handler
+  only when the walk finds no PFN.
+\end{keypoint}
+
+\section{TLB organization and performance}
+\label{sec:l13-tlb-org}
+
+The organization of a TLB follows from its role.\source{Lesson 13, videos
+25--26; H\&P §B.4.}
+\begin{description}
+  \item[Associativity] Every TLB miss costs a walk of several memory reads, so
+    TLBs are fully associative or highly set-associative; for so few entries
+    the comparators are affordable, and translations do not compete for
+    entries.
+  \item[Size] The TLB should hit about as often as the cache, so it must cover
+    the pages of the data the cache holds (\cref{ex:l13-tlb-size}); this takes
+    about 64 to 512 entries.  Consulted on every access, it must also be about
+    as fast as an L1 cache hit, which keeps it from growing larger.
+  \item[Levels] If that does not cover enough memory, a larger and slower
+    second-level TLB with hundreds to thousands of entries is placed behind the
+    first, as caches are organized in levels (Lesson 14).  It is looked up only
+    on a miss in the first, and a walk is needed only if both TLBs miss.
+\end{description}
+
+\begin{example}
+  \label{ex:l13-tlb-performance}
+  The processor of \cref{ex:l13-access-time} (AMAT of 4 cycles for every
+  memory read, four-level page table) is given a TLB that is looked up in
+  1 cycle and misses on \SI{1}{\percent} of the accesses.  Every access pays
+  for the lookup and for the data access, and one in a hundred also for a walk
+  of $4 \times 4 = 16$ cycles, so an access takes on average
+  $1 + 0.01 \times 16 + 4 = 5.16$ cycles instead of 20.  Translation now costs
+  1.16 cycles instead of 16, mostly for the lookup, which Lesson 14 overlaps
+  with the cache lookup.
+\end{example}
+
+\begin{keypoint}[Lesson summary]
+  Virtual memory maps the pages of each program's virtual address space onto
+  frames of physical memory and keeps the rest on disk; an access to a page
+  without a frame is a page fault.  Translation replaces the virtual page
+  number by a frame number from the page table and keeps the offset
+  (\cref{eq:l13-translation}).
+  Multi-level page tables avoid the entries a flat table spends on unused
+  address space (\cref{eq:l13-flat-size}); the page size trades table size
+  against internal fragmentation.  Every level adds a memory read to each
+  access, so a small, highly associative TLB caches translations, and the
+  page table is walked only on a TLB miss.
+\end{keypoint}
+
+\end{document}

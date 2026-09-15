@@ -1,0 +1,696 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Cache Coherence}
+\lessoninfo{
+  video={Lesson 19, videos 1--33},
+  textbook={H\&P \cite{hennessy2017} §5.2--5.4},
+  keywords={cache coherence, bus snooping, write-update coherence, write-invalidate coherence, MSI protocol, cache-to-cache transfer, MOSI protocol, MESI protocol, MOESI protocol, directory-based coherence, coherence miss, true sharing, false sharing},
+}
+
+In the shared-memory multiprocessors of Lesson 18 every core has caches of
+its own, while all cores share one main memory.  A cache holds a private copy
+of the data it contains: when one core writes to its copy, the copies in the
+other caches---and, under the write-back policy, main memory---still hold the
+old value.  This lesson shows how such stale copies make a multiprocessor
+return wrong results, defines the property that rules them out, cache
+coherence, and develops the mechanisms that provide it: write-update and
+write-invalidate coherence on a shared bus, the MSI protocol and its
+refinements MOSI, MESI and MOESI, and directory-based coherence for larger
+machines.  It ends with the additional cache misses that coherence causes.
+
+\section{The coherence problem}
+\label{sec:l19-problem}
+
+Consider a multiprocessor with centralized shared memory
+(\cref{sec:l18-centralized}) in which each core has a private cache that
+follows the write-back policy of Lesson 12.\source{Lesson 19, videos 1--3;
+H\&P §5.2.}  In a uniprocessor this policy is harmless: main memory may hold
+an out-of-date value for a while, but the only processor that could read it
+finds the newer copy in its own cache first.  With several caches this is no
+longer true.  \Cref{fig:l19-problem} follows a memory location X that
+initially holds 5.
+\begin{enumerate}
+  \item Core 0 reads X.  The read misses, and core 0's cache loads the block
+    that contains X from memory.
+  \item Core 1 reads X and likewise loads a copy of the block.
+  \item Core 0 writes 8 to X.  The write hits and, under write-back, changes
+    only the copy in core 0's cache, which becomes dirty.
+  \item Core 1 reads X.  The read hits in core 1's cache and returns 5,
+    although 8 has been written.
+  \item Core 2 reads X.  The read misses and is served by main memory, which
+    also still holds 5.
+\end{enumerate}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l19-problem}
+  \caption{Incoherent caches.  Cores 0 and 1 read X, which holds 5 (steps 1
+    and 2), and core 0 writes 8 into its cache (step 3).  The later reads of
+    core 1 (step 4) and core 2 (step 5) both return the stale value 5.}
+  \label{fig:l19-problem}
+\end{figure}
+
+The two wrong reads have different causes.  Step 5 reads a stale value from
+memory; the write-through policy, which updates memory on every write, would
+avoid it.  Step 4 reads a stale copy in another cache, and no write policy of
+an individual cache can avoid that: however core 0's cache handles the write,
+the copy in core 1's cache does not change.\caution{Write-through does not
+make private caches coherent: the copies in the other caches still go
+stale.}
+
+\section{Coherence}
+\label{sec:l19-definition}
+
+A shared-memory program expects the behavior of a single memory that all
+cores share, without caches.\source{Lesson 19, videos 4--5; H\&P §5.2.}
+
+\begin{definition}[Cache coherence]
+  A multiprocessor whose cores have private caches provides
+  \term{cache coherence}[キャッシュコヒーレンス] if the following hold for
+  every memory location X.
+  \begin{enumerate}
+    \item A read of X on a core returns the value most recently written to X
+      by that core, if no other core has written X in between.
+    \item If one core writes X and another core reads X sufficiently later,
+      with no write to X in between, the read returns the value written by
+      the first core.
+    \item Writes to X are serialized: all cores observe any two writes to X
+      in the same order.
+  \end{enumerate}
+\end{definition}
+
+The first condition is the behavior of memory in a uniprocessor, which every
+cache already preserves.  The second extends it to other cores but allows a
+delay: a read issued while another core's write is still in progress may
+return the old value.  The third lets all cores agree which of two nearly
+simultaneous writes came last.  The reads of steps 4 and 5 in
+\cref{fig:l19-problem} violate the second condition: the caches are
+\emph{incoherent}.
+
+\begin{note}
+  Coherence is a requirement on what reads return, not on what the copies
+  contain.  Copies may disagree without violating it: main memory may hold an
+  older value than a dirty block in a cache, and a cache may still contain an
+  old value in a line that is marked invalid.  The system is coherent as long
+  as every read is served from a copy that holds the latest value.
+\end{note}
+
+\section{Achieving coherence}
+\label{sec:l19-achieving}
+
+The definition and the example of \cref{fig:l19-problem} show what a
+mechanism for coherence has to do.\source{Lesson 19, video 6; H\&P §5.2.}
+\begin{enumerate}
+  \item \textbf{Make writes visible.}  Under write-back a write that hits
+    causes no activity outside the core, so the other caches cannot know that
+    their copies have become stale.  Writes to blocks that other caches may
+    hold must therefore be announced to them.
+  \item \textbf{Act on the writes of other cores.}  A cache that holds a
+    copy of a block written by another core must either \emph{update} its copy
+    with the new value or \emph{invalidate} it, so that its next access to the
+    block misses and fetches the new value.
+  \item \textbf{Order the writes.}  Writes to the same block by different
+    cores must be applied to all copies in one order that all caches
+    observe.
+  \item \textbf{Serve reads from the latest copy.}  A read that misses must
+    obtain the latest value, which may be in another cache rather than in
+    memory.
+\end{enumerate}
+
+With centralized shared memory, all caches and main memory are connected to
+one bus, and every operation on the bus reaches every device connected to
+it.  Coherence can therefore be built on
+\term{bus snooping}[バススヌーピング]: every cache monitors all operations on
+the bus, including those addressed to memory or to other caches, and reacts
+to those that concern blocks it holds.  Snooping also orders the operations,
+because the bus carries one operation at a time and every cache observes them
+in that order.  Machines without a shared bus need another mechanism for
+both tasks, the directory of \cref{sec:l19-directory}.  A coherence mechanism
+thus combines two choices: other copies are either updated or invalidated,
+and writes are observed and ordered either by snooping or by a directory.
+
+\section{Write-update coherence}
+\label{sec:l19-write-update}
+
+The first way of acting on a write is to propagate the new value to every
+copy.\source{Lesson 19, videos 7--11; H\&P §5.2.}
+
+\begin{definition}[Write-update coherence]
+  Under \term{write-update coherence}[書き込み時更新方式] every write is
+  broadcast with its address and its new value, and every other cache that
+  holds a copy of the written block updates its copy.
+\end{definition}
+
+With snooping, each core simply places every write on the bus.  Main memory
+performs the write like any other, and the other caches snoop it and update
+their copies if they hold the block.  In \cref{fig:l19-problem} the write of
+step 3 would then change X to 8 in memory and in core 1's cache, and both
+later reads would return 8.  Because the bus carries one operation at a time,
+writes by different cores are applied to all copies in the same order, even
+when two cores write the same location at the same moment, as the third
+condition of coherence requires.
+
+This basic scheme is correct but expensive: every write occupies the shared
+bus and is also performed in main memory---exactly the cost that the
+write-back policy is meant to avoid.  Two optimizations remove most of it.
+
+\subsection{Avoiding memory writes}
+
+The dirty bit of Lesson 12 lets a cache defer the memory write.  A write is
+still placed on the bus so that the other caches can update their copies,
+but memory ignores it; instead, the writing cache sets the dirty bit of the
+block and writes the block back to memory when it evicts it.  A cache that
+snoops another core's write to a block it holds dirty updates its copy and
+clears its dirty bit, so only the last writer is responsible for the block.
+While a dirty copy exists, memory is stale.  The cache with the dirty copy
+therefore also snoops the bus for \emph{reads} of that block: when another
+core misses on the block and places the read on the bus, this cache supplies
+the data, and memory does not respond.
+
+\subsection{Avoiding bus writes}
+
+Most blocks are used by only one core, and broadcasting the writes to such
+blocks occupies the bus for nothing.  A \emph{shared bit} in each cache line
+records whether other caches may hold the block.  When a cache snoops a read
+of a block that it holds, it sets its shared bit and signals on a
+\emph{shared line} of the bus that a copy exists; the reading cache sets its
+own shared bit if this signal is present.  A write to a block whose shared bit
+is clear is performed locally, as in a uniprocessor; only writes to blocks
+whose shared bit is set are placed on the bus.\margin{The shared bit is
+conservative: it stays set after the other copies have been evicted.}
+
+\begin{example}
+  \label{ex:l19-write-update}
+  Two cores access a block X that no cache holds initially.
+  \Cref{tab:l19-write-update} counts the bus operations and memory writes of
+  six accesses under the basic scheme and with the optimizations added.  With
+  the dirty bit, memory is not written during the sequence (core 0 writes the
+  block back once, when it evicts it), and the read of step 4 is served by
+  core 0.  With the shared bit in addition, the two writes that occur before
+  core 1 has a copy stay local, and only the write of step 5 is broadcast.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Write-update coherence (\cref{ex:l19-write-update}).  rd: read on
+    the bus; wr: write on the bus or into memory; rd$^{*}$: read served by
+    core 0 instead of memory.}
+  \label{tab:l19-write-update}
+  \begin{tabular}{@{}cl cc cc cc@{}}
+    \toprule
+    & & \multicolumn{2}{c}{Basic} & \multicolumn{2}{c}{Dirty bit}
+      & \multicolumn{2}{c}{Dirty and shared bits} \\
+    \cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(l){7-8}
+    Step & Access & Bus & Memory & Bus & Memory & Bus & Memory \\
+    \midrule
+    1 & core 0 reads X  & rd  & --- & rd       & --- & rd       & --- \\
+    2 & core 0 writes X & wr  & wr  & wr       & --- & ---      & --- \\
+    3 & core 0 writes X & wr  & wr  & wr       & --- & ---      & --- \\
+    4 & core 1 reads X  & rd  & --- & rd$^{*}$ & --- & rd$^{*}$ & --- \\
+    5 & core 0 writes X & wr  & wr  & wr       & --- & wr       & --- \\
+    6 & core 1 reads X  & --- & --- & ---      & --- & ---      & --- \\
+    \midrule
+    \multicolumn{2}{@{}l}{Total} & 5 & 3 & 5 & 0 & 3 & 0 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Write-invalidate coherence}
+\label{sec:l19-write-invalidate}
+
+The second way of acting on a write is to remove the other copies instead of
+updating them.\source{Lesson 19, videos 12--15; H\&P §5.2.}
+
+\begin{definition}[Write-invalidate coherence]
+  Under \term{write-invalidate coherence}[書き込み時無効化方式] a core that
+  writes to a block which other caches may hold first broadcasts an
+  invalidation of the block, and every other cache that holds a copy of the
+  block discards it by clearing its valid bit.
+\end{definition}
+
+An invalidation carries only the address of the block.  Once it has been
+broadcast, the writing cache holds the only valid copy, so further writes to
+the block---to any address within it---are local and need no bus operation
+until another core accesses the block.  That access misses, because its copy
+has been invalidated, and obtains the latest value either from memory, if
+the block has been written back, or from the cache that wrote it.
+
+\subsection{Update versus invalidate}
+
+Which scheme needs fewer bus operations depends on the pattern of accesses.
+\begin{itemize}
+  \item \textbf{Several writes to a block before another core reads it.}
+    Write-update broadcasts every write; write-invalidate broadcasts a single
+    invalidation.  This holds for repeated writes to one address and equally
+    for writes to different addresses in the same block, since invalidation
+    works per block.
+  \item \textbf{A thread moves to another core.}  The blocks that the thread
+    used remain in the cache of its old core, and when the thread reads them
+    on its new core, both caches mark them shared.  Under write-update, every
+    later write of the thread to such a block is broadcast and updates a copy
+    that the old core no longer uses, until that copy happens to be evicted.
+    Under write-invalidate, the first write removes the old copy, and all
+    further writes are local.
+  \item \textbf{Writes and reads by different cores alternate.}  If one core
+    writes a block and another core reads the new value after every write,
+    write-update needs one bus write per write, and the reads all hit.
+    Write-invalidate needs an invalidation per write and a miss per read.
+\end{itemize}
+Only the last pattern favors write-update, and the first two are the common
+case.  Multiprocessors therefore use write-invalidate coherence, and all
+protocols in the rest of this lesson are based on it.
+
+\begin{example}
+  Cores 0 and 1 both hold a copy of block X.  If core 0 writes X ten times
+  and core 1 then reads X once, write-update needs 10 bus writes, and core
+  1's read hits;
+  write-invalidate needs one invalidation and one bus read for core 1's miss,
+  2 bus operations in total.  If instead core 1 reads X after each of the ten
+  writes, write-update still needs 10 bus operations, whereas write-invalidate
+  needs 10 invalidations and 10 misses, 20 in total.
+\end{example}
+
+\begin{keypoint}
+  Write-update keeps every copy current at the price of a bus operation per
+  write; write-invalidate pays one invalidation per block and then lets the
+  writing core proceed locally.  Because writes usually come in bursts from
+  one core, practical coherence protocols invalidate.
+\end{keypoint}
+
+\section{The MSI protocol}
+\label{sec:l19-msi}
+
+Write-invalidate coherence with snooping is described by a small state
+machine for each cache line.\source{Lesson 19, videos 16--19; H\&P §5.2.}
+The state of the block in a line changes with the accesses of the core itself
+and with the accesses of other cores that the cache observes on the bus.  The
+simplest such state machine, the \term{MSI protocol}[MSI プロトコル], uses
+the valid and dirty bits of a line to distinguish three states.
+\begin{description}
+  \item[M (modified)] Valid and dirty.  The block has been written in this
+    cache, and all other copies have been invalidated: this cache holds the
+    only valid copy, which is newer than the block in memory.  Reads and
+    writes are local.
+  \item[S (shared)] Valid and not dirty.  Other caches may hold valid copies
+    as well.  Reads are local; a write must first broadcast an invalidation.
+  \item[I (invalid)] The valid bit is clear.  Every access misses.
+\end{description}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l19-msi}
+  \caption{The MSI protocol for one block in one cache.  R, W: read, write by
+    this core; R$'$, W$'$ (dashed): read, write by another core, observed on
+    the bus.  Accesses without an edge leave the state unchanged and need no
+    bus operation.  The shaded state holds a block newer than memory.}
+  \label{fig:l19-msi}
+\end{figure}
+
+\Cref{fig:l19-msi} shows the transitions.  Accesses by the core itself
+(solid edges) are handled as follows.
+\begin{itemize}
+  \item A read in I misses: the cache places the read on the bus, loads the
+    block and enters S.
+  \item A write in I misses too: in one bus operation, the cache reads the
+    block and invalidates all other copies, and it enters M.
+  \item A write in S broadcasts an invalidation and enters M.
+  \item Reads in S, and reads and writes in M, need no bus operation.
+\end{itemize}
+Accesses by other cores (dashed edges) are observed on the bus.
+\begin{itemize}
+  \item A write by another core, announced by its invalidation, takes S to
+    I.  The copy is discarded without being written back, since memory holds
+    the same value.
+  \item In M the cache holds the only up-to-date value of the block.  When
+    another core reads the block, the cache writes the block back to memory
+    and enters S, because the other core now holds a copy too.  When another
+    core writes the block, the cache writes the block back to memory, from
+    which the writer obtains it, and enters I.
+\end{itemize}
+When a cache evicts a block, it writes the block back to memory only in M; a
+block in S is simply discarded.
+
+\subsection{Cache-to-cache transfers}
+\label{sec:l19-c2c}
+
+When a core misses on a block that another cache holds in M, whether on a
+read or on a write, memory would answer the bus read with a stale value.  The
+cache in M, which snoops the read, can prevent this in two ways.
+\begin{enumerate}
+  \item \emph{Abort and retry}: it aborts the read and writes the block back
+    to memory; the reading core then issues the read again, and memory serves
+    it with the current value.  This costs a memory write and a memory read.
+  \item \emph{Intervention}: it signals that memory must not answer and
+    places the block on the bus itself.  On a read miss, both copies end in
+    S, which is not dirty, so memory takes the block from the bus as well.
+\end{enumerate}
+Intervention, a \term{cache-to-cache transfer}[キャッシュ間転送], needs
+more complex bus hardware, but a single transfer serves the miss and, on a
+read miss, also performs the write-back that MSI requires on the transition
+from M to S.  The dirty-bit optimization of write-update coherence
+(\cref{sec:l19-write-update}) answers reads in the same way, but there the
+cache stays dirty and memory does not take the block.
+
+\begin{example}
+  \label{ex:l19-msi}
+  Three cores access a block X that no cache holds initially
+  (\cref{tab:l19-msi}).  The reads of steps 1 and 2 leave two copies in S.
+  Core 1's write in step 3 invalidates core 0's copy, and its second write
+  (step 4) is local.  When core 2's read appears on the bus in step 5, core 1
+  holds the only current value; it writes the block back to memory, and both
+  copies end in S.  Core 0's write in step 6 misses and invalidates both of
+  them.  Five of the seven accesses need a bus operation, and one causes a
+  memory write.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Block X under the MSI protocol (\cref{ex:l19-msi}): state of the
+    block in each cache after the access.}
+  \label{tab:l19-msi}
+  \begin{tabular}{@{}cl ccc l@{}}
+    \toprule
+    Step & Access & Core 0 & Core 1 & Core 2 & Bus and memory \\
+    \midrule
+    1 & core 0 reads X  & S & I & I & read, served by memory \\
+    2 & core 1 reads X  & S & S & I & read, served by memory \\
+    3 & core 1 writes X & I & M & I & invalidation \\
+    4 & core 1 writes X & I & M & I & --- \\
+    5 & core 2 reads X  & I & S & S & read; core 1 writes X back \\
+    6 & core 0 writes X & M & I & I & read and invalidation \\
+    7 & core 0 reads X  & M & I & I & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{The MOSI protocol}
+\label{sec:l19-mosi}
+
+A cache-to-cache transfer does not remove the memory write of the transition
+from M to S.\source{Lesson 19, videos 20--21.}  After the transfer both
+copies are in S, which is not dirty, so both caches would discard their
+copies on eviction; unless memory takes the block during the transfer, the
+latest value is lost once both copies are gone.  A block that one core writes
+and another core reads in alternation therefore costs a memory write for
+every write, although neither cache evicts it.
+
+The \term{MOSI protocol}[MOSI プロトコル] avoids these writes by making one
+of the copies of a shared block its owner.
+\begin{description}
+  \item[O (owned)] Valid; other caches may hold copies in S.  The block is
+    newer than the block in memory, and this cache is responsible for it: it
+    answers reads of the block by other cores and writes the block back to
+    memory when it evicts it.  Reads are local; a write broadcasts an
+    invalidation and enters M.
+\end{description}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l19-mosi}
+  \caption{The MOSI protocol.  Notation as in \cref{fig:l19-msi}; the shaded
+    states are responsible for a block newer than memory.  On W$'$ in O, the
+    block is supplied only if the writer misses.}
+  \label{fig:l19-mosi}
+\end{figure}
+
+When another core reads a block that the cache holds in M, the cache supplies
+the block by a cache-to-cache transfer and enters O instead of S, without
+writing memory (\cref{fig:l19-mosi}).  In O it supplies the block to every
+further reader.  A write by the owner broadcasts an invalidation and returns
+to M; a write by another core takes O to I, and only if the writer missed
+does the owner first supply the block, since a writer in S already holds the
+current value.  The block reaches memory only when a cache evicts it in
+M or O.  In \cref{ex:l19-msi}, MOSI would take core 1 to O instead of S in
+step 5, without the memory write, and core 1 would supply the block for core
+0's write in step 6.
+
+\section{The exclusive state}
+\label{sec:l19-mesi}
+
+MSI and MOSI handle a very common access pattern
+inefficiently.\source{Lesson 19, videos 22--25; H\&P §5.2;
+\cite{papamarcos1984}.}  Programs often read a variable and then write it, as
+in an increment, and most variables are used by only one thread.  For such a
+block the read misses and enters S, and the write then broadcasts an
+invalidation---although no other cache holds a copy.  Every such read-write
+pair needs two bus operations, where a uniprocessor has only the miss.
+
+S covers two cases that the cache cannot tell apart: other caches hold
+copies, or the block is unshared but not yet written.  A fourth state
+separates them.
+\begin{description}
+  \item[E (exclusive)] Valid and not dirty; no other cache holds a copy.
+    Reads are local, and so is a write, which enters M without any bus
+    operation.
+\end{description}
+A read in I enters E if no other cache holds the block, and S otherwise.  The
+cache learns which case applies during the bus read itself: caches that hold
+the block snoop the read and signal on the shared line of the bus, as in
+\cref{sec:l19-write-update}.  When another core reads a block held in E, the
+cache enters S without a write, since memory is current.  A write by another
+core takes E to I.
+
+Adding E to MSI gives the \term{MESI protocol}[MESI プロトコル], and adding
+it to MOSI gives the \term{MOESI protocol}[MOESI プロトコル]
+(\cref{fig:l19-moesi}).  \Cref{tab:l19-states} summarizes the five states.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l19-moesi}
+  \caption{The MOESI protocol.  Notation as in \cref{fig:l19-msi}.  Every
+    transition out of I performs a bus read.  A write by another core takes
+    every valid state to I; if the writer misses, a cache in M or O supplies
+    the block (these edges are not drawn).}
+  \label{fig:l19-moesi}
+\end{figure}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{The states of MOESI.  MSI uses M, S and I; MOSI adds O and MESI
+    adds E.  A responsible cache answers reads by other cores and writes the
+    block back on eviction.}
+  \label{tab:l19-states}
+  \begin{tabular}{@{}lcccc@{}}
+    \toprule
+    State & Valid & Copies elsewhere & Responsible & Write without bus \\
+    \midrule
+    M (modified)  & yes & no       & yes & yes \\
+    O (owned)     & yes & possible & yes & no \\
+    E (exclusive) & yes & no       & no  & yes \\
+    S (shared)    & yes & possible & no  & no \\
+    I (invalid)   & no  & possible & no  & no \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{example}
+  \label{ex:l19-protocols}
+  Two cores access a block X that no cache holds initially: core 0 reads and
+  then writes X, core 1 reads it, core 0 writes it again, and core 1 reads it
+  again.  \Cref{tab:l19-protocols} gives the states and operations under the
+  four protocols.  E saves the invalidation of step 2, because core 0's read
+  found no other copy; O saves the memory writes of steps 3 and 5, at the
+  price of one write when core 0 eventually evicts X.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Block X under four protocols (\cref{ex:l19-protocols}): states in
+    core 0 and core 1 after each access.  b: bus operation; m: memory write.}
+  \label{tab:l19-protocols}
+  \begin{tabular}{@{}cl cc cc cc cc@{}}
+    \toprule
+    & & \multicolumn{2}{c}{MSI} & \multicolumn{2}{c}{MOSI}
+      & \multicolumn{2}{c}{MESI} & \multicolumn{2}{c}{MOESI} \\
+    \cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}\cmidrule(l){9-10}
+    Step & Access & States & Ops & States & Ops & States & Ops & States & Ops \\
+    \midrule
+    1 & core 0 reads X  & S\,I & b    & S\,I & b   & E\,I & b    & E\,I & b \\
+    2 & core 0 writes X & M\,I & b    & M\,I & b   & M\,I & ---  & M\,I & --- \\
+    3 & core 1 reads X  & S\,S & b, m & O\,S & b   & S\,S & b, m & O\,S & b \\
+    4 & core 0 writes X & M\,I & b    & M\,I & b   & M\,I & b    & M\,I & b \\
+    5 & core 1 reads X  & S\,S & b, m & O\,S & b   & S\,S & b, m & O\,S & b \\
+    \midrule
+    \multicolumn{2}{@{}l}{Bus operations} & & 5 & & 5 & & 4 & & 4 \\
+    \multicolumn{2}{@{}l}{Memory writes}  & & 2 & & 0 & & 2 & & 0 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{keypoint}
+  In all four protocols only a cache in M or O is responsible for a block
+  newer than memory, and only a cache in M or E may write without a bus
+  operation.  The two additions are independent: the E state saves the
+  invalidation after reading unshared data, and the O state saves the memory
+  write when a modified block is read by another core.
+\end{keypoint}
+
+\section{Directory-based coherence}
+\label{sec:l19-directory}
+
+Snooping requires every cache to observe every bus operation, which ties it
+to a shared bus.\source{Lesson 19, videos 26--30; H\&P §5.4;
+\cite{agarwal1988}.}  A shared bus limits a machine to a few cores (Lesson
+18), and a larger machine whose cores share one address space over a network
+(distributed shared memory in the sense of H\&P, see the terminology note in
+Lesson 18) has no bus at all.  Sending every read and invalidation to all
+caches over the network would cost far more than the operations themselves,
+and without a bus nothing orders the operations of different cores on a
+block.  Larger machines therefore keep explicit track of where each block is
+cached.
+
+\begin{definition}[Directory-based coherence]
+  Under \term{directory-based coherence}[ディレクトリ方式] a
+  \emph{directory} records, for every block, which caches hold a copy of it.
+  A cache sends each operation that a snooping protocol would broadcast to the
+  directory, which forwards it only to the caches that hold the block.  All
+  such requests for a block pass through its directory entry, which thereby
+  serializes them.
+\end{definition}
+
+A directory entry needs little information (\cref{fig:l19-directory}):
+\begin{itemize}
+  \item an \emph{exclusive} bit, which indicates that a single cache holds
+    the block, in M or E, and can write it without notifying anyone;
+  \item one \emph{presence} bit per cache, which indicates whether that cache
+    holds a valid copy.
+\end{itemize}
+The states themselves are still kept in the caches, so the protocols of the
+previous sections can be used unchanged.  Accesses that a protocol handles
+locally---reads in every valid state, writes in M and E---do not involve the
+directory; the others are sent to it.
+\begin{itemize}
+  \item \textbf{Read miss.}  If no cache holds the block, memory supplies
+    it, and the reader becomes its only holder (in E under MESI and MOESI,
+    with the exclusive bit set).  Otherwise the directory forwards the read to
+    a cache that holds the block, which supplies it by a cache-to-cache
+    transfer; if the entry is exclusive, the read goes to the exclusive
+    holder, which changes its state as on a snooped read, and the exclusive
+    bit is cleared.  In both cases the reader is added to the entry.
+  \item \textbf{Write in S or O, or write miss.}  The directory forwards the
+    invalidation only to the caches whose presence bits are set and records
+    the writer as the exclusive holder.  On a write miss, a cache that holds
+    the block supplies it before entering I, or memory does if no cache holds
+    it.
+\end{itemize}
+When a cache evicts a block, writing it back in M or O, it notifies the
+directory, which clears the presence bit of that cache and the exclusive
+bit, so that the entry remains exact.
+
+The directory need not reside in one place.  It is divided into slices kept
+on different nodes, each slice serving a set of blocks, so that no single
+node has to handle all requests.  Every request for a block goes to the
+slice that serves it, the home of the block, and this slice determines the
+order of all accesses to the block.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l19-directory}
+  \caption{Directory-based coherence in step 5 of \cref{ex:l19-directory}.
+    The entry of X shows that cores 0, 1 and 3 hold copies and that none
+    holds X exclusively.  Core 3's write (1) is forwarded as an invalidation
+    to cores 0 and 1 only (2).}
+  \label{fig:l19-directory}
+\end{figure}
+
+\needspace{4\baselineskip}
+\begin{example}
+  \label{ex:l19-directory}
+  Four cores use MOESI with a directory (\cref{tab:l19-directory}).  Core 1
+  reads and then writes X; its read found no other copy, so X is in E in
+  core 1's cache, and the write needs no message.  The read of core 3 goes to
+  the directory, which forwards it to the exclusive holder, core 1; core 1
+  supplies the block and becomes its owner.  The directory forwards the read
+  of core 0 to one of the holders, again core 1.  When core 3 writes X in
+  step 5, the directory sends invalidations to cores 0 and 1 only; core 2,
+  which holds no copy, receives no message, whereas a broadcast would have
+  reached it as well.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Block X with directory-based MOESI (\cref{ex:l19-directory}):
+    cache states and directory entry (exclusive bit; presence bits of cores 0
+    to 3) after each access, and the messages sent (d: directory).}
+  \label{tab:l19-directory}
+  \begin{tabular}{@{}cl cccc cc l@{}}
+    \toprule
+    & & \multicolumn{4}{c}{Cache of core} & \multicolumn{2}{c}{Entry} & \\
+    \cmidrule(lr){3-6}\cmidrule(lr){7-8}
+    Step & Access & 0 & 1 & 2 & 3 & Ex & Presence & Messages \\
+    \midrule
+    1 & core 1 reads X  & I & E & I & I & 1 & 0100 & 1$\to$d, memory$\to$1 \\
+    2 & core 1 writes X & I & M & I & I & 1 & 0100 & --- \\
+    3 & core 3 reads X  & I & O & I & S & 0 & 0101 & 3$\to$d$\to$1$\to$3 \\
+    4 & core 0 reads X  & S & O & I & S & 0 & 1101 & 0$\to$d$\to$1$\to$0 \\
+    5 & core 3 writes X & I & I & I & M & 1 & 0001 & 3$\to$d$\to$0, 1 \\
+    6 & core 3 writes X & I & I & I & M & 1 & 0001 & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Cache misses and coherence}
+\label{sec:l19-misses}
+
+Lesson 14 divided cache misses into compulsory, capacity and conflict
+misses.  Invalidation adds a fourth kind.\source{Lesson 19, videos 31--33;
+H\&P §5.3.}
+
+\begin{definition}[Coherence miss]
+  A \term{coherence miss}[コヒーレンスミス] is a miss on a block whose copy in
+  the cache has been invalidated because another core wrote the block.
+\end{definition}
+
+Coherence misses are of two kinds.
+\begin{description}
+  \item[True sharing] The core accesses data that the other core actually
+    wrote.  Such \term{true sharing}[真共有] makes the miss necessary: without
+    the miss, the core would read a stale value.
+  \item[False sharing] The other core wrote different data that merely lies
+    in the same block.  The data that the core accesses has not changed, and
+    the miss is caused only by coherence being maintained per block rather than
+    per address.  Such \term{false sharing}[偽共有] increases with the block
+    size, since larger blocks contain more unrelated data.
+\end{description}
+
+\begin{example}
+  \label{ex:l19-false-sharing}
+  Threads on cores 0 and 1 each increment a counter of their own, c0 and c1,
+  \num{1000} times, and the increments of the two threads alternate.  The
+  counters are adjacent and lie in the same cache block
+  (\cref{fig:l19-false-sharing}).  Under MOESI, core 0's first increment
+  finds no other copy, and its write needs no invalidation.  From core 1's
+  first increment on, however, every increment writes the block while the
+  other core holds a copy, and invalidates it, so every increment from core
+  0's second one on starts with a coherence miss: \num{1998} misses, all due
+  to false sharing, because neither thread ever reads the other's counter.
+  With the counters in different blocks, only the two compulsory misses
+  remain.
+\end{example}
+\begin{marginfigure}
+  \resizebox{\linewidth}{!}{\input{figures/l19-false-sharing}}
+  \caption{False sharing: counters used by different cores lie in the same
+    cache block.}
+  \label{fig:l19-false-sharing}
+\end{marginfigure}
+
+\begin{keypoint}[Lesson summary]
+  The private caches of a shared-memory multiprocessor must be coherent: a
+  core sees its own writes, the writes of other cores after a short time,
+  and all writes to a location in the same order as every other core.  On a
+  shared bus, caches snoop each other's operations, and the bus orders them.
+  Write-update coherence broadcasts every write to all copies;
+  write-invalidate coherence broadcasts one invalidation per block and wins
+  for the common access patterns.  MSI
+  implements write-invalidate with three states; cache-to-cache transfers
+  serve reads from the cache that holds the current value, the O state of
+  MOSI avoids writing that value to memory at every transfer, and the E
+  state of MESI avoids invalidations for data used by a single core; MOESI
+  combines both.  Machines without a shared bus replace broadcasts by a
+  directory that records which caches hold each block and orders the
+  requests for it.  Invalidation causes coherence misses, the fourth kind of
+  miss, which stem from true or false sharing.
+\end{keypoint}
+
+\end{document}

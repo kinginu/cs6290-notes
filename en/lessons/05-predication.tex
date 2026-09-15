@@ -1,0 +1,416 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Predication}
+\lessoninfo{
+  video={Lesson 5, videos 1--12},
+  textbook={H\&P \cite{hennessy2017} §A.6, §C.2, §H.4, §H.6},
+  keywords={predication, hard-to-predict branch, if-conversion, conditional move, MOVZ, MOVN, CMOVcc, condition code, break-even misprediction rate, full predication, Itanium, predicate register},
+}
+
+The predictors of Lesson 4 guess most branches correctly, but some branches
+remain hard to predict for any predictor, typically because their direction
+depends on the data being processed, and in a deep pipeline every
+misprediction flushes tens of instructions.  This lesson studies the
+alternative for such branches: \emph{predication}, which executes the work of
+both directions of a branch and keeps only the results of the correct one, so
+that nothing is left to mispredict.  We examine which branches benefit, how a
+compiler removes a branch by if-conversion, the conditional move instructions
+this relies on, when the transformation pays off, and instruction sets in
+which every instruction can be made conditional.
+
+\section{Prediction and predication}
+\label{sec:l05-predication}
+
+A branch predictor guesses in the fetch stage where a branch goes, and the
+processor continues to fetch along the guessed path.\source{Lesson 5, videos
+1--2; H\&P §C.2.}  A correct guess costs nothing.  A wrong guess flushes every
+instruction fetched after the branch, which in a modern processor, several
+instructions wide and many stages deep, amounts to tens of instructions
+(\cref{ex:l04-better}).  The cost of a branch is thus zero most of the time
+and large once in a while.
+
+\begin{definition}[Predication]
+  \label{def:l05-predication}
+  Executing the work of \emph{both} directions of a branch and throwing away
+  the results of the direction that turns out to be wrong is called
+  \term{predication}[プレディケーション].
+\end{definition}
+
+Predication has no misprediction penalty, since nothing is predicted, but it
+always wastes the work of the direction that is not needed: if both
+directions contain equally many instructions, half of the work is thrown
+away.  Per execution of the branch, predication wastes the instructions of
+the unneeded direction, while prediction wastes the misprediction penalty
+multiplied by the probability of a misprediction.  Which is smaller depends
+on the kind of branch (\cref{tab:l05-which}); predication can be the better
+choice only for a small if-then-else, whose directions contain far fewer
+instructions than a misprediction flushes.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Prediction and predication for different kinds of branches.}
+  \label{tab:l05-which}
+  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.17\linewidth}>{\raggedright\arraybackslash}p{0.27\linewidth}>{\raggedright\arraybackslash}p{0.27\linewidth}>{\raggedright\arraybackslash}p{0.19\linewidth}@{}}
+    \toprule
+    Branch & Prediction & Predication & Better \\
+    \midrule
+    Loop               & accurate
+                       & also runs the code after the loop in every iteration
+                       & prediction \\
+    \addlinespace
+    Call, return       & always taken; BTB and RAS give the target
+                       & no second direction to execute
+                       & prediction \\
+    \addlinespace
+    Large if-then-else & occasionally flushes tens of instructions
+                       & wastes a large direction every time
+                       & prediction \\
+    \addlinespace
+    Small if-then-else & flushes tens of instructions per misprediction
+                       & wastes a few instructions every time
+                       & predication, if hard to predict \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+For a small if-then-else the choice depends on how well the branch is
+predicted.  If a misprediction flushes 40 instructions and the unneeded
+direction contains 4, predication wastes less than prediction as soon as more
+than one execution in ten is mispredicted.  \Cref{sec:l05-performance} makes
+this comparison precise for the code that a compiler actually produces.
+
+\section{If-conversion}
+\label{sec:l05-if-conversion}
+
+Predication needs the work of both directions in the form of instructions
+that are executed one after the other, with no branch between
+them.\source{Lesson 5, video 3; H\&P §H.4; \cite{allen1983}.}  Producing
+such code is the task of the compiler.  Consider the following if-then-else, which sums the
+values below and above a threshold separately and counts the values below it.
+If the values of \texttt{v} fall on either side of \texttt{t} in no regular
+order, the branch is hard to predict.
+\begin{lstlisting}[language=C, numbers=none]
+if (v < t) {
+  lo = lo + v;
+  n  = n + 1;
+} else {
+  hi = hi + v;
+}
+\end{lstlisting}
+
+\begin{definition}[If-conversion]
+  \label{def:l05-if-conversion}
+  The compiler transformation that removes such a branch by turning the
+  control dependence (Lesson 3) of the statements of both directions into a
+  data dependence on the branch condition is called
+  \term{if-conversion}[if 変換].
+\end{definition}
+
+With ordinary instructions, the converted code (\cref{fig:l05-if-conversion})
+executes the statements of both directions unconditionally, writing their
+results into temporaries, and then uses the condition~\texttt{c} as data to
+select the new value of every variable assigned in either
+direction.\caution{The unneeded direction also runs: it must not store
+to memory or fault, e.g.\ by loading via an invalid pointer.}  When both
+directions assign a variable~\texttt{x}, the selection chooses between their
+two temporaries, \texttt{x = c ? x1 : x2}; when only one direction assigns
+it, as for each variable in this example, the other alternative is the old
+value.  The converted code contains no branch.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l05-if-conversion}
+  \caption{If-conversion of a small if-then-else.  (a) The original code
+    branches on~\texttt{c}.  (b) The converted code computes both directions
+    into temporaries and uses~\texttt{c} as data to select the results.}
+  \label{fig:l05-if-conversion}
+\end{figure}
+
+The transformation gains something only if the selections can be carried out
+without a branch.  Translated into ordinary branch instructions, each
+selection is itself an if-then-else on~\texttt{c}, as hard to predict as the
+branch that was removed, so the converted code would still mispredict and in
+addition execute the work of both directions.  If-conversion therefore needs
+instructions that select a value without branching.
+
+\section{Conditional move instructions}
+\label{sec:l05-cmov}
+
+A \term{conditional move}[条件付きムーブ] is an instruction that copies a
+value into its destination if a condition holds and leaves the destination
+unchanged otherwise.\source{Lesson 5, videos 4--5; H\&P §H.4, §A.6.}  The
+instruction is executed in either case; only whether it writes depends on the
+condition.  It does not change the flow of control, so there is nothing to
+predict.
+
+The MIPS instruction set has two conditional moves whose condition is the
+contents of a register.  The instruction \term{MOVZ}[MOVZ] (move if zero)
+copies register Rs into register Rd if register Rt holds zero, and the
+instruction \term{MOVN}[MOVN] (move if not zero) copies it if Rt does not hold
+zero:
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+MOVZ Rd, Rs, Rt     ; if (Rt == 0) Rd <- Rs
+MOVN Rd, Rs, Rt     ; if (Rt != 0) Rd <- Rs
+\end{lstlisting}
+A selection \texttt{x = c ? x1 : x2} becomes two moves into the register of
+\texttt{x}, of which exactly one writes.  With \texttt{c} in R3, \texttt{x1}
+and \texttt{x2} in R1 and R2, and \texttt{x} in R4:
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+MOVN R4, R1, R3     ; if c != 0: x <- x1
+MOVZ R4, R2, R3     ; if c == 0: x <- x2
+\end{lstlisting}
+The condition register is typically set by a comparison such as
+\texttt{SLT}, which writes 1 if the condition holds and 0 otherwise.
+
+\begin{example}
+  \label{ex:l05-movzn}
+  With \texttt{v} in R1, \texttt{t} in R2, and \texttt{lo}, \texttt{n},
+  \texttt{hi} in R4, R5, R6, the code of \cref{sec:l05-if-conversion}
+  compiles with a branch into
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+      SLT  R3, R1, R2     ; R3 <- (v < t)
+      BEQ  R3, R0, Else   ; v >= t: go to else part
+      ADD  R4, R4, R1     ; lo <- lo + v
+      ADDI R5, R5, 1      ; n  <- n + 1
+      J    Done           ; skip else part
+Else: ADD  R6, R6, R1     ; hi <- hi + v
+Done: ...
+\end{lstlisting}
+  and, if-converted, into
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+      SLT  R3, R1, R2     ; R3 <- (v < t)
+      ADD  R7, R4, R1     ; then part into R7, R8
+      ADDI R8, R5, 1
+      ADD  R9, R6, R1     ; else part into R9
+      MOVN R4, R7, R3     ; lo <- R7 if v < t
+      MOVN R5, R8, R3     ; n  <- R8 if v < t
+      MOVZ R6, R9, R3     ; hi <- R9 if v >= t
+\end{lstlisting}
+  The temporaries R7--R9 are needed because R4--R6 must keep their old
+  values until the moves decide which of them change.  Each variable here is
+  assigned in only one direction, so a single move per variable suffices.
+\end{example}
+
+Other instruction sets base conditional moves on flags rather than on the
+contents of a register.
+
+\begin{definition}[Condition code]
+  \label{def:l05-condition-code}
+  A \term{condition code}[条件コード], or flag, is a one-bit status value, for
+  example zero, negative, carry or overflow, that arithmetic and comparison
+  instructions set as a side effect and that later instructions test.
+\end{definition}
+
+The x86 instruction set has a family of conditional moves,
+\term{CMOVcc}[CMOVcc], in which \texttt{cc} names a condition on the condition
+codes: \texttt{CMOVZ} moves if the zero flag is set, \texttt{CMOVNZ} if it is
+clear, \texttt{CMOVG} if the last comparison found \enquote{greater},
+\texttt{CMOVL} if it found \enquote{less}, and so on.  A common pattern
+assigns one alternative unconditionally and lets a single conditional move
+overwrite it with the other, as in this computation of $m = \max(a,b)$:
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+MOV   EAX, EBX      ; m <- a
+CMP   EBX, ECX      ; set flags from a - b
+CMOVL EAX, ECX      ; if a < b: m <- b
+\end{lstlisting}
+
+\section{Performance of if-conversion}
+\label{sec:l05-performance}
+
+If-conversion is not free: the converted code executes the work of both
+directions and the conditional moves on every execution.\source{Lesson 5,
+videos 6--7; H\&P §C.2.}  To compare the two versions of a code fragment we
+count pipeline slots, as in Lesson 3: every executed instruction occupies one
+slot, and every misprediction wastes as many slots as it flushes instructions.
+Let the branch version execute $n_b$ instructions per execution on average
+and mispredict $m$ times per execution with a penalty of $P$ instructions, and
+let the converted version execute $n_c$ instructions.  If-conversion pays off
+when
+\begin{equation}
+  n_c \;<\; n_b + mP
+  \qquad\Longleftrightarrow\qquad
+  m \;>\; \frac{n_c - n_b}{P} .
+  \label{eq:l05-break-even}
+\end{equation}
+The right-hand side is the \emph{break-even misprediction rate}: the extra
+instructions of the converted code, measured in units of the misprediction
+penalty.  Compared with the rough comparison of \cref{sec:l05-predication},
+the extra instructions include the conditional moves, less the branch and
+jump instructions that the conversion removes.
+
+\begin{example}
+  \label{ex:l05-performance}
+  The branch version of \cref{ex:l05-movzn} executes five instructions when
+  the then part applies (\texttt{SLT}, \texttt{BEQ}, \texttt{ADD},
+  \texttt{ADDI}, \texttt{J}) and three otherwise (\texttt{SLT}, \texttt{BEQ},
+  \texttt{ADD}).  If both parts apply equally often, $n_b = 4$; the converted
+  version always executes $n_c = 7$.  Suppose the predictor is
+  \SI{75}{\percent} accurate on this branch and $P = 20$.  The branch version
+  costs $4 + 0.25 \times 20 = 9$ slots per execution and the converted
+  version 7, a speedup of $9/7 \approx 1.29$ for the fragment.  By
+  \cref{eq:l05-break-even} the break-even rate is $m = 3/20 = 0.15$: the
+  branch version is faster only if the predictor is more than
+  \SI{85}{\percent} accurate.  With $P = 40$ the break-even rate halves to
+  $0.075$, an accuracy of \SI{92.5}{\percent}.
+\end{example}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l05-break-even}
+  \caption{Slots per execution of the fragment of \cref{ex:l05-performance}
+    as a function of the misprediction rate.  Dots mark the break-even
+    rates; the fully predicated version is discussed in
+    \cref{sec:l05-full}.}
+  \label{fig:l05-break-even}
+\end{figure}
+
+\Cref{fig:l05-break-even} shows the comparison as a function of~$m$.  The
+cost of the branch version grows linearly with the misprediction rate, with a
+slope equal to the penalty, while the converted version costs the same for
+every~$m$.  A deeper or wider pipeline raises the penalty and so favours
+if-conversion; larger then and else parts raise $n_c - n_b$ and favour the
+branch.
+
+\begin{keypoint}
+  If-conversion replaces an occasional large penalty by a constant overhead.
+  It pays off when the mispredictions per execution times the penalty exceed
+  the extra instructions of the converted code (\cref{eq:l05-break-even}).
+\end{keypoint}
+
+\section{Benefits and costs of conditional moves}
+\label{sec:l05-cmov-summary}
+
+Removing branches with conditional moves has one benefit and several
+costs.\source{Lesson 5, video 8; H\&P §H.4.}
+\begin{itemize}
+  \item \textbf{Benefit:} hard-to-predict branches, and with them their
+    mispredictions, disappear.
+  \item \textbf{Compiler support} is needed.  The processor executes the code
+    it is given; a branch is removed only if the compiler recognizes a
+    suitable if-then-else and converts it.
+  \item \textbf{More registers} are needed: every result is first computed
+    into a temporary.
+  \item \textbf{More instructions} are executed: the work of both directions,
+    even on executions where the branch would have been predicted correctly,
+    and the conditional moves that select the results.
+\end{itemize}
+
+Of these, the compiler support, the removal of the branch and the execution
+of both directions are inherent to predication; the extra registers and the
+moves are not.  They arise because only the move is conditional: every
+result has to be computed into a temporary so that a conditional move can
+decide whether to keep it.  If the instruction
+that computes a result could itself be made conditional, neither the
+temporaries nor the moves would be needed.
+
+\section{Full predication}
+\label{sec:l05-full}
+
+A conditional move is a separate opcode, and the only operation it makes
+conditional is a copy.\source{Lesson 5, videos 9--12; H\&P §H.4, §H.6;
+\cite{mahlke1995}.}
+The alternative is support in the instruction set for making every
+instruction conditional.
+
+\begin{definition}[Full predication]
+  \label{def:l05-full-predication}
+  An instruction set provides \term{full predication}[完全プレディケーション]
+  if condition bits are added to every instruction: the instruction takes
+  effect only if its condition holds, and has no effect otherwise.
+\end{definition}
+
+The IA-64 instruction set of Intel's Itanium processors is an
+example\index{Itanium} (\cref{fig:l05-qp}).  In most IA-64 instructions, the
+six least significant bits of the 41-bit instruction hold a \emph{qualifying
+predicate}: the number of one of 64 one-bit registers, each called a
+\term{predicate register}[述語レジスタ].  The instruction takes effect only
+if the selected predicate register holds~1; otherwise it is annulled: it
+neither writes a result nor raises an exception, so, unlike with conditional
+moves, a direction may contain loads and stores that would be unsafe on the
+other path.  Predicate register~0 always holds~1, so an instruction whose
+qualifying predicate is~0 is unconditional.
+The predicate registers are set by compare instructions, which write a pair
+of predicates with complementary values, one for the condition and one for
+its negation.  In assembly language the qualifying predicate is written in
+parentheses before the instruction, as in \mbox{\texttt{(P1) ADD R1, R2,
+R3}}.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l05-qp}
+  \caption{Full predication in IA-64.  The qualifying predicate (qp) of an
+    instruction selects one of 64 one-bit predicate registers.  The
+    instruction is executed only if that register holds~1; otherwise it is
+    annulled, with no write and no exception.}
+  \label{fig:l05-qp}
+\end{figure}
+
+\needspace{8\baselineskip}
+\begin{example}
+  \label{ex:l05-full}
+  With full predication, if-conversion guards each statement of both
+  directions directly with the condition or its negation, and the code of
+  \cref{sec:l05-if-conversion} becomes
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+      CMPLT P1, P2, R1, R2 ; P1 <- (v < t), P2 <- !P1
+(P1)  ADD   R4, R4, R1     ; lo <- lo + v  if v < t
+(P1)  ADDI  R5, R5, 1      ; n  <- n + 1   if v < t
+(P2)  ADD   R6, R6, R1     ; hi <- hi + v  if v >= t
+\end{lstlisting}
+  where \texttt{CMPLT} denotes a compare instruction that sets P1 to~1 and P2
+  to~0 if R1 is less than R2, and the reverse otherwise.  The additions
+  themselves are conditional, so they write directly into the variables, and
+  the compare replaces both the \texttt{SLT} and the branch.
+  \Cref{tab:l05-versions} compares the three versions with the numbers of
+  \cref{ex:l05-performance}.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Three versions of the example fragment with a \SI{75}{\percent}
+    accurate predictor and $P = 20$.}
+  \label{tab:l05-versions}
+  \begin{tabular}{@{}lccccc@{}}
+    \toprule
+    Version & Instructions & Temporaries & Moves & Mispred. & Slots \\
+    \midrule
+    Branch           & 5 or 3 & 0 & 0 & 0.25 & 9 \\
+    MOVZ/MOVN        & 7      & 3 & 3 & 0    & 7 \\
+    Full predication & 4      & 0 & 0 & 0    & 4 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The fully predicated version executes the compare and the instructions of
+both directions, and nothing else.  Compared with the branch version it
+executes the unneeded direction but no branch and no jump; here the two
+balance, and its $n_c = 4$ equals the average $n_b$ of the branch version.
+Its break-even rate by \cref{eq:l05-break-even} is $m = (4-4)/20 = 0$: the
+branch version is not faster even with perfect prediction, and every
+misprediction makes it slower (\cref{fig:l05-break-even}).  With larger
+directions the break-even rate is positive, but lower than with conditional
+moves by the number of moves divided by~$P$, or by one instruction less if
+the conditional moves test a register that already holds the condition and so
+need no compare.
+By lowering the break-even rate, full predication makes if-conversion pay off
+also for branches that are predicted too well to justify conditional moves.
+
+\begin{keypoint}[Lesson summary]
+  Branch prediction costs nothing when right and tens of instructions when
+  wrong; predication executes both directions of a branch and never
+  mispredicts, at the price of always doing the unneeded work.  Branches are
+  therefore predicted by default, and compilers use predication only for
+  small, hard-to-predict if-then-else branches, not for loops, calls, returns
+  or large if-then-else branches.  If-conversion removes such a branch by
+  turning the control dependence into a data dependence on the condition.
+  With ordinary instructions it computes both directions into temporaries and
+  selects the results with conditional moves, such as MOVZ and MOVN in MIPS or
+  CMOVcc on the condition codes in x86.  If-conversion pays off when the
+  mispredictions per execution times the penalty exceed its extra
+  instructions (\cref{eq:l05-break-even}); deeper pipelines favour it.  Full
+  predication, with a condition on every instruction as in IA-64, avoids the
+  temporaries and moves and so lowers the break-even misprediction rate.
+\end{keypoint}
+
+\end{document}

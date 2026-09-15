@@ -1,0 +1,31 @@
+% The cache coherence problem: three cores with private write-back caches
+% share one main memory.  Core 0 has overwritten X in its cache only; core 1
+% reads a stale copy from its cache, core 2 a stale value from memory.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  core/.style={draw, fill=ln-accent!15, minimum width=2.5cm, minimum height=0.6cm, inner sep=2pt},
+  cache/.style={draw, fill=ln-box, minimum width=2.5cm, minimum height=0.6cm, inner sep=2pt},
+  big/.style={draw, fill=ln-box, minimum height=0.7cm, inner sep=3pt},
+  op/.style={font=\scriptsize, align=center, anchor=south},
+  bad/.style={text=ln-caution}]
+  \foreach \i/\c in {0/{X $=$ 8\enspace\iflangja{（ダーティ）}{(dirty)}},
+                     1/{X $=$ 5},
+                     2/{\iflangja{X のコピーなし}{no copy of X}}} {
+    \node[core] (c\i) at (\i*3.4,0) {\iflangja{コア}{core}~\i};
+    \node[cache] (k\i) at (\i*3.4,-0.85) {\c};
+    \draw (c\i.south) -- (k\i.north);
+    \draw (k\i.south) -- (\i*3.4,-1.75);
+  }
+  % operations, numbered in the order they happen
+  \node[op] at (c0.north) {\iflangja{(1) X を読む\\(3) X に 8 を書く}%
+                                   {(1) read X\\(3) write 8 to X}};
+  \node[op] at (c1.north) {\iflangja{(2) X を読む}{(2) read X}\\
+    \textcolor{ln-caution}{\iflangja{(4) X を読む: ヒット，5}%
+                                   {(4) read X: hit, 5}}};
+  \node[op, bad] at (c2.north) {\iflangja{(5) X を読む:\\ミス，主記憶から 5}%
+                                        {(5) read X:\\miss, 5 from memory}};
+  % bus and memory
+  \draw[line width=1.4pt] (-1.45,-1.75) -- (8.25,-1.75)
+    node[right, font=\footnotesize] {\iflangja{バス}{bus}};
+  \node[big, minimum width=4.2cm] (mem) at (3.4,-2.75) {\iflangja{主記憶: X $=$ 5}{main memory: X $=$ 5}};
+  \draw (mem.north) -- (3.4,-1.75);
+\end{tikzpicture}

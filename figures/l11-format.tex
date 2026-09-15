@@ -1,0 +1,33 @@
+% A VLIW instruction with N = 4 operation slots, each encoded like an
+% ordinary instruction, decoded and executed in parallel.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.6mm]},
+  unit/.style={draw, fill=ln-box, minimum width=1.9cm, minimum height=0.5cm, inner sep=1pt}]
+  % --- the instruction word: four contiguous slots of 2.45 cm
+  \foreach \s in {0,...,3} {
+    \pgfmathsetmacro{\x}{2.45*\s}
+    \fill[ln-accent!15] (\x,0) rectangle (\x+0.95,0.55);
+    \foreach \d in {0.95,1.45,1.95} { \draw[ln-rule] (\x+\d,0) -- (\x+\d,0.55); }
+    \node[font=\scriptsize\sffamily] at (\x+0.475,0.275) {\iflangja{{\tiny 命令コード}}{opcode}};
+    \node[font=\scriptsize\sffamily] at (\x+1.2,0.275) {rd};
+    \node[font=\scriptsize\sffamily] at (\x+1.7,0.275) {rs};
+    \node[font=\scriptsize\sffamily] at (\x+2.2,0.275) {rt};
+    \pgfmathtruncatemacro{\n}{\s+1}
+    \node[font=\scriptsize\sffamily, text=ln-muted, anchor=south] at (\x+1.225,0.55)
+      {\iflangja{スロット \n}{slot \n}};
+    % decode and execute
+    \node[unit] (d\s) at (\x+1.225,-0.9) {\iflangja{デコード}{decode}};
+    \node[unit] (e\s) at (\x+1.225,-1.8) {\iflangja{実行}{execute}};
+    \draw[->] (\x+1.225,0) -- (d\s);
+    \draw[->] (d\s) -- (e\s);
+    \draw[->] (e\s) -- (\x+1.225,-2.6);
+  }
+  \foreach \s in {1,2,3} { \draw[line width=0.9pt] (2.45*\s,0) -- (2.45*\s,0.55); }
+  \draw[line width=0.9pt] (0,0) rectangle (9.8,0.55);
+  % --- architectural state
+  \draw[fill=white] (0,-2.6) rectangle (9.8,-3.1);
+  \node at (4.9,-2.85) {\iflangja{レジスタとメモリ}{registers and memory}};
+  % --- marker for the whole word
+  \draw[ln-accent, line width=0.6pt] (0,1.0) -- (0,1.1) -- (9.8,1.1) -- (9.8,1.0);
+  \node[font=\scriptsize\sffamily, text=ln-accent, anchor=south] at (4.9,1.1)
+    {\iflangja{1 命令 $=$ $N$ 個の独立な操作}{one instruction $=$ $N$ independent operations}};
+\end{tikzpicture}

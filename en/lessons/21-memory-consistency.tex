@@ -1,0 +1,568 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Memory Consistency}
+\lessoninfo{
+  video={Lesson 21, videos 1--14},
+  textbook={H\&P \cite{hennessy2017} §5.6; \cite{mosberger1993}},
+  keywords={memory consistency, cache coherence, program order, consistency model, sequential consistency, strong consistency, load replay, relaxed consistency, MSYNC, data race, weak consistency, release consistency},
+}
+
+Lesson 19 made every read of a memory location return the value most
+recently written to that location, and Lesson 20 used locks and barriers to
+coordinate the threads that update shared data.  Neither addresses the order
+in which accesses to \emph{different} locations take effect, and an
+out-of-order processor changes that order as a matter of course.  This lesson
+shows that such reordering can produce results that no execution of the
+program in its own order could produce, defines sequential consistency, the
+guarantee that rules these results out, and explains how an out-of-order
+processor provides it.  It then turns to relaxed consistency, in which the
+program marks the places where order matters, and to data races, which decide
+whether a program can tell the difference.
+
+\section{Coherence and consistency}
+\label{sec:l21-coherence}
+
+Cache coherence\index{cache coherence} (\cref{sec:l19-definition}) constrains the accesses to one
+memory location: a read of the location, by any core, returns the value of
+the most recent write to that same location, by any core.\source{Lesson 21,
+videos 1--2; H\&P §5.6.}  This is what allows threads to share data at all.
+Coherence, however, treats each location on its own.  It does not say whether
+a core that writes location A and then reads location B performs the two
+accesses in this order as far as the other cores can tell, or whether two
+writes of one core, to A and to B, become visible to the other cores in the
+order in which the core made them.
+
+\begin{definition}[Memory consistency]
+  The \term{memory consistency}[メモリ一貫性] of a shared-memory system is its
+  guarantee about the order in which the memory accesses of all cores,
+  including accesses to different locations, take effect.  It determines
+  which combinations of values the reads of a parallel program can return.
+\end{definition}
+
+A write takes effect when it becomes visible to reads; a read takes effect at
+the moment whose memory contents it returns.  A precise statement of the
+orders that a system allows is a \term{consistency model}[一貫性モデル].  This
+lesson develops the most important model, sequential consistency, and its
+relaxed alternatives; \cref{sec:l21-models} surveys further models.
+
+The two properties have different origins.  Coherence is needed because
+caches keep copies of memory: a system without caches has a single copy of
+every location and is coherent by construction.  Consistency does not depend
+on caches.  Even with a single copy of every location, a processor that
+performs its memory accesses in a different order than the program specifies
+changes which values its reads return---and, as the next section shows,
+current processors do exactly that.  A coherent system is therefore not
+necessarily consistent.
+
+\section{Why consistency matters}
+\label{sec:l21-matters}
+
+Whether the order of accesses to different locations matters is best seen in
+a small program (\cref{ex:l21-flags}).\source{Lesson 21, videos 3--5; H\&P
+§5.6.}
+
+\begin{example}[Two flags]
+  \label{ex:l21-flags}
+  Two cores execute the same code.  On core 0, R4 holds the address of a
+  flag X and R5 the address of a flag Y; on core 1 the roles of X and Y are
+  exchanged.  Both flags are initially 0.
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+      ADDI R1, R0, 1    ; R1 <- 1
+      SW   R1, 0(R4)    ; own flag <- 1
+      LW   R2, 0(R5)    ; R2 <- other core's flag
+      BNEZ R2, skip     ; other core has announced
+      ...               ; work for one core only
+skip: ...
+\end{lstlisting}
+  Each core first announces with its own flag that it is about to do the
+  work, and does the work only if the other core has not announced.
+\end{example}
+
+If each core performs its two memory accesses in program order, at most one
+core does the work.  Suppose core 0 reads Y as 0.  Then its read of Y took
+effect before core 1's store to Y, and therefore also before core 1's read of
+X, which follows that store.  Core 0's store to X precedes its own read of Y,
+so it precedes core 1's read of X as well, and that read returns 1.  (If both
+stores take effect before both reads, neither core does the work.)
+
+An out-of-order processor does not perform the accesses in program order.  A
+store writes memory only when it commits, whereas a load reads memory as soon
+as it has computed its address and found no earlier store to the same address
+in the load-store queue (\cref{sec:l09-lsq}).  The store and the load of
+\cref{ex:l21-flags} access different addresses, so the load can read memory
+long before the store commits.  If this happens on both cores
+(\cref{fig:l21-reorder}), both loads read 0 and both cores do the work.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l21-reorder}
+  \caption{\Cref{ex:l21-flags} on two out-of-order cores.  Each core's load
+    reads memory before its own store commits; both loads read 0, and both
+    cores do the work.}
+  \label{fig:l21-reorder}
+\end{figure}
+
+Every read in this execution is coherent: when each load reads its flag, the
+flag really holds 0, and the stores take effect at commit, in program order.
+The result is nevertheless impossible in any execution in program order.  What
+the out-of-order cores have changed is the order of accesses to different
+locations: each core's read of the other flag took effect before its own
+store.
+
+\subsection{Reordered loads in correct programs}
+\label{sec:l21-ready}
+
+The two-flag program may look contrived, but the same kind of reordering
+breaks common and otherwise correct patterns.  One is a \emph{data-ready
+flag}: a writer thread stores new data and then sets a flag, and a reader
+thread waits until the flag is set and then uses the data.  With R4 holding
+the address of the flag and R5 that of the data, the writer executes
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+      SW   R6, 0(R5)    ; data  <- new value
+      SW   R7, 0(R4)    ; ready <- R7 (= 1)
+\end{lstlisting}
+and the reader executes
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+poll: LW   R1, 0(R4)    ; R1 <- ready
+      BEQZ R1, poll     ; not set: poll again
+      LW   R2, 0(R5)    ; R2 <- data
+\end{lstlisting}
+In program order, the reader's load of the data follows the load of the flag
+that found it set, which follows the writer's store to the flag, which in turn
+follows the writer's store of the data: the reader always obtains the new
+data.  Branch prediction (Lesson 4) removes this guarantee.  The reader's core
+predicts that the loop exits and executes the load of the data speculatively,
+possibly before the load of the flag in the same iteration.
+\Cref{tab:l21-ready} traces such an execution in which the data
+holds 3 and the writer stores 8.  The load of the flag executes after the
+writer has set it, so the prediction turns out to be correct, and the load of
+the data commits with the old value.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{The data-ready flag on an out-of-order reader core (core 0) and a
+    writer core (core 1).  Memory contents after each step.}
+  \label{tab:l21-ready}
+  \begin{tabular}{@{}cclcc@{}}
+    \toprule
+    Step & Core & Event & ready & data \\
+    \midrule
+    1 & 0 & \texttt{LW data} executes on the predicted path: R2 $=$ 3 & 0 & 3 \\
+    2 & 1 & \texttt{SW data} commits                               & 0 & 8 \\
+    3 & 1 & \texttt{SW ready} commits                              & 1 & 8 \\
+    4 & 0 & \texttt{LW ready} executes: R1 $=$ 1                   & 1 & 8 \\
+    5 & 0 & \texttt{BEQZ} resolves: not taken, as predicted        & 1 & 8 \\
+    6 & 0 & the three instructions commit with R2 $=$ 3            & 1 & 8 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The same happens when a thread creates another thread, waits until that
+thread has exited, and then uses the results it produced.  The wait ends when
+a load of the thread's status, which the operating system writes when the
+thread exits, finds the thread finished; the load of the results, which
+follows in program order, can execute earlier, before the other thread has
+written them.
+
+In both patterns all caches are coherent, and the program is correct whenever
+its accesses take effect in program order.  To be able to write such programs
+at all, programmers need a guarantee about the order of accesses to different
+locations---a guarantee beyond coherence.
+
+\begin{keypoint}
+  Coherence orders the accesses to each location separately.  Out-of-order
+  execution and branch prediction let loads take effect before earlier
+  accesses to other locations, which can produce results that no execution in
+  program order could produce.
+\end{keypoint}
+
+\section{Sequential consistency}
+\label{sec:l21-sc}
+
+The most intuitive guarantee requires memory to behave as if the cores took
+turns.\source{Lesson 21, video 6; H\&P §5.6; \cite{lamport1979}.}
+
+\begin{definition}[Sequential consistency]
+  A shared-memory system provides
+  \term{sequential consistency}[逐次一貫性] if the result of every execution
+  is the same as if the memory accesses of each core were performed in program
+  order and the accesses of different cores were interleaved in some arbitrary
+  order.
+\end{definition}
+
+The definition, which goes back to Lamport \cite{lamport1979}, has two parts.
+Within one core the order is fixed: the accesses appear in the order that the
+program specifies.  Across cores any interleaving is allowed; which one an
+execution corresponds to depends on the timing of the cores, so a correct
+program must produce a correct result for every interleaving.  The words
+\enquote{as if} matter: the hardware need not actually perform the accesses in
+such an order, as long as no program can tell the difference.
+
+\begin{example}[Interleavings of the two-flag program]
+  \label{ex:l21-interleavings}
+  In \cref{ex:l21-flags} core 0 stores X ($w_0$) and then reads Y ($r_0$);
+  core 1 stores Y ($w_1$) and then reads X ($r_1$).  Keeping the order of each
+  core leaves six interleavings (\cref{tab:l21-interleavings}).  In every one
+  of them at least one read returns 1, so a sequentially consistent system
+  never lets both cores do the work: the execution of \cref{fig:l21-reorder}
+  is not sequentially consistent.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{The six interleavings of the accesses in
+    \cref{ex:l21-interleavings} that keep each core's program order.}
+  \label{tab:l21-interleavings}
+  \begin{tabular}{@{}clccl@{}}
+    \toprule
+    & Order & $r_0$ (Y) & $r_1$ (X) & Does the work \\
+    \midrule
+    1 & $w_0\;r_0\;w_1\;r_1$ & 0 & 1 & core 0 \\
+    2 & $w_0\;w_1\;r_0\;r_1$ & 1 & 1 & neither \\
+    3 & $w_0\;w_1\;r_1\;r_0$ & 1 & 1 & neither \\
+    4 & $w_1\;w_0\;r_0\;r_1$ & 1 & 1 & neither \\
+    5 & $w_1\;w_0\;r_1\;r_0$ & 1 & 1 & neither \\
+    6 & $w_1\;r_1\;w_0\;r_0$ & 1 & 0 & core 1 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\needspace{8\baselineskip}
+\begin{note}[Strong consistency]
+  Sequential consistency requires only that \emph{some} interleaving explain
+  the results; the interleaving need not agree with the real time at which the
+  accesses occur.  As far as the model is concerned, a read may return an old
+  value although another core completed a write to the location earlier, as
+  long as the read can be placed before that write without contradicting any
+  other result.  A system in which the order must also respect real
+  time---an access that completes before another begins comes first, so that
+  every read returns the value most recently written---provides
+  \term{strong consistency}[強い一貫性].
+\end{note}
+
+\section{Implementing sequential consistency}
+\label{sec:l21-implementing}
+
+\subsection{The simple implementation}
+
+The simplest way to provide sequential consistency is to remove the
+\enquote{as if} from its definition.\source{Lesson 21, videos 7--8; H\&P
+§5.6.}  Each core performs its memory accesses one at a time and in program
+order: it starts an access only when all its earlier accesses have been
+completed.  Coherence makes every completed access visible to all cores, so
+the order in which the accesses of all cores complete is itself an
+interleaving of the kind the definition requires.
+
+This implementation is correct but very slow.  An out-of-order core can still
+reorder the instructions that do not access memory, but it can have only one
+memory access in progress at a time: a load cannot execute until
+every earlier store has committed, and every instruction that uses the loaded
+value waits with it.  Memory accesses are, however, exactly the slow
+operations that out-of-order execution most needs to overlap.  A cache miss
+takes many cycles, and in a multiprocessor an access may in addition have to
+wait for the bus and the coherence protocol (Lesson 19).  Limited to one
+memory access at a time, a core loses most of the benefit of out-of-order
+execution.
+
+\subsection{Reordering loads safely}
+
+A better implementation lets the core execute loads out of order, detects the
+cases in which this could violate sequential consistency, and repairs them.
+Two observations make this possible.
+\begin{itemize}
+  \item \textbf{Only loads need attention.}  Stores write memory at commit, in
+    program order (\cref{sec:l09-write}), so they already take effect in
+    program order.  A load that reads the location of an earlier store of the
+    same core obtains the store's value from the load-store queue (Lesson 9).
+  \item \textbf{The ROB records the program order.}  Whatever the order of
+    execution, the ROB holds the instructions in program order, and a load
+    that has executed early can be regarded as taking effect when it commits.
+    The value it read is correct for that point unless another core has
+    written the location in between.
+\end{itemize}
+The core therefore watches the coherence traffic of the other cores for the
+locations of all loads that have executed but not yet committed.  Under
+write-invalidate coherence, a write by another core arrives as an
+invalidation of the block that contains the location
+(\cref{sec:l19-write-invalidate}).  If such a write is observed, the load may
+have read a stale value: the load and all instructions after it are cancelled
+and executed again, exactly as after a branch misprediction
+(\cref{sec:l08-recovery}).  This is always possible because the load has not
+committed.  Once the load commits, it has taken effect in program order, and
+its location no longer needs to be watched.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l21-replay}
+  \caption{Replaying a reordered load.  In program order core 0 executes I1:
+    \texttt{LW ready} and then I2: \texttt{LW data}.  While I2 has executed
+    but not committed (shaded), core 1 writes the data; its invalidation forces
+    I2 to be executed again.}
+  \label{fig:l21-replay}
+\end{figure}
+
+\Cref{fig:l21-replay} applies this to the data-ready flag of
+\cref{tab:l21-ready}.  Core 0 executes the load of the data, I2, before the
+load of the flag, I1, and reads the old value 3.  Core 1 then stores 8 into
+the data.  The invalidation reaches core 0 while I2 is uncommitted, so I2 is
+executed again and now reads 8.  I1, executed after core 1 has set the flag,
+reads 1, and both loads commit with the values they would have returned in
+program order.
+
+A replay is needed only when another core writes a location in the few cycles
+between the execution and the commit of a load that reads it, which is rare.
+Because invalidations refer to whole blocks, a write to another location in
+the same block also causes a replay; this costs time but never produces a
+wrong result.
+
+\begin{keypoint}
+  Sequential consistency does not forbid reordering memory accesses; it
+  forbids reordering that a program could observe.  An out-of-order core may
+  execute loads early if it replays every load whose location another core
+  writes before the load commits.
+\end{keypoint}
+
+\section{Relaxed consistency}
+\label{sec:l21-relaxed}
+
+Sequential consistency constrains every pair of accesses that a core makes,
+whether or not the program depends on their order.\source{Lesson 21, videos
+9--11; H\&P §5.6.}  For two accesses that a core makes in program order, the
+first to location A and the second to location B, there are four kinds of
+ordering: WR A $\to$ WR B, WR A $\to$ RD B, RD A $\to$ WR B and RD A $\to$ RD
+B.  Each requires the first access to take effect before the second, as
+observed by all cores (\cref{tab:l21-orderings}).  Sequential consistency
+obeys all four, always.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{The four orderings between two accesses of one core, first to A and
+    then to B, and what a core that violates them may do.}
+  \label{tab:l21-orderings}
+  \begin{tabular}{@{}lp{4.3cm}p{4.1cm}@{}}
+    \toprule
+    Ordering & Violation & Example \\
+    \midrule
+    WR A $\to$ WR B & new value of B visible before new value of A
+      & flag set before the data is stored \\
+    WR A $\to$ RD B & B read before the write to A is visible
+      & two flags (\cref{ex:l21-flags}) \\
+    RD A $\to$ WR B & new value of B visible before A is read
+      & a reply visible before the request has been read \\
+    RD A $\to$ RD B & B read before A is read
+      & data-ready flag (\cref{tab:l21-ready}) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{definition}[Relaxed consistency]
+  A system with \term{relaxed consistency}[緩和一貫性] does not always obey
+  some of these orderings for ordinary memory accesses, and provides a way for
+  programs to enforce the order where their correctness depends on it.
+\end{definition}
+
+The orderings that end in a read, RD $\to$ RD in particular, are the natural
+candidates for relaxation.  If a load may take effect before the earlier
+accesses of its core to other locations, the core of
+\cref{sec:l21-implementing} needs neither to watch coherence traffic nor to
+replay loads: every load simply executes when it is ready, as in
+\cref{fig:l21-reorder} and \cref{tab:l21-ready}.
+
+\subsection{Synchronizing accesses}
+
+If even two reads may be reordered, a program needs some way to obtain a
+particular order where it matters.  A system with relaxed consistency
+therefore distinguishes two kinds of operations.  Ordinary loads and stores
+may be reordered as the model allows.  Special operations, which the program
+uses where order matters, are never reordered.  The lecture calls such an
+instruction \texttt{MSYNC}\index{MSYNC}: every memory access that precedes an
+\texttt{MSYNC} in program order takes effect before any access that follows it
+(\cref{fig:l21-msync}).\margin{x86 provides such an instruction,
+\texttt{MFENCE}\index{MFENCE}: every load and store that precedes it in
+program order completes before the next load or store.}  Between two
+\texttt{MSYNC} instructions, accesses may still be reordered.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l21-msync}
+  \caption{\texttt{MSYNC} divides the accesses of a core, in program order,
+    into groups.  Accesses within a group may take effect in any order; no
+    access takes effect before an access in an earlier group.}
+  \label{fig:l21-msync}
+\end{figure}
+
+With one \texttt{MSYNC} on each side, the data-ready flag is correct under
+relaxed consistency.  The writer and the reader execute
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+; writer
+      SW   R6, 0(R5)    ; data  <- new value
+      MSYNC             ; the data is visible
+      SW   R7, 0(R4)    ; ready <- 1
+; reader
+poll: LW   R1, 0(R4)    ; R1 <- ready
+      BEQZ R1, poll     ; not set: poll again
+      MSYNC             ; the load of ready is done
+      LW   R2, 0(R5)    ; R2 <- data
+\end{lstlisting}
+On the reader, \texttt{MSYNC} makes the load of the flag that found the flag
+set take effect before the load of the data.  On the writer, it makes the
+store of the data take effect before the store to the flag, which a
+relaxation of WR $\to$ WR could otherwise make visible first.  Because the
+reader's load of the flag returned 1, the flag, and before it the data, had
+been stored when that load took effect, and the load of the data comes later
+still.
+
+The flag is a simple form of synchronization, and the placement of the two
+\texttt{MSYNC}s follows a general rule: place \texttt{MSYNC} \emph{after} an
+operation that acquires the right to proceed and \emph{before} an operation
+that releases it.  A thread that uses a lock (Lesson 20) executes
+\texttt{MSYNC} right after \texttt{lock}, so that the accesses of its critical
+section take effect after the acquisition and see all writes of earlier lock
+holders, and right before \texttt{unlock}, so that all writes of its critical
+section have taken effect when the next thread acquires the lock.  Such
+instructions normally belong inside the lock and barrier routines of a
+synchronization library rather than in every program.
+
+\section{Data races and consistency}
+\label{sec:l21-races}
+
+Whether relaxed consistency can change the result of a program depends on
+how the program accesses shared data.\source{Lesson 21, video 12; H\&P §5.6;
+\cite{adve1990}.}
+
+\begin{definition}[Data race]
+  Two accesses to the same memory location made by different cores form a
+  \term{data race}[データ競合] if at least one of them is a write---RD $\to$
+  WR, WR $\to$ RD or WR $\to$ WR---and they are not ordered by
+  synchronization, that is, no synchronization operation determines which of
+  them takes effect first.
+\end{definition}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l21-race}
+  \caption{Left: nothing orders the load and the store of A, a data race.
+    Right: a barrier after the load and before the store makes the load take
+    effect first.}
+  \label{fig:l21-race}
+\end{figure}
+
+On the left of \cref{fig:l21-race}, a load of A on core 0 and a store to A on
+core 1 have nothing between them; which of them takes effect first depends on
+the timing of the cores, and the load returns the old or the new value
+accordingly.  On the right, core 0 reaches a barrier (\cref{sec:l20-barrier})
+after its load, and core 1 reaches the same barrier before its store.  No
+thread leaves a barrier before all threads have arrived, so the load always
+takes effect before the store, and there is no data race.  Accesses protected
+by the same lock are ordered as well: one critical section ends with
+\texttt{unlock} before the other begins with \texttt{lock}.
+
+The importance of data races lies in the following property
+\cite{adve1990}.
+\begin{itemize}
+  \item A \textbf{data-race-free program} produces the same results as under
+    sequential consistency, whatever consistency model the system provides,
+    as long as the system does not reorder the synchronization itself.
+    Reordering accesses to different locations, or reads of the same location,
+    does not change any value that is read, and every pair of accesses whose
+    order could change a value is ordered by synchronization, which the system
+    keeps in order.
+  \item A program \textbf{with data races} has no such guarantee.  On a system
+    with relaxed consistency anything can happen, including results that no
+    interleaving explains.
+\end{itemize}
+
+The examples of this lesson all contain data races.  In
+\cref{ex:l21-flags} each core reads a flag that the other core writes without
+synchronization.  The data-ready flag of \cref{tab:l21-ready} is a form of
+synchronization that the memory system does not recognize: nothing orders the
+reader's load of the data after the writer's store; the \texttt{MSYNC}s of
+\cref{sec:l21-relaxed} remove the race.  The lost increment of
+\cref{tab:l20-race} is also a data race.  Under sequential consistency its
+possible results are at least limited to those of the interleavings of the two
+threads; under relaxed consistency even that limit disappears.
+\caution{A program that works on a sequentially consistent system can still
+fail under relaxed consistency if it contains a data race.}
+
+\begin{keypoint}
+  A data-race-free program cannot tell relaxed consistency from sequential
+  consistency, so relaxing consistency costs a properly synchronized program
+  nothing.  A program with data races can observe anything.
+\end{keypoint}
+
+\section{Consistency models}
+\label{sec:l21-models}
+
+Sequential consistency and the relaxed consistency of \cref{sec:l21-relaxed}
+are two points in a wide range of consistency models.\source{Lesson 21, videos
+13--14; \cite{mosberger1993}.}  The models differ in which orderings they
+relax, and in whether and how they distinguish synchronization from other
+accesses.  Some models treat all accesses alike; from stronger to weaker:
+\begin{description}
+  \item[Strong consistency] Every read returns the value most recently written
+    in real time (\cref{sec:l21-sc}).
+  \item[Sequential consistency] Some interleaving that keeps the program order
+    of each core explains all results.
+  \item[Causal consistency] Under \term{causal consistency}[因果一貫性] only
+    writes that are causally related---the later write was made after reading,
+    directly or indirectly, the result of the earlier one---must be seen by
+    all cores in the same order.  Unrelated writes may be seen in different
+    orders by different cores.
+  \item[Processor consistency]\index{processor consistency} The writes of one
+    core are seen by all cores in the order in which that core made them, but
+    different cores may see the writes of different cores in different
+    orders.  A core's read may also take effect before its own earlier write
+    to another location, so the execution of \cref{fig:l21-reorder} is
+    allowed.
+\end{description}
+Other models distinguish synchronization, and a data-race-free program that
+uses the synchronization they recognize behaves under them as under
+sequential consistency:
+\begin{description}
+  \item[Weak consistency] Under \term{weak consistency}[弱い一貫性] accesses to
+    synchronization variables, such as locks, are sequentially consistent and
+    act like \texttt{MSYNC}: every earlier access takes effect before them and
+    no later access does.  All other accesses may be reordered freely between
+    them.
+  \item[Release consistency]\index{release consistency} Synchronization is
+    split into acquiring and releasing, as in \texttt{lock} and
+    \texttt{unlock}.  An acquire keeps later accesses from taking effect before
+    it, and a release waits until all earlier accesses have taken effect, so
+    ordinary accesses are never reordered across the boundaries of a critical
+    section---the placement of \texttt{MSYNC} in \cref{sec:l21-relaxed}.
+  \item[Lazy release consistency]\index{lazy release consistency} Release
+    consistency implemented lazily, originally for distributed shared memory
+    built in software: the updates made in a critical section are transferred
+    to another node only when that node accesses the data after acquiring the
+    lock, not at every release.
+  \item[Scope consistency]\index{scope consistency} Each lock defines a
+    scope.  A thread that enters a critical section sees the updates made in
+    earlier critical sections of the same lock, but not necessarily the updates
+    made under other locks.
+\end{description}
+The list is not complete, and new models continue to be proposed.  What they
+share is the arrangement of this lesson: the system may reorder the accesses
+that its model leaves unordered, and a program that needs a particular order
+obtains it through synchronization.
+
+\begin{keypoint}[Lesson summary]
+  Coherence orders the accesses to one location; memory consistency concerns
+  the order of accesses to different locations, which out-of-order execution
+  and branch prediction change.  Sequential consistency requires every
+  execution to look as if each core's accesses were performed in program
+  order and those of different cores interleaved.  Performing accesses one at
+  a time provides it but ruins out-of-order execution; instead, a core can
+  execute loads early and replay any load whose location another core writes
+  before the load commits.  Relaxed consistency does not always keep the
+  orderings between accesses and gives programs synchronizing operations, such
+  as \texttt{MSYNC}, placed after acquiring and before releasing.  A program
+  without data races---conflicting accesses on different cores not ordered by
+  synchronization---behaves as under sequential consistency in any such
+  model; a program with data races can observe anything.  Weak, release, lazy
+  release and scope consistency differ in how they recognize synchronization,
+  and causal and processor consistency in which orders of writes all cores
+  must agree on.
+\end{keypoint}
+
+\end{document}

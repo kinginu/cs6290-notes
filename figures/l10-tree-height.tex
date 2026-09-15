@@ -1,0 +1,57 @@
+% Tree height reduction of a six-operand sum: (a) left-to-right translation,
+% a chain of height 5; (b) balanced tree of height 3.  Each level of
+% operations is executed in one cycle of the ideal processor.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily,
+  op/.style={circle, draw, fill=ln-box, minimum size=0.5cm, inner sep=0pt},
+  leaf/.style={font=\scriptsize\ttfamily, inner sep=1pt, fill=white},
+  edge/.style={thick, ln-accent},
+  res/.style={font=\scriptsize\ttfamily, inner sep=1pt}]
+  % ---- cycle rows
+  \foreach \c in {1,...,5} {
+    \draw[ln-rule, dotted] (-0.2,{(\c-1)*0.8}) -- (9.7,{(\c-1)*0.8});
+    \node[anchor=east, text=ln-muted, font=\scriptsize\sffamily]
+      at (-0.25,{(\c-1)*0.8}) {\iflangja{サイクル \c}{cycle \c}};
+  }
+  % ---- (a) left to right: ((((R1+R2)+R3)+R4)+R5)+R6
+  \node[leaf] (r1) at (0.2,-0.8) {R1};
+  \node[leaf] (r2) at (1.0,-0.8) {R2};
+  \node[op] (a1) at (0.6,0.0) {$+$};
+  \node[op] (a2) at (1.2,0.8) {$+$};
+  \node[op] (a3) at (1.8,1.6) {$+$};
+  \node[op] (a4) at (2.4,2.4) {$+$};
+  \node[op] (a5) at (3.0,3.2) {$+$};
+  \node[leaf] (r3) at (1.8,0.0) {R3};
+  \node[leaf] (r4) at (2.4,0.8) {R4};
+  \node[leaf] (r5) at (3.0,1.6) {R5};
+  \node[leaf] (r6) at (3.6,2.4) {R6};
+  \draw[edge] (a1) -- (r1) (a1) -- (r2)
+              (a2) -- (a1) (a2) -- (r3)
+              (a3) -- (a2) (a3) -- (r4)
+              (a4) -- (a3) (a4) -- (r5)
+              (a5) -- (a4) (a5) -- (r6);
+  \node[res] (ra) at (3.0,3.85) {R10};
+  \draw[edge] (a5) -- (ra);
+  \node at (1.9,-1.45) {\iflangja{(a) 左から順に：高さ 5}{(a) left to right: height 5}};
+  % ---- (b) balanced: ((R1+R2)+(R3+R4))+(R5+R6)
+  \begin{scope}[xshift=5.6cm]
+    \node[leaf] (s1) at (0.0,-0.8) {R1};
+    \node[leaf] (s2) at (0.9,-0.8) {R2};
+    \node[leaf] (s3) at (1.5,-0.8) {R3};
+    \node[leaf] (s4) at (2.4,-0.8) {R4};
+    \node[leaf] (s5) at (3.0,-0.8) {R5};
+    \node[leaf] (s6) at (3.9,-0.8) {R6};
+    \node[op] (p1) at (0.45,0.0) {$+$};
+    \node[op] (p2) at (1.95,0.0) {$+$};
+    \node[op] (p3) at (3.45,0.0) {$+$};
+    \node[op] (p4) at (1.2,0.8) {$+$};
+    \node[op] (p5) at (2.3,1.6) {$+$};
+    \draw[edge] (p1) -- (s1) (p1) -- (s2)
+                (p2) -- (s3) (p2) -- (s4)
+                (p3) -- (s5) (p3) -- (s6)
+                (p4) -- (p1) (p4) -- (p2)
+                (p5) -- (p4) (p5) -- (p3);
+    \node[res] (rb) at (2.3,2.25) {R10};
+    \draw[edge] (p5) -- (rb);
+    \node at (1.95,-1.45) {\iflangja{(b) 平衡木：高さ 3}{(b) balanced: height 3}};
+  \end{scope}
+\end{tikzpicture}

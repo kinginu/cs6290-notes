@@ -1,0 +1,33 @@
+% Components of one disk access, drawn to scale for the numbers of
+% Example ex:l16-access (seek 4 ms, rotational latency 3 ms, data read
+% 1.2 ms, controller 0.3 ms, I/O bus 0.5 ms).  1 ms = 1.2 cm.
+\begin{tikzpicture}[x=1.2cm,y=1cm, font=\footnotesize\sffamily,
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted},
+  pin/.style={draw=ln-muted, thin},
+  seg/.style={draw, minimum height=0.55cm}]
+  % segments (x in ms)
+  \draw[fill=ln-accent!40] (0,0) rectangle (4,0.55);
+  \draw[fill=ln-accent!20] (4,0) rectangle (7,0.55);
+  \draw[fill=ln-accent!10] (7,0) rectangle (8.2,0.55);
+  \draw[fill=ln-box] (8.2,0) rectangle (8.5,0.55);
+  \draw[fill=white] (8.5,0) rectangle (9,0.55);
+  \node at (2,0.275) {\iflangja{シーク時間}{seek time}};
+  \node at (5.5,0.275) {\iflangja{回転待ち時間}{rotational latency}};
+  \node[lab, anchor=south] at (7.6,0.6) {\iflangja{データ読み出し}{data read}};
+  \draw[pin] (8.35,0.55) -- (8.35,1.0);
+  \node[lab, anchor=south] at (8.35,0.97) {\iflangja{コントローラ}{controller}};
+  \draw[pin] (8.75,0.55) -- (8.95,0.72);
+  \node[lab, anchor=south west] at (8.85,0.62) {\iflangja{I/O バス}{I/O bus}};
+  % time axis
+  \draw (0,-0.1) -- (9,-0.1);
+  \foreach \t in {0,...,9} {
+    \draw (\t,-0.1) -- (\t,-0.18);
+    \node[lab, anchor=north] at (\t,-0.16) {\t};
+  }
+  \node[lab, anchor=north west] at (9.1,-0.16) {ms};
+  % mechanical vs electronic parts
+  \draw[ln-muted] (0,-0.6) -- (0,-0.68) -- (8.15,-0.68) -- (8.15,-0.6);
+  \node[lab, anchor=north] at (4.1,-0.7) {\iflangja{機械的な動作（ヘッドとプラッタ）}{mechanical (head and platter movement)}};
+  \draw[ln-muted] (8.25,-0.6) -- (8.25,-0.68) -- (9,-0.68) -- (9,-0.6);
+  \node[lab, anchor=north] at (8.61,-0.7) {\iflangja{電子的}{electronic}};
+\end{tikzpicture}

@@ -1,0 +1,26 @@
+% Cross-section of a DRAM trench cell (schematic): the access transistor
+% sits at the surface; the storage capacitor is a deep, narrow trench
+% etched into the silicon next to it.
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily,
+  lab/.style={font=\footnotesize\sffamily, text=ln-muted}]
+  % substrate
+  \fill[ln-box] (0,0) rectangle (4.2,-3.2);
+  \draw[ln-rule] (0,0) -- (4.2,0);
+  % source/drain regions
+  \draw[fill=ln-accent!30] (0.5,0) rectangle (1.3,-0.35);
+  \draw[fill=ln-accent!30] (2.1,0) rectangle (3.5,-0.35);
+  % gate (word line)
+  \draw[fill=ln-accent] (1.3,0.08) rectangle (2.1,0.36);
+  \draw (1.7,0.36) -- (1.7,0.9);
+  \node[lab, anchor=south] at (1.7,0.9) {\iflangja{ワード線}{word line}};
+  % bit line contact
+  \draw (0.9,0) -- (0.9,0.6) -- (0.2,0.6);
+  \node[lab, anchor=south west] at (0.0,0.62) {\iflangja{ビット線}{bit line}};
+  % trench capacitor: storage electrode joined to the drain region, lined
+  % with a thin dielectric
+  \fill[ln-accent!30] (2.68,-0.3) rectangle (3.32,-2.82);
+  \draw[ln-muted, line width=1.2pt] (2.64,-0.35) -- (2.64,-2.86) -- (3.36,-2.86) -- (3.36,-0.35);
+  \node[rotate=-90, font=\footnotesize\sffamily] at (3.0,-1.6) {\iflangja{容量}{capacitor}};
+  \node[lab, anchor=west] at (3.5,-2.55) {Si};
+\end{tikzpicture}}

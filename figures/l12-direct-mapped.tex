@@ -1,0 +1,42 @@
+% Direct-mapped lookup for a 64 KB cache with 128-byte blocks and 32-bit
+% addresses: the index selects one line, one comparator checks the tag.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]}]
+  % --- address fields
+  \draw[fill=ln-accent!15] (0,0) rectangle (3.0,0.55);
+  \node at (1.5,0.275) {\iflangja{タグ}{tag}\ (31\,\dots\,16)};
+  \draw[fill=ln-box] (3.0,0) rectangle (5.6,0.55);
+  \node at (4.3,0.275) {\iflangja{インデックス}{index}\ (15\,\dots\,7)};
+  \draw[fill=white] (5.6,0) rectangle (8.2,0.55);
+  \node at (6.9,0.275) {\iflangja{オフセット}{offset}\ (6\,\dots\,0)};
+  % --- table: V | tag | data, 6 drawn rows
+  \node[font=\sffamily\scriptsize, text=ln-muted, anchor=south] at (3.85,-1.0) {V};
+  \node[font=\sffamily\scriptsize, text=ln-muted, anchor=south] at (4.9,-1.0) {\iflangja{タグ}{tag}};
+  \node[font=\sffamily\scriptsize, text=ln-muted, anchor=south] at (7.2,-1.0) {\iflangja{データ}{data}};
+  \fill[ln-accent!15] (3.6,-2.35) rectangle (8.7,-2.8);
+  \foreach \i/\lab in {0/0,1/1,2/{},3/335,4/{},5/511} {
+    \draw (3.6,-1.0-0.45*\i) rectangle (4.1,-1.45-0.45*\i);
+    \draw (4.1,-1.0-0.45*\i) rectangle (5.7,-1.45-0.45*\i);
+    \draw (5.7,-1.0-0.45*\i) rectangle (8.7,-1.45-0.45*\i);
+    \node[font=\sffamily\scriptsize, text=ln-muted, anchor=west] at (8.75,-1.225-0.45*\i) {\lab};
+  }
+  \foreach \i in {2,4} {
+    \node[font=\small, text=ln-muted, inner sep=0pt] at (4.9,-1.225-0.45*\i) {$\vdots$};
+    \node[font=\small, text=ln-muted, inner sep=0pt] at (7.2,-1.225-0.45*\i) {$\vdots$};
+  }
+  % --- index selects a line
+  \draw[->] (3.3,0) -- (3.3,-2.575) -- (3.6,-2.575);
+  % --- tag comparison and valid bit
+  \node[draw, circle, fill=white, inner sep=1pt, minimum size=0.5cm] (eq) at (4.9,-4.25) {$=$};
+  \node[draw, fill=ln-box, minimum width=0.7cm, minimum height=0.5cm, inner sep=1pt, font=\sffamily\scriptsize] (and) at (3.85,-4.25) {AND};
+  \draw[->] (4.9,-3.7) -- (eq.north);
+  \draw[->] (3.85,-3.7) -- (and.north);
+  \draw[->] (1.5,0) -- (1.5,-5.0) -- (4.9,-5.0) -- (eq.south);
+  \draw[->] (eq.west) -- (and.east);
+  \draw[->] (and.west) -- (2.6,-4.25) node[left] {\iflangja{ヒット}{hit}};
+  % --- data selection by offset
+  \node[draw, fill=white, minimum width=2.0cm, minimum height=0.5cm, inner sep=1pt, font=\sffamily\scriptsize] (sel) at (7.2,-4.25)
+    {\iflangja{バイトを選択}{select byte}};
+  \draw[->] (7.2,-3.7) -- (sel.north);
+  \draw[->] (8.2,0.275) -- (9.6,0.275) -- (9.6,-4.25) -- (sel.east);
+  \draw[->] (sel.south) -- (7.2,-5.0) node[below] {\iflangja{データ}{data}};
+\end{tikzpicture}

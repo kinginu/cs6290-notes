@@ -1,0 +1,44 @@
+% Memory is divided into 128-byte blocks starting at multiples of the block
+% size; the cache into lines holding one block each, with valid bit and tag.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]}]
+  % --- address fields
+  \draw[fill=ln-accent!15] (1.2,0) rectangle (6.4,0.55);
+  \node at (3.8,0.275) {\iflangja{ブロック番号}{block number}\ (31\,\dots\,7)};
+  \draw[fill=ln-box] (6.4,0) rectangle (9.6,0.55);
+  \node at (8.0,0.275) {\iflangja{ブロックオフセット}{block offset}\ (6\,\dots\,0)};
+  \node[anchor=east] at (1.15,0.275) {\iflangja{アドレス}{address}};
+  % --- main memory
+  \node[font=\sffamily\scriptsize, text=ln-muted, anchor=south] at (2.3,-1.0) {\iflangja{主記憶}{main memory}};
+  \foreach \i/\a in {0/0x000,1/0x080,2/0x100,3/0x180,4/0x200} {
+    \draw[fill=white] (1.2,-1.0-0.5*\i) rectangle (3.4,-1.5-0.5*\i);
+    \node[font=\sffamily\scriptsize\ttfamily, anchor=east, text=ln-muted] at (1.15,-1.0-0.5*\i) {\a};
+    \node at (2.3,-1.25-0.5*\i) {\iflangja{ブロック}{block}\ \i};
+  }
+  \fill[ln-accent!15] (1.2,-1.5) rectangle (3.4,-2.0);
+  \fill[ln-accent!15] (1.2,-3.0) rectangle (3.4,-3.5);
+  \foreach \i in {1,4} {
+    \draw (1.2,-1.0-0.5*\i) rectangle (3.4,-1.5-0.5*\i);
+    \node at (2.3,-1.25-0.5*\i) {\iflangja{ブロック}{block}\ \i};
+  }
+  \node at (2.3,-3.75) {$\vdots$};
+  % --- cache lines
+  \node[font=\sffamily\scriptsize, text=ln-muted, anchor=south] at (6.35,-1.0) {V};
+  \node[font=\sffamily\scriptsize, text=ln-muted, anchor=south] at (7.15,-1.0) {\iflangja{タグ}{tag}};
+  \node[font=\sffamily\scriptsize, text=ln-muted, anchor=south] at (8.9,-1.0) {\iflangja{データ（128 バイト）}{data (128 bytes)}};
+  \foreach \i/\v/\t/\d in {0/1/4/{\iflangja{ブロック 4 の写し}{copy of block 4}},
+                           1/0/?/?,
+                           2/1/1/{\iflangja{ブロック 1 の写し}{copy of block 1}},
+                           3/0/?/?} {
+    \draw[fill=white] (6.1,-1.0-0.5*\i) rectangle (6.6,-1.5-0.5*\i);
+    \draw[fill=white] (6.6,-1.0-0.5*\i) rectangle (7.7,-1.5-0.5*\i);
+    \draw[fill=ln-box] (7.7,-1.0-0.5*\i) rectangle (10.1,-1.5-0.5*\i);
+    \node at (6.35,-1.25-0.5*\i) {\v};
+    \node at (7.15,-1.25-0.5*\i) {\t};
+    \node[font=\sffamily\scriptsize] at (8.9,-1.25-0.5*\i) {\d};
+    \node[font=\sffamily\scriptsize, text=ln-muted, anchor=west] at (10.15,-1.25-0.5*\i) {\iflangja{ライン}{line}\ \i};
+  }
+  \node[font=\sffamily\scriptsize, text=ln-muted, anchor=north] at (8.1,-3.05) {\iflangja{キャッシュ}{cache}};
+  % --- copies
+  \draw[->, dashed, ln-accent] (3.4,-1.75) .. controls (4.8,-1.75) and (4.6,-2.25) .. (6.1,-2.25);
+  \draw[->, dashed, ln-accent] (3.4,-3.25) .. controls (4.9,-3.25) and (4.4,-1.25) .. (6.1,-1.25);
+\end{tikzpicture}

@@ -1,0 +1,753 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Fault Tolerance}
+\lessoninfo{
+  video={Lesson 17, videos 1--32},
+  textbook={H\&P \cite{hennessy2017} §1.7, §D.2--D.3},
+  keywords={dependability, fault, error, failure, reliability, availability, MTTF, MTTR, fault tolerance, checkpointing, N-module redundancy, parity, ECC, RAID},
+}
+
+Lesson 16 described the devices that store data persistently.  Every
+component of a computer, storage devices included, eventually deviates from
+its intended behavior, and a system that returns wrong results or loses data
+whenever one component does so cannot be relied on.  This lesson introduces
+the vocabulary for reasoning about such problems---faults, errors and
+failures; reliability and availability---classifies the faults that occur in
+practice, and presents the general techniques for tolerating them.  The
+second half applies these ideas to disks: redundant arrays of independent
+disks (RAID) combine several disks into one, and their redundant
+organizations keep data intact and accessible even when an entire disk
+fails.
+
+\section{Dependability}
+\label{sec:l17-dependability}
+
+A computer is useful only if its users can trust the service it
+provides.\source{Lesson 17, videos 1--2; H\&P §1.7;
+\cite{avizienis2004}.}  To make this precise, two descriptions of the
+system's behavior are distinguished.  The \emph{specified service} is the
+behavior the system should have according to its specification; the
+\emph{delivered service} is the behavior it actually exhibits.
+
+\begin{definition}[Dependability]
+  The \term{dependability}[ディペンダビリティ] of a system is the quality of
+  its delivered service that justifies relying on the system to provide that
+  service.
+\end{definition}
+
+A system is built from components, or \emph{modules}: processors, memory
+modules, disks and, at a finer level, the circuits and program functions
+inside them.  Each module has a specified behavior of its own.
+Dependability problems begin when some module deviates from its
+specification; the next section describes how such a deviation can, but need
+not, turn into a deviation of the whole system.
+
+\section{Faults, errors and failures}
+\label{sec:l17-fault-error-failure}
+
+A problem that starts inside one module passes through up to three stages
+before the users of the system can observe it.\source{Lesson 17, videos
+3--5; H\&P §1.7, §D.3.}  The stages are named separately because a
+dependable system tries to stop the problem at one of the transitions
+between them.
+
+\begin{definition}[Fault, error, failure]
+  \label{def:l17-fault-error-failure}
+  A \term{fault}[フォールト] is a deviation of a module from its specified
+  behavior, such as a defective transistor or a mistake in a program.
+
+  An \term{error}[エラー] exists when the actual behavior inside the
+  system---its internal state---differs from the specified behavior, such as
+  a wrong value stored in a variable.
+
+  A \term{failure}[故障] occurs when the delivered service of the system
+  deviates from the specified service.
+\end{definition}
+
+A fault can exist for a long time without any effect.  Until the faulty
+module is used in a way that exposes the deviation, the fault is a
+\emph{latent} error.  When the module is used in that way, the fault is
+\emph{activated} and becomes an \emph{effective} error: the internal state
+is now wrong.  An effective error causes a failure only if it propagates to
+the service the system delivers.  Not every fault is activated, and not every error becomes a
+failure (\cref{fig:l17-fault-chain}).
+
+\begin{example}
+  \label{ex:l17-fault-chain}
+  A function that multiplies two integers contains a programming mistake:
+  it returns the correct product for all arguments except 6 and 9, for
+  which it returns 45 instead of 54.  The mistake is a fault from the moment
+  the function is written, and it stays latent as long as no caller
+  multiplies 6 by 9.  When a program calls the function with these arguments
+  and stores the result, the fault has been activated and the program state
+  contains an error.  If the result is the number of seats a booking system
+  reserves, 45 seats are reserved instead of 54: the error has reached the
+  delivered service, and a failure has occurred.  If instead the program
+  only tests whether the product is positive, the wrong value leads to the
+  same decision as the correct one, and no failure occurs.
+\end{example}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l17-fault-chain}
+  \caption{A fault becomes an error when activated.  An error that leaves a
+    module is a failure of the module and, at the same time, a fault of the
+    system that contains it; an error that reaches the delivered service is a
+    failure of the system.}
+  \label{fig:l17-fault-chain}
+\end{figure}
+
+The three terms are relative to the boundary under consideration.  A failure
+of a module is, seen from the system that contains the module, a fault of
+that system.  A disk whose head has crashed has failed as a disk; for an
+array of disks that stores redundant copies of the data (\cref{sec:l17-raid}),
+the same event is a fault that need not lead to a failure of the array.
+
+\section{Reliability and availability}
+\label{sec:l17-reliability}
+
+With respect to its specified service, a system is at any time in one of
+two states.\source{Lesson 17, videos 6--7; H\&P §1.7.}  In \emph{service
+accomplishment} the delivered service matches the specified service; in
+\emph{service interruption} it does not.  A failure moves the system from
+the first state to the second, and a restoration (repair) moves it back
+(\cref{fig:l17-service-timeline}).  The time spent in each state gives two
+different measures of dependability.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l17-service-timeline}
+  \caption{The two service states and a history that alternates between
+    them.  $U_i$ are the periods of service accomplishment, $D_i$ the periods
+    of service interruption.}
+  \label{fig:l17-service-timeline}
+\end{figure}
+
+\begin{definition}[Reliability]
+  The \term{reliability}[信頼性] of a system is a measure of
+  \emph{continuous} service accomplishment.  It is usually quantified by the
+  \term{mean time to failure}[平均故障時間]\index{MTTF|see{mean time to failure}}
+  (MTTF): the average length of a period of service accomplishment, i.e.\
+  the average time from the start of service until the next failure.
+\end{definition}
+
+\begin{definition}[Availability]
+  The \term{availability}[可用性] of a system is the fraction of time it
+  spends in service accomplishment.  With the \term{mean time to
+  repair}[平均修復時間]\index{MTTR|see{mean time to repair}} (MTTR), the
+  average length of a period of service interruption,
+  \begin{equation}
+    \text{availability} \;=\; \frac{\mathrm{MTTF}}{\mathrm{MTTF}+\mathrm{MTTR}} .
+    \label{eq:l17-availability}
+  \end{equation}
+\end{definition}
+
+The sum of the two means is the average length of one complete
+failure--repair cycle, the \term{mean time between failures}[平均故障間隔]%
+\index{MTBF|see{mean time between failures}}:
+\begin{equation}
+  \mathrm{MTBF} \;=\; \mathrm{MTTF} + \mathrm{MTTR} .
+  \label{eq:l17-mtbf}
+\end{equation}
+When repairs are short compared with the periods of service, the MTBF and
+the MTTF are nearly equal.
+
+\begin{example}
+  \label{ex:l17-availability}
+  A server runs for \SI{1200}{\hour}, is down for \SI{6}{\hour}, runs for
+  \SI{900}{\hour}, is down for \SI{10}{\hour}, runs for \SI{1500}{\hour} and is
+  down for \SI{8}{\hour}.  Its MTTF is $(1200+900+1500)/3 = \SI{1200}{\hour}$,
+  its MTTR is $(6+10+8)/3 = \SI{8}{\hour}$, its MTBF is \SI{1208}{\hour}, and
+  its availability is $1200/1208 \approx \SI{99.34}{\percent}$.  A second
+  server that fails ten times as often (MTTF $=\SI{120}{\hour}$) but is
+  restored within \SI{0.8}{\hour} on average has the same availability but
+  only one tenth of the MTTF, so it is far less reliable.
+\end{example}
+
+\section{Kinds of faults}
+\label{sec:l17-kinds}
+
+Faults are classified in two ways: by their cause and by how long they
+last.\source{Lesson 17, videos 8--9; H\&P §D.3.}
+
+\subsection{By cause}
+
+\begin{description}
+  \item[Hardware] A \term{hardware fault}[ハードウェアフォールト] occurs when
+    hardware fails to perform as designed, e.g.\ a transistor that no longer
+    switches or a disk head that touches the platter.
+  \item[Design] A \term{design fault}[設計フォールト] is a mistake in the
+    design itself: a software bug, or a hardware design error such as the
+    division bug of the early Intel Pentium, which was present in every chip
+    built from the flawed design.
+  \item[Operation] An \term{operation fault}[運用フォールト] is a mistake
+    made by the operators or users of the system, e.g.\ deleting the wrong
+    file or disconnecting the wrong cable.
+  \item[Environment] An \term{environmental fault}[環境フォールト] originates
+    outside the system: fire, flooding, a power outage, extreme temperature,
+    or deliberate sabotage.
+\end{description}
+
+\subsection{By duration}
+
+\begin{description}
+  \item[Permanent] A \term{permanent fault}[永久フォールト] persists once it
+    has occurred until the faulty part is repaired or replaced, e.g.\ a
+    chip damaged by overheating.
+  \item[Intermittent] An \term{intermittent fault}[間欠フォールト] lasts for
+    a while, disappears, and recurs, e.g.\ a loose connector, or a processor
+    running above its rated clock frequency that miscalculates only when it
+    becomes hot.
+  \item[Transient] A \term{transient fault}[過渡フォールト] occurs once and
+    goes away by itself, e.g.\ a bit of memory flipped by a high-energy
+    particle; rewriting the bit restores correct operation.
+\end{description}
+
+The two classifications describe different properties of a fault.  A
+hardware fault, for instance, can be permanent (a burnt-out chip),
+intermittent (a cracked solder joint that loses contact only when warm) or
+transient (a flipped memory bit).  A design fault, in contrast, is present in
+every copy of the design until the design is corrected, so it is permanent,
+even if it is activated only occasionally.
+
+\section{Improving reliability and availability}
+\label{sec:l17-improving}
+
+There are three ways to make a system more dependable.\source{Lesson 17,
+video 10; H\&P §1.7.}
+
+\begin{description}
+  \item[Avoid faults] Preventing faults from occurring in the first place is
+    called \term{fault avoidance}[フォールト回避]: for example, using
+    components with lower failure rates, keeping them cool, or keeping
+    liquids away from the machines.
+  \item[Tolerate faults] Preventing faults from becoming failures is called
+    \term{fault tolerance}[フォールトトレランス]: the system keeps
+    delivering its specified service although some of its modules are
+    faulty.  Fault tolerance is built on redundancy, for instance
+    error-correcting codes in memory (\cref{sec:l17-codes}) or redundant
+    disks (\cref{sec:l17-raid}).
+  \item[Repair faster] Shortening the time from a failure to the restoration
+    of service, e.g.\ by keeping spare parts on site.
+\end{description}
+
+\begin{keypoint}
+  Fault avoidance and fault tolerance reduce the number of failures, so they
+  raise the MTTF and thereby both reliability and availability.  Faster
+  repair lowers only the MTTR; for a system that stops whenever a module
+  fails it improves availability but not reliability.
+\end{keypoint}
+
+\section{Fault-tolerance techniques}
+\label{sec:l17-techniques}
+
+General-purpose fault tolerance combines two ingredients: a way to
+\emph{detect} errors and a way to \emph{recover} from them.\source{Lesson
+17, videos 11--13.}
+
+\subsection{Checkpointing}
+
+Saving the complete state of a system at regular intervals, so that
+execution can later resume from a saved state, is called
+\term{checkpointing}[チェックポインティング].  When an error is detected,
+the system restores the most recent checkpoint and executes again from
+there.  The re-execution is likely to succeed if the fault was transient,
+and often if it was intermittent; a permanent fault is activated again and
+cannot be tolerated this way.  Recovery also takes time.  If restoring the
+checkpoint and repeating the lost work is quick, users perceive only a delay;
+if it takes too long, the recovery itself counts as a service interruption.
+
+\subsection{Redundancy}
+
+\begin{definition}[$N$-module redundancy]
+  In \term[N-module redundancy]{$N$-module redundancy}[N モジュール冗長]
+  $N$ identical modules perform the same computation on the same inputs, and
+  their outputs are compared or put to a majority vote
+  (\cref{fig:l17-nmr}).
+\end{definition}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l17-nmr}
+  \caption{$N$-module redundancy.  (a) Two modules and a comparator detect
+    that one module is faulty, but not which.  (b) Three modules and a
+    majority voter mask the wrong output of any one module.}
+  \label{fig:l17-nmr}
+\end{figure}
+
+With two modules (\emph{dual-module redundancy}), a mismatch reveals that
+one of them is faulty, but not which one, so the error is detected but
+cannot be corrected by the comparison alone.  Combined with checkpointing,
+the system rolls back and repeats the computation.  With three modules
+(\emph{triple-module redundancy}), the correct result is the one produced by
+at least two, and a single faulty module is outvoted without any
+rollback---even if its fault is permanent.  In general a majority vote among
+$N$ modules masks up to $\lfloor (N-1)/2 \rfloor$ faulty modules
+(\cref{tab:l17-nmr}).  The price is $N$ times the hardware and
+energy.\caution{All $N$ modules share one design, so a design fault is not
+tolerated.}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Faulty modules handled by $N$-module redundancy.}
+  \label{tab:l17-nmr}
+  \begin{tabular}{@{}cp{0.75\linewidth}@{}}
+    \toprule
+    $N$ & Effect of faulty modules \\
+    \midrule
+    2 & one faulty module is detected (the outputs differ) but not corrected \\
+    3 & one faulty module is outvoted 2:1 \\
+    5 & one faulty module is outvoted 4:1, two are outvoted 3:2 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+With one faulty module, a five-module system still masks one more fault.
+With two faulty modules, the three correct ones still outvote them 3:2, but
+no margin is left: a third faulty module would outvote the two correct ones,
+and the vote would produce a wrong result.  Operation is therefore stopped
+before that can happen.  The Space Shuttle, with its five flight computers,
+followed this policy: after one computer failed the mission continued
+normally, and after a second one failed it was cut short.
+
+\section{Codes for memory and storage}
+\label{sec:l17-codes}
+
+For memory and storage, replicating whole modules is overkill.\source{Lesson
+17, video 14; H\&P ch.~2.}  A fault typically corrupts a few of the
+stored bits, and those can be protected with far fewer extra bits by an
+error detection or correction code.
+
+\begin{definition}[Parity]
+  The \term{parity}[パリティ] of a group of data bits $d_1,\dots,d_n$ is
+  their exclusive OR,
+  \begin{equation}
+    p \;=\; d_1 \oplus d_2 \oplus \dots \oplus d_n ,
+    \label{eq:l17-parity}
+  \end{equation}
+  and a parity bit is one extra bit that stores $p$ together with the data.
+\end{definition}
+
+When the data is read, the parity is computed again and compared with the
+stored bit.  Flipping any single bit, including the parity bit itself,
+changes the result, so every single-bit error is detected.  The parity does
+not reveal which bit flipped, so the error cannot be corrected, and two
+flipped bits cancel each other and go unnoticed.  For example, the byte
+\texttt{10110010} has four ones and parity 0; if it is read back as
+\texttt{10100010}, the recomputed parity is 1 and the error is detected.
+
+\begin{definition}[Error-correcting code]
+  An \term{error-correcting code}[誤り訂正符号]\index{ECC|see{error-correcting code}}
+  (ECC) adds enough check bits to a group of data bits that a limited
+  number of flipped bits can be both located and corrected.
+\end{definition}
+
+Memory modules with ECC typically use a SECDED code (single error
+correction, double error detection), for example 8 check bits for every 64
+data bits: any single flipped bit in a word is corrected, and any two
+flipped bits are detected.  Disks protect each sector with considerably
+stronger codes, such as Reed--Solomon codes, that correct many flipped bits,
+in particular bursts of adjacent bits caused by defects on the recording
+surface.  These codes handle damaged bits within a sector; they cannot help
+when a whole disk stops working.  That case calls for redundancy across
+disks.
+
+\section{Redundant arrays of independent disks}
+\label{sec:l17-raid}
+
+A \term{redundant array of independent
+disks}[RAID]\index{RAID|see{redundant array of independent disks}} (RAID) is
+a set of disks that together play the role of a single disk, one that can be
+larger, faster or more reliable than a single disk.\source{Lesson 17, video
+15; H\&P §D.2; \cite{patterson1988}.}  An array has two goals:
+\begin{itemize}
+  \item better performance than a single disk, and
+  \item normal read and write service even when a sector goes bad or an
+    entire disk fails.
+\end{itemize}
+Not every organization pursues both goals: RAID 0 (\cref{sec:l17-raid0})
+aims only at performance.
+
+Each disk in the array still protects its sectors with its own code
+(\cref{sec:l17-codes}).  When a sector cannot be read correctly, or a disk
+does not respond at all, the array therefore \emph{knows which} disk and
+which block are affected.  Its redundancy does not have to find the error,
+only to reconstruct the contents of a known block.  This is what allows a
+single parity block to correct errors in an array (\cref{sec:l17-raid4}),
+whereas a parity bit in memory can only detect them.
+
+The RAID variants are called levels and numbered; the number identifies an
+organization, not a ranking.  This lesson covers levels 0, 1, 4, 5 and 6.
+\margin{In \cite{patterson1988} the \enquote{I} stood for
+\emph{inexpensive}.  Levels 2 and 3 are rarely used and are omitted here.}
+
+\begin{keypoint}
+  A parity bit only detects an error at an unknown position; a parity block
+  reconstructs lost data at a known position.  Disks report their own
+  errors, which is what makes parity-based RAID possible.
+\end{keypoint}
+
+\section{RAID 0: striping}
+\label{sec:l17-raid0}
+
+The first organization uses no redundancy at all and aims only at
+performance.\source{Lesson 17, videos 16--18; H\&P §D.2.}  The data of one
+logical disk is distributed over several physical disks so that consecutive
+blocks are stored on different disks, which is called
+\term{striping}[ストライピング].  The blocks at the same position on all
+disks form a \emph{stripe}.  An array of $N$ disks that uses striping without
+any redundancy is \term{RAID 0}[RAID 0]: logical block $i$ is stored on disk
+$i \bmod N$ (\cref{fig:l17-raid01}a).
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l17-raid01}
+  \caption{Placement of logical blocks (a) in RAID 0 with three disks, where
+    each stripe holds three different blocks, and (b) in RAID 1, where both
+    disks hold every block.}
+  \label{fig:l17-raid01}
+\end{figure}
+
+\subsection{Performance}
+
+The array has $N$ times the capacity of one disk.  Requests for blocks on
+different disks are served simultaneously, and a large transfer is split
+into $N$ transfers that proceed in parallel, so the throughput is up to $N$
+times that of one disk.  An access to a single block still needs a seek and
+a rotational latency on its disk (Lesson 16), so small requests complete
+sooner only because they spend less time waiting in a queue behind other
+requests.  Large transfers also finish sooner, since their data moves to or
+from $N$ disks at once.
+
+\subsection{Reliability}
+
+For reliability calculations we assume that disks fail independently of each
+other and that each disk has a constant \emph{failure rate}
+$f_1 = 1/\mathrm{MTTF}_1$, where $\mathrm{MTTF}_1$ is the MTTF of one
+disk.\margin{Real disks fail more often early and late in their life; the
+constant rate models the long middle part of their service life.}  The
+failure rate of a set of disks is then the sum of the individual rates.  In
+RAID 0 each disk holds every $N$-th block of the logical disk, so the failure
+of any disk loses data.  The array fails at the rate $N f_1$, and
+\begin{equation}
+  \mathrm{MTTF}_{\text{RAID 0}} \;=\; \frac{\mathrm{MTTF}_1}{N} .
+  \label{eq:l17-raid0}
+\end{equation}
+For an array, a failure means that data is lost, so its MTTF is also called
+the \emph{mean time to data loss} (MTTDL).
+
+\begin{example}
+  \label{ex:l17-raid0}
+  Disks with $\mathrm{MTTF}_1 = \SI{120000}{\hour}$ (about 13.7 years) are
+  combined into a RAID 0 array of five disks.  The array is up to five times
+  as fast and as large as one disk, but its MTTF is only
+  $\SI{120000}{\hour}/5 = \SI{24000}{\hour}$, about 2.7 years.
+\end{example}
+
+\section{RAID 1: mirroring}
+\label{sec:l17-raid1}
+
+The second organization spends disks on reliability.\source{Lesson 17,
+videos 19--22; H\&P §D.2.}  Writing the same data to two disks, so that each
+holds a complete copy of every block, is called
+\term{mirroring}[ミラーリング].  An array of two mirrored disks
+(\cref{fig:l17-raid01}b) keeps all data available as long as one of its
+disks works; it is called \term{RAID 1}[RAID 1].
+
+\begin{itemize}
+  \item \textbf{Writes} go to both disks.  The two writes proceed in parallel,
+    so writing is as fast as on a single disk.
+  \item \textbf{Reads} can be served by either copy, so the read throughput
+    is twice that of one disk.
+  \item \textbf{Faults} confined to one disk, including the failure of the
+    whole disk, are tolerated.  With only two copies a vote is impossible,
+    but none is needed: the disk's own code reports which copy is bad, and
+    the other copy is used.
+  \item \textbf{Cost}: two disks provide the capacity of one.
+\end{itemize}
+
+\subsection{Reliability without repair}
+
+While both disks work, the array suffers a disk failure at the rate $2f_1$,
+so the first failure comes after $\mathrm{MTTF}_1/2$ on average.  The array
+survives it with one disk left.  Because the failure rate is constant, the
+surviving disk is as good as new, and it fails after another
+$\mathrm{MTTF}_1$ on average.  Only then is data lost:
+\begin{equation}
+  \mathrm{MTTF}_{\text{RAID 1}} \;=\; \frac{\mathrm{MTTF}_1}{2} + \mathrm{MTTF}_1
+  \;=\; 1.5\,\mathrm{MTTF}_1 .
+  \label{eq:l17-raid1-norepair}
+\end{equation}
+
+\subsection{Reliability with repair}
+
+In practice a failed disk is replaced and the data is copied onto the new
+disk from the surviving one.  Let $\mathrm{MTTR}_1$ be the average time from
+the failure until the new disk holds a complete copy.  Data is lost only if
+the second disk fails within this window (\cref{fig:l17-raid-repair} with
+$N=2$).  Since $\mathrm{MTTR}_1 \ll \mathrm{MTTF}_1$, the probability of that
+is about $\mathrm{MTTR}_1/\mathrm{MTTF}_1$, so on average
+$\mathrm{MTTF}_1/\mathrm{MTTR}_1$ first failures occur before one of them
+ends in data loss.  Each is preceded by $\mathrm{MTTF}_1/2$ of both disks
+working, hence
+\begin{equation}
+  \mathrm{MTTF}_{\text{RAID 1}} \;\approx\;
+  \frac{\mathrm{MTTF}_1}{2} \times \frac{\mathrm{MTTF}_1}{\mathrm{MTTR}_1}
+  \;=\; \frac{\mathrm{MTTF}_1^2}{2\,\mathrm{MTTR}_1} .
+  \label{eq:l17-raid1-repair}
+\end{equation}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l17-raid-repair}
+  \caption{An array that tolerates one failed disk, with repair.  Data is
+    lost only if a second disk fails while the first is being repaired.  For
+    RAID 1, $N=2$.}
+  \label{fig:l17-raid-repair}
+\end{figure}
+
+\begin{example}
+  \label{ex:l17-raid1}
+  With the disks of \cref{ex:l17-raid0} ($\mathrm{MTTF}_1 = \SI{120000}{\hour}$),
+  a RAID 1 array without repair has an MTTF of \SI{180000}{\hour}, about
+  20.5 years.  If a failed disk is replaced and its copy restored within
+  $\mathrm{MTTR}_1 = \SI{30}{\hour}$, the MTTF becomes
+  $\SI{60000}{\hour} \times 4000 = \SI{2.4e8}{\hour}$, about
+  \num{27000} years.
+\end{example}
+
+\begin{keypoint}
+  Without repair, redundancy helps little: two mirrored disks last only
+  $1.5\,\mathrm{MTTF}_1$ on average, because the first of them fails after
+  $\mathrm{MTTF}_1/2$.  With
+  repair, it multiplies the MTTF by a factor of the order of
+  $\mathrm{MTTF}_1/\mathrm{MTTR}_1$.  In a fault-tolerant system, faster
+  repair of a module improves the reliability of the system, not only its
+  availability.
+\end{keypoint}
+
+\section{RAID 4: block-interleaved parity}
+\label{sec:l17-raid4}
+
+Parity provides the redundancy of mirroring at a fraction of its
+cost.\source{Lesson 17, videos 23--27; H\&P §D.2.}  An array of $N$ disks
+can use $N-1$ of them as data disks, striped as in RAID 0, and the remaining
+one as a parity disk, whose block in each stripe is the exclusive OR of the
+data blocks of that stripe (\cref{fig:l17-raid4-write}a).  This organization
+is called \term{RAID 4}[RAID 4].  For a stripe with data blocks
+$D_0,\dots,D_{N-2}$, applying \cref{eq:l17-parity} bit by bit gives
+\begin{equation}
+  P \;=\; D_0 \oplus D_1 \oplus \dots \oplus D_{N-2} .
+  \label{eq:l17-raid4-parity}
+\end{equation}
+
+Because $x \oplus x = 0$, XORing both sides of \cref{eq:l17-raid4-parity}
+with all surviving blocks shows that a lost block is the XOR of all other
+blocks of its stripe, parity included.  If a disk fails, every block on it
+can be reconstructed from the other $N-1$ disks.  If the failed disk is the
+parity disk, the parity is simply recomputed.  The redundancy costs one disk
+out of $N$, much less than the second copy of mirroring.
+
+\subsection{Writes}
+
+A write must update the parity of its stripe.  Recomputing it from all data
+blocks of the stripe would require reading $N-2$ other disks.  Instead, the
+new parity is obtained from the old parity by removing the old data and
+adding the new data (\cref{fig:l17-raid4-write}b):
+\begin{equation}
+  P' \;=\; P \oplus D \oplus D' .
+  \label{eq:l17-parity-update}
+\end{equation}
+A write therefore reads the old data block and the old parity block, and
+then writes the new data block and the new parity block: two reads and two
+writes, independently of $N$.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l17-raid4-write}
+  \caption{RAID 4.  (a) Three data disks and a parity disk; rows are stripes.
+    (b) A write to block $B_1$ reads $B_1$ and $P_B$, computes the new
+    parity with \cref{eq:l17-parity-update}, and writes $B_1'$ and $P_B'$.}
+  \label{fig:l17-raid4-write}
+\end{figure}
+
+\begin{example}
+  \label{ex:l17-parity}
+  Consider an array with three data disks and a parity disk, and one stripe
+  with 4-bit blocks (\cref{tab:l17-parity}).  The parity is
+  $1001 \oplus 0111 \oplus 1010 = 0100$.  When disk~1 fails, its block is
+  rebuilt as $1001 \oplus 1010 \oplus 0100 = 0111$.  When $0010$ is written
+  to disk~1, \cref{eq:l17-parity-update} gives the new parity
+  $0100 \oplus 0111 \oplus 0010 = 0001$, which equals the XOR of the new data
+  blocks $1001 \oplus 0010 \oplus 1010$.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{One stripe of RAID 4 in \cref{ex:l17-parity}.  The reconstructed
+    and updated blocks are shown in bold.}
+  \label{tab:l17-parity}
+  \begin{tabular}{@{}lcccc@{}}
+    \toprule
+    & Disk 0 & Disk 1 & Disk 2 & Disk 3 (parity) \\
+    \midrule
+    Initial stripe            & 1001 & 0111 & 1010 & 0100 \\
+    Disk 1 lost, rebuilt      & 1001 & \textbf{0111} & 1010 & 0100 \\
+    After writing 0010 to disk 1 & 1001 & \textbf{0010} & 1010 & \textbf{0001} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Performance and reliability}
+
+\begin{itemize}
+  \item \textbf{Reads} use only the data disks, so the read throughput is
+    $N-1$ times that of one disk.
+  \item \textbf{Writes} all need the parity disk, once to read and once to
+    write.  Writes cannot proceed in parallel even when they go to different
+    data disks, and each write occupies the parity disk for two accesses.
+    The write throughput is therefore half that of a single disk, whatever
+    the value of $N$.
+  \item \textbf{Reliability}: the array tolerates the failure of any one
+    disk.  Without repair the first failure comes after
+    $\mathrm{MTTF}_1/N$ on average and the second after a further
+    $\mathrm{MTTF}_1/(N-1)$.  For $N \ge 3$ the sum is less than
+    $\mathrm{MTTF}_1$: without repair, such an array is less reliable than a
+    single disk.  With repair, the argument of \cref{eq:l17-raid1-repair}
+    applies with $N$ disks that can fail first and $N-1$ that can fail
+    during the repair (\cref{fig:l17-raid-repair}):
+    \begin{equation}
+      \mathrm{MTTF}_{\text{RAID 4}} \;\approx\;
+      \frac{\mathrm{MTTF}_1}{N} \times
+      \frac{\mathrm{MTTF}_1}{(N-1)\,\mathrm{MTTR}_1} .
+      \label{eq:l17-raid4}
+    \end{equation}
+\end{itemize}
+
+\section{RAID 5: distributed parity}
+\label{sec:l17-raid5}
+
+The parity disk of RAID 4 is a bottleneck for writes.\source{Lesson 17,
+videos 28--29; H\&P §D.2.}  The remedy is to spread the parity over all
+disks: each stripe still has one parity block, computed exactly as in RAID 4,
+but the parity blocks of different stripes are stored on different disks,
+rotating through all $N$ disks (\cref{fig:l17-raid5-6}a).  This organization
+is called \term{RAID 5}[RAID 5]; every disk holds both data and parity.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l17-raid5-6}
+  \caption{(a) RAID 5 with five disks.  The parity block rotates among the
+    disks; a write to $A_0$ (red) and a write to $C_1$ (green) use disjoint
+    disks and can proceed in parallel.  (b) RAID 6 with two check blocks,
+    $P$ and $Q$, per stripe.}
+  \label{fig:l17-raid5-6}
+\end{figure}
+
+\begin{itemize}
+  \item \textbf{Reads}: data is spread over all $N$ disks, so the read
+    throughput is $N$ times that of one disk.
+  \item \textbf{Writes} still need two reads and two writes
+    (\cref{eq:l17-parity-update}), but the disk holding the parity depends
+    on the stripe.  Writes to different stripes usually involve different
+    disks and proceed in parallel.  The four accesses per write are spread
+    over all $N$ disks, so the write throughput is $N/4$ times that of one
+    disk.
+  \item \textbf{Reliability} and \textbf{cost} are the same as for RAID 4:
+    one failed disk is tolerated, \cref{eq:l17-raid4} gives the MTTF with
+    repair, and one disk's worth of capacity holds parity.
+\end{itemize}
+
+\begin{example}
+  \label{ex:l17-raid5}
+  Six disks, each able to perform 200 accesses per second, with
+  $\mathrm{MTTF}_1 = \SI{120000}{\hour}$ and $\mathrm{MTTR}_1 =
+  \SI{30}{\hour}$.  As RAID 4 they serve 1000 reads or 100 writes per second;
+  as RAID 5, 1200 reads or 300 writes per second.  In both cases the MTTF
+  with repair is $(\num{120000}/6) \times \num{120000}/(5 \times 30) =
+  \SI{1.6e7}{\hour}$, about \num{1800} years.
+\end{example}
+
+\begin{keypoint}
+  RAID 5 has the reliability and the cost of RAID 4 and better read and write
+  performance.  Since it is at least as good in every respect, RAID 4 is
+  rarely used.
+\end{keypoint}
+
+\section{RAID 6: two check blocks}
+\label{sec:l17-raid6}
+
+RAID 5 tolerates one failed disk; the next organization tolerates
+two.\source{Lesson 17, videos 30--32; H\&P §D.2.}  It adds a second check
+block to every stripe (\cref{fig:l17-raid5-6}b): one check block, $P$, is the
+parity; the other, $Q$, is computed with a different code.  This
+organization is called \term{RAID 6}[RAID 6].  $P$ and $Q$ give two
+independent equations per stripe, so any two lost blocks of a stripe can be
+reconstructed: a single lost block is rebuilt from the parity as in RAID 5,
+and two lost blocks are obtained by solving both equations.
+
+\begin{itemize}
+  \item \textbf{Reliability}: the array tolerates the failure of any two
+    disks.
+  \item \textbf{Cost}: two disks' worth of capacity hold check blocks.
+  \item \textbf{Writes} must update both check blocks: three reads (old
+    data, $P$, $Q$) and three writes, compared with two of each in RAID 5.
+    With six accesses per write spread over $N$ disks, the write throughput
+    is about $N/6$ times that of one disk; reads remain $N$ times as fast.
+\end{itemize}
+
+\subsection{RAID 6 and correlated failures}
+
+For independent disk failures, RAID 5 with repair already achieves an MTTF
+of well over a thousand years (\cref{ex:l17-raid5}).  In RAID 6 data is lost
+only if a third disk fails while two are being repaired, which multiplies the
+MTTF by another factor of the order of
+$\mathrm{MTTF}_1/((N-2)\,\mathrm{MTTR}_1)$, about a thousand with the numbers
+of the example.  Against independent
+failures, RAID 6 is overkill.
+
+Its value lies in failures that are \emph{not} independent of the first
+one.  The typical case is an operation fault during the repair: the
+operator replaces a working disk instead of the failed one.  A RAID 5 array
+now misses two disks and has lost data; a RAID 6 array keeps working and can
+still be repaired.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Comparison of the RAID levels for $N$ disks, each with
+    $\mathrm{MTTF}_1$ and $\mathrm{MTTR}_1$.  Capacity and throughput are
+    relative to one disk.  The MTTF assumes repair for RAID 1, 4, 5 and 6;
+    RAID 0 loses data at the first failure.}
+  \label{tab:l17-raid}
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}lccccc@{}}
+    \toprule
+    Level & Capacity & Reads & Writes & Failures tolerated & MTTF \\
+    \midrule
+    RAID 0 & $N$   & $N$   & $N$   & 0 & $\mathrm{MTTF}_1/N$ \\
+    RAID 1 ($N=2$) & 1 & 2 & 1   & 1 & $\mathrm{MTTF}_1^2/(2\,\mathrm{MTTR}_1)$ \\
+    RAID 4 & $N-1$ & $N-1$ & $1/2$ & 1 & $\mathrm{MTTF}_1^2/(N(N-1)\,\mathrm{MTTR}_1)$ \\
+    RAID 5 & $N-1$ & $N$   & $N/4$ & 1 & $\mathrm{MTTF}_1^2/(N(N-1)\,\mathrm{MTTR}_1)$ \\
+    RAID 6 & $N-2$ & $N$   & $N/6$ & 2 & much higher than RAID 5 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{keypoint}[Lesson summary]
+  A fault in a module becomes an error when activated and a failure when the
+  error reaches the delivered service.  Reliability is measured by the MTTF,
+  availability by $\mathrm{MTTF}/(\mathrm{MTTF}+\mathrm{MTTR})$.  Faults are
+  classified by cause (hardware, design, operation, environment) and by
+  duration (permanent, intermittent, transient), and are dealt with by
+  avoidance, tolerance and faster repair.  Checkpointing and $N$-module
+  redundancy tolerate faults in general; parity and ECC protect memory; RAID
+  protects against failed disks.  Striping (RAID 0) trades reliability for
+  speed, mirroring (RAID 1) buys reliability with a second copy, and parity
+  (RAID 4, 5) does so at the cost of one disk, with RAID 5 avoiding the
+  parity-disk bottleneck.  With repair, the MTTF of a redundant array grows
+  with $\mathrm{MTTF}_1/\mathrm{MTTR}_1$ (\cref{tab:l17-raid}); RAID 6 guards
+  mainly against correlated failures such as mistakes during repair.
+\end{keypoint}
+
+\end{document}

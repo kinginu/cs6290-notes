@@ -1,0 +1,44 @@
+% Renaming one instruction: sources are looked up in the RAT, the result
+% gets a free physical register, and the RAT entry of the destination is
+% updated to it.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  fld/.style={draw, fill=ln-box, minimum width=1.1cm, minimum height=0.5cm, inner sep=0pt},
+  arch/.style={draw, fill=ln-box, minimum width=0.8cm, minimum height=0.5cm, inner sep=0pt},
+  phys/.style={draw, fill=white, minimum width=0.8cm, minimum height=0.5cm, inner sep=0pt}]
+  % decoded instruction
+  \node[fld] (s1) at (0,0)    {R1};
+  \node[fld] (s2) at (0,-0.5) {R2};
+  \node[fld] (d)  at (0,-1.0) {R3};
+  \foreach \n/\lab in {s1/src$_1$,s2/src$_2$,d/dst} {
+    \node[anchor=east, font=\scriptsize, text=ln-muted] at (\n.west) {\lab};
+  }
+  \node[anchor=south] at (0,0.3) {\texttt{ADD R3, R1, R2}};
+  % RAT
+  \foreach \i in {1,...,7} {
+    \node[arch] (a\i) at (3.0,{-(\i-1)*0.5}) {R\i};
+  }
+  \foreach \i in {1,2,4,5,6,7} {
+    \node[phys] (p\i) at (3.8,{-(\i-1)*0.5}) {P\i};
+  }
+  \node[phys, fill=ln-accent!15] (p3) at (3.8,-1.0) {P8};
+  \node[anchor=north, inner sep=1pt] at (3.4,-3.27) {$\vdots$};
+  \node[anchor=north, font=\footnotesize\bfseries\sffamily] at (3.4,-3.75) {RAT};
+  % renamed instruction
+  \node[fld] (r1) at (6.8,0)    {P1};
+  \node[fld] (r2) at (6.8,-0.5) {P2};
+  \node[fld] (rd) at (6.8,-1.0) {P8};
+  \node[anchor=south] at (6.8,0.3) {\texttt{ADD P8, P1, P2}};
+  % lookups
+  \draw[->] (s1.east) -- (a1.west);
+  \draw[->] (s2.east) -- (a2.west);
+  \draw[->] (p1.east) -- (r1.west);
+  \draw[->] (p2.east) -- (r2.west);
+  % destination
+  \draw[->, dashed] (d.east) -- (a3.west)
+    node[midway, below, font=\scriptsize] {\iflangja{エントリ選択}{select entry}};
+  \node[draw, fill=ln-box, minimum height=0.5cm, inner sep=3pt] (free) at (6.8,-2.4)
+    {\iflangja{空き}{free}: P8, P9, P10, \ldots};
+  \draw[->, thick, ln-accent] (free.north) -- (rd.south);
+  \draw[->, thick, ln-accent] (rd.west) -- (p3.east)
+    node[midway, below, font=\scriptsize, text=ln-accent] {\iflangja{更新}{update}};
+\end{tikzpicture}

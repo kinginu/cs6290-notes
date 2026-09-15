@@ -1,0 +1,34 @@
+% Two overlapping misses with a miss penalty of 20 cycles; the second miss
+% occurs 6 cycles after the first.  (a) The cache services one miss at a
+% time (blocking cache); (b) the cache has miss-under-miss support.  The red line marks the
+% moment the second miss occurs.
+\begin{tikzpicture}[x=0.215cm,y=1cm, font=\footnotesize\sffamily,
+  svc/.style={draw, fill=ln-accent!25, minimum height=0.42cm, inner sep=0pt, font=\scriptsize\sffamily},
+  lab/.style={anchor=east, font=\footnotesize\sffamily}]
+  % \lnbar{x0}{x1}{y}{style}{text}
+  \def\lnbar#1#2#3#4#5{%
+    \draw[#4] (#1,#3+0.21) rectangle (#2,#3-0.21);
+    \node[font=\scriptsize\sffamily] at ({(#1+#2)/2},#3) {#5};
+  }
+  % ---- (a) one miss at a time
+  \node[anchor=west] at (-5,0.75) {\iflangja{(a) ブロッキングキャッシュ}{(a) blocking cache}};
+  \node[lab] at (-1,0) {\iflangja{ミス 1}{miss 1}};
+  \lnbar{0}{20}{0}{fill=ln-accent!25}{\iflangja{処理}{service}}
+  \node[lab] at (-1,-0.6) {\iflangja{ミス 2}{miss 2}};
+  \lnbar{6}{20}{-0.6}{fill=ln-box, draw=ln-rule}{\iflangja{待ち}{wait}}
+  \lnbar{20}{40}{-0.6}{fill=ln-accent!25}{\iflangja{処理}{service}}
+  \draw[ln-caution, thick] (6,-0.25) -- (6,-0.95);
+  % ---- (b) miss-under-miss support
+  \node[anchor=west] at (-5,-1.45) {\iflangja{(b) ミスアンダーミス対応}{(b) miss-under-miss support}};
+  \node[lab] at (-1,-2.2) {\iflangja{ミス 1}{miss 1}};
+  \lnbar{0}{20}{-2.2}{fill=ln-accent!25}{\iflangja{処理}{service}}
+  \node[lab] at (-1,-2.8) {\iflangja{ミス 2}{miss 2}};
+  \lnbar{6}{26}{-2.8}{fill=ln-accent!25}{\iflangja{処理}{service}}
+  \draw[ln-caution, thick] (6,-2.45) -- (6,-3.15);
+  % ---- time axis
+  \draw[->] (0,-3.45) -- (42.5,-3.45);
+  \foreach \t in {0,10,20,30,40} {
+    \draw (\t,-3.45) -- (\t,-3.53) node[below, font=\scriptsize\sffamily] {\t};
+  }
+  \node[anchor=west, font=\scriptsize\sffamily] at (43,-3.45) {\iflangja{サイクル}{cycles}};
+\end{tikzpicture}

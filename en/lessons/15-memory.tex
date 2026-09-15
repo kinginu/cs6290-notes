@@ -1,0 +1,493 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Memory}
+\lessoninfo{
+  video={Lesson 15, videos 1--14},
+  textbook={H\&P \cite{hennessy2017} §2.2},
+  keywords={SRAM, DRAM, memory cell, word line, bit line, sense amplifier, destructive read, trench cell, refresh, row decoder, RAS and CAS, fast page mode, front-side bus, northbridge},
+}
+
+Lessons 12--14 treated main memory as a large, slow device hidden behind the
+caches, and Lesson 1 showed that the gap between processor and memory speed,
+the memory wall, keeps widening.  This lesson looks inside the memory itself.
+It describes the two technologies from which memories are built, static RAM
+for caches and dynamic RAM for main memory, down to the circuit that stores a
+single bit; it then shows how DRAM cells are organized into a chip and
+accessed, and how the chip is connected to the processor.  Together these
+explain why main memory is slow and why it is not simply built with the
+faster technology of the caches.
+
+\section{Memory technologies}
+\label{sec:l15-technologies}
+
+Caches and main memory are both random-access memories.\source{Lesson 15,
+videos 1--3; H\&P §2.2.}
+
+\begin{definition}[Random access]
+  A memory provides \term{random access}[ランダムアクセス] if any location can
+  be read or written directly through its address, in about the same time for
+  every location.
+\end{definition}
+
+The opposite is sequential access (Lesson 16), in which a medium such as a
+magnetic tape has to be moved past all the data that lies between the current
+position and the requested one.  Random-access memory (RAM) is built in two
+technologies, named after what happens to a stored bit while the memory is
+powered.
+
+\begin{definition}[SRAM and DRAM]
+  In \term{static random-access memory}[SRAM]%
+  \index{SRAM|see{static random-access memory}} (SRAM) a stored bit keeps its
+  value for as long as the memory is powered.  In
+  \term{dynamic random-access memory}[DRAM]%
+  \index{DRAM|see{dynamic random-access memory}} (DRAM) a stored bit loses
+  its value after a short time, even with power on, unless it is
+  periodically rewritten.
+\end{definition}
+
+The names say nothing about what happens without power: both technologies are
+volatile and lose their entire contents when power is removed.
+
+The two technologies differ in the circuit that stores a bit, and this
+difference determines their speed and cost.  SRAM uses several transistors per
+bit, six in the usual design (\cref{sec:l15-sram}); DRAM uses a single
+transistor (\cref{sec:l15-dram}).  SRAM therefore takes more chip area per bit
+and is more expensive per bit, but it is faster, because its cell actively
+drives the bit lines, whereas a DRAM cell only holds a small charge that has to
+be sensed, written back and refreshed.  DRAM packs more bits into the same area
+and is cheaper per bit, but slower.  Caches, which must be fast
+and can be small, are built from SRAM; main memory, which must be large and
+cheap, is built from DRAM.
+
+\section{The SRAM cell}
+\label{sec:l15-sram}
+
+A memory stores its bits in a two-dimensional array of identical
+circuits.\source{Lesson 15, video 4; H\&P §2.2.}  The circuit that stores one
+bit is called a \term{memory cell}[メモリセル].  The cells are arranged in
+rows and columns and are reached through two sets of wires that cross the
+array.
+
+\begin{definition}[Bit line and word line]
+  A \term{bit line}[ビット線] runs along a column of cells and carries the
+  value that is read from or written to a cell of the column.  A
+  \term{word line}[ワード線] runs along a row of cells; when it is activated,
+  it connects every cell of the row to the bit line of its column.
+\end{definition}
+
+In an SRAM cell (\cref{fig:l15-cells}a) the bit is held by two inverters
+connected in a loop, the output of each driving the input of the other.  If
+the first inverter outputs~1, the second outputs~0, which in turn keeps the
+first at~1.  The loop is stable in either of its two states and holds it for
+as long as the inverters are powered, which is what makes SRAM static.  An
+access transistor, whose gate is connected to the word line, connects one node
+of the loop to the bit line.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l15-cells}
+  \caption{One memory bit.  (a)~An SRAM cell holds the bit in a loop of two
+    inverters, whose nodes are connected to the complementary bit lines $B$
+    and $\overline{B}$ by two access transistors.  (b)~A DRAM cell holds the
+    bit as charge on a capacitor behind a single access transistor.}
+  \label{fig:l15-cells}
+\end{figure}
+
+\begin{description}
+  \item[Write] The bit line is driven strongly to the new value and the word
+    line is activated.  The bit line overpowers the small inverter that drives
+    the node, the loop settles in the state that matches the bit line, and it
+    keeps this state after the word line has been deactivated.
+  \item[Read] The word line is activated and the loop drives the bit line.
+    The transistors of the inverters are small, because the cell has to be
+    small, whereas the bit line is a long wire attached to every cell of the
+    column.  A single cell can change the voltage of the bit line only slowly.
+\end{description}
+
+To speed up the read, the other node of the loop, which holds the complement
+of the bit, is connected through a second access transistor to a second bit
+line, $\overline{B}$.  When the word line is activated, the cell pulls the two
+bit lines in opposite directions, and the value is found by comparing them.
+
+\begin{definition}[Sense amplifier]
+  A \term{sense amplifier}[センスアンプ] detects a small voltage change on a
+  bit line, or a small difference between a pair of bit lines, and amplifies
+  it to a full logic~0 or~1.
+\end{definition}
+
+With a complementary pair, the sense amplifier only compares the two bit
+lines.  The cell moves them in opposite directions, so the sign of their
+difference is clear after a very small swing and no reference voltage is
+needed; a single bit line would have to move much further before its value
+could be decided reliably.  The pair helps writes as well,
+since the value and its complement act on both sides of the loop at once.  The
+resulting cell has six transistors, two in each inverter and two access
+transistors, and it needs a word line, two bit lines and the supply
+connections of its inverters.
+
+\section{The DRAM cell}
+\label{sec:l15-dram}
+
+A DRAM cell stores its bit as electric charge on a capacitor
+(\cref{fig:l15-cells}b).\source{Lesson 15, videos 5--6; H\&P §2.2;
+\cite{dennard1968}.}  A single access transistor, controlled by the word line,
+connects the capacitor to the bit line; a charged capacitor represents~1 and a
+discharged one~0.  To write, the bit line is set to the value and the word
+line is activated, so that the capacitor charges or discharges through the
+transistor.  When the word line is deactivated, the transistor turns off and
+isolates the charge.
+
+A transistor that is off is not a perfect switch, however.  A small current
+still flows through it---the same imperfection that causes static power
+(Lesson 1)---and the charge of a stored~1 gradually leaks away until the cell
+can no longer be distinguished from a~0.  This is what makes DRAM dynamic: a
+bit survives only if it is rewritten before too much of its charge has been
+lost.
+
+\begin{definition}[Refresh]
+  Reading the bits of DRAM cells and writing them back with full charge
+  before the charge has leaked away is called \term{refresh}[リフレッシュ].
+  Every cell must be refreshed periodically, whether or not its data is being
+  used.
+\end{definition}
+
+Reading a DRAM cell is delicate as well.  The bit line is first set to a
+voltage halfway between~0 and~1, and then the word line is activated.  The
+capacitor shares its charge with the bit line, whose voltage rises slightly if
+the cell held~1 and falls slightly if it held~0.  The capacitor of a cell is
+tiny compared with the capacitance of the long bit line, so the change is very
+small, and a sense amplifier is needed to detect it.  Once the charge has been
+shared, the capacitor is left near the intermediate voltage: the stored value
+is gone.
+
+\begin{definition}[Destructive read]
+  A \term{destructive read}[破壊読み出し] is a read that destroys the stored
+  value.  Every read of a DRAM cell is therefore followed by writing the value
+  that was read back into the cell.
+\end{definition}
+
+An SRAM read is not destructive, because the inverter loop keeps driving its
+nodes and restores their values by itself.
+
+The capacitor also raises a problem of area.  Built flat on the surface of the
+chip, a capacitor large enough to be sensed reliably would occupy far more
+area than the transistor, and much of the density advantage of a
+one-transistor cell would be lost.
+
+\begin{definition}[Trench cell]
+  A \term{trench cell}[トレンチセル] is a DRAM cell whose capacitor is formed
+  in a deep, narrow trench etched vertically into the silicon next to the
+  access transistor (\cref{fig:l15-trench}).
+\end{definition}
+
+\begin{marginfigure}
+  \input{figures/l15-trench}
+  \caption{Cross-section of a trench cell (schematic).}
+  \label{fig:l15-trench}
+\end{marginfigure}
+
+The trench gives the capacitor a large plate area while using little of the
+chip surface.  The other common design, used in most current DRAMs, stacks the
+capacitor above the access transistor; either way the cell occupies little
+more area than the transistor.  It also needs fewer wires than an SRAM cell: one bit line instead
+of two, and no supply connections for inverters.  \Cref{tab:l15-sram-dram}
+summarizes the comparison of the two cells.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{SRAM and DRAM compared.}
+  \label{tab:l15-sram-dram}
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+                              & SRAM           & DRAM \\
+    \midrule
+    Storage element           & inverter loop  & capacitor \\
+    Transistors per bit       & 6              & 1 \\
+    Bit lines per cell        & 2              & 1 \\
+    Keeps its value when powered & yes         & only if refreshed \\
+    Read                      & non-destructive & destructive, then write-back \\
+    Speed                     & fast           & slow \\
+    Area and cost per bit     & high           & low \\
+    Used for                  & caches         & main memory \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{keypoint}
+  DRAM stores a bit as a tiny charge behind one transistor, which makes it
+  dense and cheap but slow: every read destroys the charge and must be
+  followed by a write-back, and leakage forces a periodic refresh.  SRAM
+  avoids both at the price of six transistors per bit.
+\end{keypoint}
+
+\section{Memory chip organization}
+\label{sec:l15-chip}
+
+The cells of a memory chip form an array of $2^r$ rows and $2^c$ columns
+(\cref{fig:l15-chip}), and an address of $r+c$ bits is split into a row
+address of $r$ bits and a column address of $c$ bits, for instance the upper
+and the lower bits of the address.\source{Lesson 15, video 7; H\&P §2.2.}  A
+read of one bit of a DRAM chip proceeds in four steps.
+\begin{enumerate}
+  \item The \term{row decoder}[行デコーダ] turns the row address into the
+    activation of exactly one of the $2^r$ word lines.
+  \item Every cell of the selected row is connected to its bit line.  One sense
+    amplifier per bit line detects the values, and the whole row is stored in
+    a row latch.
+  \item The \term{column multiplexer}[列マルチプレクサ] uses the column address
+    to select one bit of the latch and delivers it to the data output.
+  \item The read was destructive for every cell of the row, so the contents of
+    the latch are written back into the row over the bit lines.
+\end{enumerate}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l15-chip}
+  \caption{Organization of a DRAM chip.  The row decoder activates the word
+    line selected by the row address or by the refresh counter
+    (\cref{sec:l15-refresh}); the sense amplifiers read the whole row into the
+    row latch, the column multiplexer selects one bit, and the latch is written
+    back into the row.}
+  \label{fig:l15-chip}
+\end{figure}
+
+A write uses the same path.  The row is read into the latch as above, the bit
+selected by the column address is replaced in the latch by the value to be
+written, and the write-back then stores the modified row.  In a DRAM chip a
+write is thus a read whose latch is changed before it is written back.
+
+\begin{note}
+  \label{note:l15-model}
+  A row latch that is written back when the row is closed is the simplified
+  model used throughout this lesson.  In real DRAM chips the sense amplifiers
+  themselves latch the row: while the word line is still active they drive
+  the bit lines to full levels, which restores the cells of the row, and a bit
+  written into the latch reaches its cell at once.  Closing the row turns the
+  word line off and prepares the bit lines for the next read.
+\end{note}
+
+The two parts of the address take very different amounts of time.  Selecting a
+row involves decoding, driving a long word line and waiting for the sense
+amplifiers to detect tiny charges on long bit lines.  Selecting a column only
+switches a multiplexer between bits that are already in the latch.
+\Cref{sec:l15-ras-cas,sec:l15-fpm} exploit this difference.
+
+\begin{note}
+  An SRAM chip is organized in the same way, with a row decoder, sense
+  amplifiers and a column multiplexer.  Its reads are not destructive,
+  however, so no write-back follows a read, and its cells need no refresh.
+\end{note}
+
+\section{Refresh}
+\label{sec:l15-refresh}
+
+Every row of a DRAM chip has to be refreshed at least once in every
+interval~$T$, typically a few tens of milliseconds.\source{Lesson 15, videos
+8--9; H\&P §2.2.}  A refresh uses the normal read path: it is a read
+(\cref{sec:l15-chip}) whose latch is written back without using the output.
+
+A read by the program refreshes the row it touches, but such reads cannot be
+relied upon, because some rows are not read for long periods or not at all.
+All rows are therefore refreshed systematically.  A refresh counter holds a
+row number.  Periodically the row decoder is given the value of the counter
+instead of the row address (\cref{fig:l15-chip}); that row is read and written
+back, and the counter advances to the next row, wrapping around after the last
+one.  With $R$ rows, each of which must be refreshed once per interval~$T$,
+the chip must refresh one row, and advance the counter, at least once in every
+interval of length
+\begin{equation}
+  t_{\text{row}} = \frac{T}{R} .
+  \label{eq:l15-refresh}
+\end{equation}
+
+While a row is being refreshed, the chip cannot serve a read or a write, and an
+access that arrives in the meantime has to wait.  Refresh is thus one more
+reason why DRAM is slow, and its cost grows with the number of rows.
+
+\begin{example}
+  \label{ex:l15-refresh}
+  A DRAM chip has \num{8192} rows whose cells must be refreshed every
+  \SI{64}{\milli\second}.  By \cref{eq:l15-refresh} the chip must refresh one
+  row in every $\SI{64}{\milli\second}/\num{8192} \approx
+  \SI{7.8}{\micro\second}$, i.e.\ \num{128000} rows per second.  If
+  refreshing one row takes \SI{50}{\nano\second}, the chip spends
+  $\num{128000} \times \SI{50}{\nano\second} = \SI{6.4}{\milli\second}$ of
+  every second, or \SI{0.64}{\percent} of the time, on refresh.  A chip with
+  four times as many rows and the same~$T$ spends \SI{2.56}{\percent}.
+\end{example}
+
+\section{Address multiplexing}
+\label{sec:l15-ras-cas}
+
+A chip with $2^{r+c}$ cells needs $r+c$ address bits, and every bit that is
+sent in parallel costs a pin on the package and a wire to the
+chip.\source{Lesson 15, video 10; H\&P §2.2.}  The row address and the column
+address are not needed at the same time, however.  The row address is needed
+first, to start the slow selection of the row; the column address is needed
+only once the row is in the latch.  DRAM chips therefore receive both parts
+over the same pins, one after the other, and two control signals tell the chip
+which part is present.
+
+\begin{definition}[RAS and CAS]
+  When the \term{row address strobe}[行アドレスストローブ] (RAS) is asserted, the chip takes the
+  value on the address pins as the row address, activates the word line and
+  reads the row into the latch.  When the
+  \term{column address strobe}[列アドレスストローブ]%
+  \index{CAS|see{column address strobe}} (CAS) is asserted, the chip takes the
+  value on the address pins as the column address and selects that bit of the
+  latch.
+\end{definition}
+
+On a read the selected bit appears at the data output.  If a write-enable
+signal is asserted together with CAS, the bit in the latch is instead replaced
+by the value at the data input.  Deasserting RAS ends the access: the latch is
+written back and the row is closed (in the model of \cref{note:l15-model}).
+\Cref{fig:l15-timing}a shows two
+accesses of this kind.\margin{In real chips RAS and CAS are active low;
+\cref{fig:l15-timing} draws asserted signals high.}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l15-timing}
+  \caption{Signals of a DRAM chip with multiplexed address pins.  (a)~Each
+    access opens the row with RAS, selects a column with CAS and closes the
+    row.  (b)~In fast page mode (\cref{sec:l15-fpm}) the row is opened once,
+    three columns are accessed, and the row is written back when RAS is
+    deasserted.}
+  \label{fig:l15-timing}
+\end{figure}
+
+Multiplexing reduces the address pins from $r+c$ to $\max(r,c)$, half as many
+when rows and columns are equally many, which makes the package
+smaller and cheaper and reduces the wiring between the chip and the memory
+controller that drives it (\cref{sec:l15-connection}).  A chip with $2^{28}$
+cells in \num{16384} rows and \num{16384} columns, for example, needs 14
+address pins instead of~28.
+
+\section{Fast page mode}
+\label{sec:l15-fpm}
+
+In the sequence of \cref{fig:l15-timing}a every access opens a row, uses one
+column and closes the row again, even when the next access is to the same
+row.\source{Lesson 15, videos 11--12.}  Once a row has been opened, however,
+all its bits are in the latch, and reaching another bit of the row requires
+only a new column address.
+
+\begin{definition}[Fast page mode]
+  In \term{fast page mode}[ファストページモード] a row, once opened with RAS,
+  stays open while several column addresses are applied with successive CAS
+  pulses, each reading or writing one bit of the row.  The row is written back
+  only once, when RAS is finally deasserted (\cref{fig:l15-timing}b).
+\end{definition}
+
+\caution{This \enquote{page} is a row of the chip, not a virtual-memory page
+(Lesson 13).}
+
+Fast page mode pays for the expensive steps---selecting and sensing the row,
+and writing it back---once for a whole group of accesses, and for each access
+only the quick selection of a column.  Accesses to nearby addresses, which
+spatial locality (Lesson 12) makes common, usually differ only in the lower
+bits of the address and therefore share a row.  The controller that drives RAS and CAS decides
+how long a row stays open.  It can keep the row open as long as the following
+accesses use the same row, and it must close the row before it accesses
+another row or refreshes one.  The savings therefore depend on how many
+consecutive accesses share a row.
+
+\begin{example}
+  \label{ex:l15-fpm}
+  In a DRAM chip, opening a row (RAS, decoding and sensing) takes
+  \SI{30}{\nano\second}, selecting a column with CAS \SI{5}{\nano\second}, and
+  closing the row (write-back) \SI{10}{\nano\second}.  Five accesses arrive in
+  the order of \cref{tab:l15-fpm}, where the pairs give (row, column).
+  Without fast page mode every access opens and closes its row, which takes
+  $5\times\SI{45}{\nano\second} = \SI{225}{\nano\second}$.  With fast page
+  mode, rows are opened and closed three times, and the table adds up to
+  \SI{145}{\nano\second}.  Had the access to row~22 come last, the four
+  accesses to row~7 would have shared a single opening, for a total of
+  \SI{105}{\nano\second}.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{The accesses of \cref{ex:l15-fpm} in fast page mode.}
+  \label{tab:l15-fpm}
+  \begin{tabular}{@{}llr@{}}
+    \toprule
+    Access         & Steps                                      & Time (ns) \\
+    \midrule
+    read (7, 12)   & open row 7, CAS column 12                  & 35 \\
+    read (7, 13)   & CAS column 13                              & 5 \\
+    write (7, 14)  & CAS column 14 with write enable            & 5 \\
+    read (22, 3)   & close row 7, open row 22, CAS column 3     & 45 \\
+    read (7, 15)   & close row 22, open row 7, CAS column 15    & 45 \\
+    ---            & close row 7                                & 10 \\
+    \midrule
+    Total          &                                            & 145 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Connecting DRAM to the processor}
+\label{sec:l15-connection}
+
+The time the processor waits for main memory is not just the access time of
+the DRAM chips.\source{Lesson 15, videos 13--14.}  Between the two lies a path
+through other chips and buses, shown in its traditional form in
+\cref{fig:l15-connection}a.
+
+\begin{definition}[Front-side bus and northbridge]
+  The \term{front-side bus}[フロントサイドバス]\index{FSB|see{front-side bus}}
+  (FSB) connects the processor to the \term{northbridge}[ノースブリッジ], a
+  chip that links the processor with main memory, with fast devices such as
+  the graphics adapter, and with the southbridge, to which the slower I/O
+  devices are attached (Lesson 16).
+\end{definition}
+
+The northbridge contains the \term{memory controller}[メモリコントローラ].  It
+translates each memory access that arrives over the FSB into the signals of
+the DRAM chips: it splits the address into the row and the column address and
+drives RAS, CAS and write enable over the memory bus.  A memory access on a
+cache miss therefore travels from the processor over the FSB to the
+northbridge and from there over the memory bus to the DRAM chips, and the data
+returns the same way.  Each of these steps adds latency, and the FSB carries
+all other traffic between the processor and the devices behind the northbridge
+as well.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l15-connection}
+  \caption{The path between processor and DRAM.  (a)~The memory controller in
+    the northbridge is reached over the front-side bus.  (b)~With the memory
+    controller integrated into the processor, the memory bus is attached to
+    the processor directly.}
+  \label{fig:l15-connection}
+\end{figure}
+
+Newer processors integrate the memory controller on the processor chip and
+attach the memory bus to the processor directly (\cref{fig:l15-connection}b).
+The FSB and the northbridge then disappear from the path to memory, which
+lowers the latency of every access to main memory.  Even so, a DRAM access
+remains far slower than the processor, for the reasons collected in this
+lesson, and the caches of Lessons 12--14 remain indispensable.  Lesson 16
+turns to storage devices, which are slower still but keep their data without
+power.
+
+\begin{keypoint}[Lesson summary]
+  RAM is built as SRAM, whose six-transistor cell holds a bit in an inverter
+  loop, or as DRAM, whose one-transistor cell (for example a trench cell)
+  holds it as charge on a capacitor.  SRAM is fast and expensive and is used
+  for caches.  DRAM is dense and cheap and is used for main memory, but its
+  reads are destructive and are followed by a write-back, and leakage forces
+  every row to be refreshed, so that one row must be refreshed in every
+  interval $T/R$.  A DRAM chip selects a row with the row decoder, reads it
+  with the sense amplifiers into a latch and selects a bit with the column
+  multiplexer.  The row and column addresses share the address pins and are
+  marked by RAS and CAS, and fast page mode serves several accesses to one row
+  with a single opening.  A memory access traditionally travels over the
+  front-side bus to the memory controller in the northbridge and on over the
+  memory bus; newer processors integrate the memory controller and drive the
+  memory bus directly.
+\end{keypoint}
+
+\end{document}

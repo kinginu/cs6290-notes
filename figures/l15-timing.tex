@@ -1,0 +1,52 @@
+% RAS/CAS timing on a DRAM chip with multiplexed address pins (asserted
+% signals drawn high).  (a) Two separate accesses to the same row: each
+% opens the row with RAS, selects a column with CAS and closes the row.
+% (b) Fast page mode: the row is opened once and three columns are
+% accessed before RAS is deasserted and the row is written back.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily,
+  lab/.style={anchor=east, font=\footnotesize\sffamily},
+  ann/.style={font=\scriptsize\sffamily, text=ln-muted}]
+  % \lnbus{x0}{x1}{y}{text}: valid value on the address pins
+  \def\lnbus#1#2#3#4{%
+    \draw[fill=ln-accent!15] (#1,#3) -- (#1+0.1,#3+0.2) -- (#2-0.1,#3+0.2) -- (#2,#3)
+      -- (#2-0.1,#3-0.2) -- (#1+0.1,#3-0.2) -- cycle;
+    \node[font=\scriptsize\sffamily] at ({(#1+#2)/2},#3) {#4};
+  }
+  % \lnidle{x0}{x1}{y}: no value on the address pins
+  \def\lnidle#1#2#3{\draw[ln-muted] (#1,#3) -- (#2,#3);}
+  % \lnsig{y}{list of x0/x1 pulses}: control signal, low outside the pulses
+  \def\lnsig#1#2{%
+    \draw (1.4,#1-0.2) \foreach \a/\b in {#2} { -- (\a,#1-0.2) -- (\a+0.08,#1+0.2)
+      -- (\b-0.08,#1+0.2) -- (\b,#1-0.2) } -- (11.4,#1-0.2);
+  }
+  % ================================================= (a)
+  \node[anchor=west] at (0,0.75) {\iflangja{(a) 同じ行への 2 回のアクセス}{(a) two accesses to the same row}};
+  \node[lab] at (1.3,0) {\iflangja{アドレス}{address}};
+  \lnidle{1.4}{2.0}{0}
+  \lnbus{2.0}{3.4}{0}{\iflangja{行}{row}}
+  \lnbus{3.4}{4.8}{0}{\iflangja{列}{column}}
+  \lnidle{4.8}{6.6}{0}
+  \lnbus{6.6}{8.0}{0}{\iflangja{行}{row}}
+  \lnbus{8.0}{9.4}{0}{\iflangja{列}{column}}
+  \lnidle{9.4}{11.4}{0}
+  \node[lab] at (1.3,-0.6) {RAS};
+  \lnsig{-0.6}{2.3/5.1, 6.9/9.7}
+  \node[lab] at (1.3,-1.2) {CAS};
+  \lnsig{-1.2}{3.7/4.7, 8.3/9.3}
+  \node[ann, anchor=west] at (5.15,-0.6) {\iflangja{書き戻し}{write back}};
+  \node[ann, anchor=west] at (9.75,-0.6) {\iflangja{書き戻し}{write back}};
+  % ================================================= (b)
+  \node[anchor=west] at (0,-2.05) {\iflangja{(b) ファストページモード}{(b) fast page mode}};
+  \node[lab] at (1.3,-2.8) {\iflangja{アドレス}{address}};
+  \lnidle{1.4}{2.0}{-2.8}
+  \lnbus{2.0}{3.4}{-2.8}{\iflangja{行}{row}}
+  \lnbus{3.4}{4.8}{-2.8}{\iflangja{列}{column}}
+  \lnbus{4.8}{6.2}{-2.8}{\iflangja{列}{column}}
+  \lnbus{6.2}{7.6}{-2.8}{\iflangja{列}{column}}
+  \lnidle{7.6}{11.4}{-2.8}
+  \node[lab] at (1.3,-3.4) {RAS};
+  \lnsig{-3.4}{2.3/8.2}
+  \node[lab] at (1.3,-4.0) {CAS};
+  \lnsig{-4.0}{3.7/4.7, 5.1/6.1, 6.5/7.5}
+  \node[ann, anchor=west] at (8.2,-3.4) {\iflangja{書き戻し}{write back}};
+\end{tikzpicture}

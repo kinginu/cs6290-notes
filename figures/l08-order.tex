@@ -1,0 +1,23 @@
+% The steps of an out-of-order processor: only execution and write result
+% are performed out of program order.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\scriptsize\sffamily, >={Stealth[length=1.6mm]},
+  stp/.style={draw, fill=ln-box, minimum width=1.55cm, minimum height=0.62cm,
+    inner sep=1pt, align=center},
+  ooo/.style={stp, draw=ln-accent, fill=ln-accent!15}]
+  \foreach \i/\txt/\sty in {0/{\iflangja{フェッチ}{Fetch}}/stp,
+      1/{\iflangja{デコード}{Decode}}/stp, 2/{\iflangja{発行}{Issue}}/stp,
+      3/{\iflangja{実行}{Execute}}/ooo, 4/{\iflangja{結果書き込み}{Write result}}/ooo,
+      5/{\iflangja{コミット}{Commit}}/stp} {
+    \node[\sty] (s\i) at ({\i*1.95},0) {\txt};
+  }
+  \foreach \i [evaluate=\i as \j using int(\i+1)] in {0,...,4} {
+    \draw[->] (s\i.east) -- (s\j.west);
+  }
+  \draw[thick] ([yshift=4pt]s0.north west) -- ++(0,4pt) -| ([yshift=4pt]s2.north east);
+  \draw[thick, ln-accent] ([yshift=4pt]s3.north west) -- ++(0,4pt) -| ([yshift=4pt]s4.north east);
+  \draw[thick] ([yshift=4pt]s5.north west) -- ++(0,4pt) -| ([yshift=4pt]s5.north east);
+  \node[anchor=base] at ([yshift=11pt]s1.north) {\iflangja{プログラム順}{in program order}};
+  \node[anchor=base, text=ln-accent] at ([yshift=11pt]$(s3.north)!0.5!(s4.north)$)
+    {\iflangja{順序外}{out of order}};
+  \node[anchor=base] at ([yshift=11pt]s5.north) {\iflangja{プログラム順}{in program order}};
+\end{tikzpicture}

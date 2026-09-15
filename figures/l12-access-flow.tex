@@ -1,0 +1,34 @@
+% One memory access in a set-associative cache with LRU replacement and
+% the write-back policy.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  stp/.style={draw, fill=ln-box, align=center, inner sep=3pt, minimum height=0.8cm, minimum width=4.4cm},
+  miss/.style={stp, fill=white, minimum width=4.2cm},
+  dec/.style={draw, diamond, aspect=2.4, fill=ln-accent!15, align=center, inner sep=1pt},
+  lab/.style={font=\sffamily\scriptsize, text=ln-muted}]
+  % --- hit path (left column)
+  \node[stp] (split) at (0,0)
+    {\iflangja{アドレスをタグ，インデックス，\\オフセットに分ける}{split the address into\\tag, index and offset}};
+  \node[stp] (cmp) at (0,-1.3)
+    {\iflangja{インデックスでセットを選び，\\有効な各ラインのタグと比較}{select the set by the index; compare\\the tag with every valid line of the set}};
+  \node[dec] (hit) at (0,-2.65) {\iflangja{ヒット?}{hit?}};
+  \node[stp] (acc) at (0,-6.55)
+    {\iflangja{オフセットの位置を読み書き\\（書き込みなら D $\gets 1$）\\LRU カウンタを更新}{read or write at the offset\\(on a write: D $\gets 1$);\\update the LRU counters}};
+  % --- miss path (right column)
+  \node[miss] (victim) at (5.8,-2.65)
+    {\iflangja{追い出すライン: 無効なライン，\\なければ LRU カウンタが 0 のライン}{victim: an invalid line, or else\\the line whose LRU counter is 0}};
+  \node[dec] (dirty) at (5.8,-3.95) {\iflangja{有効かつ\\ダーティ?}{valid and\\dirty?}};
+  \node[miss] (wb) at (5.8,-5.25)
+    {\iflangja{追い出すブロックを\\主記憶に書き戻す}{write the victim block\\back to main memory}};
+  \node[miss] (load) at (5.8,-6.55)
+    {\iflangja{ブロックを読み込みタグを格納\\V $\gets 1$，D $\gets 0$}{load the block, store its tag,\\V $\gets 1$, D $\gets 0$}};
+  % --- arrows
+  \draw[->] (split) -- (cmp);
+  \draw[->] (cmp) -- (hit);
+  \draw[->] (hit) -- node[lab, above] {\iflangja{いいえ}{no}} (victim);
+  \draw[->] (hit) -- node[lab, right, pos=0.3] {\iflangja{はい}{yes}} (acc);
+  \draw[->] (victim) -- (dirty);
+  \draw[->] (dirty) -- node[lab, right] {\iflangja{はい}{yes}} (wb);
+  \draw[->] (wb) -- (load);
+  \draw[->] (dirty.east) -- node[lab, above] {\iflangja{いいえ}{no}} (8.4,-3.95) |- (load.east);
+  \draw[->] (load) -- (acc);
+\end{tikzpicture}

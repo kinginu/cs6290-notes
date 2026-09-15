@@ -1,0 +1,36 @@
+% Barrier synchronization with three threads over two rounds.  A thread that
+% reaches the barrier waits until the last thread of its round arrives; then
+% all three continue together.
+\begin{tikzpicture}[x=0.85cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.6mm]}]
+  \def\lnbox#1#2#3#4{% y, x0, x1, fill
+    \draw[fill=#4] (#2,{#1-0.2}) rectangle (#3,{#1+0.2});}
+  % releases of the barrier
+  \foreach \x/\r in {5/{0 $\to$ 1}, 9.5/{1 $\to$ 2}} {
+    \draw[dashed, ln-accent, thick] (\x,-0.55) -- (\x,2.45);
+    \node[font=\scriptsize, text=ln-accent, anchor=south, align=center] at (\x,2.45)
+      {\iflangja{解放}{release}\\\texttt{round}: \r};
+  }
+  % thread/y/arrival in round 0/arrival in round 1
+  \foreach \t/\y/\a/\b in {0/2/2.5/9.5, 1/1/4/7.5, 2/0/5/8} {
+    \node[anchor=east] at (-0.15,\y) {\iflangja{スレッド}{thread}~\t};
+    \lnbox{\y}{0}{\a}{white}
+    \ifdim\a pt<5pt \lnbox{\y}{\a}{5}{ln-caution!15}\fi
+    \lnbox{\y}{5}{\b}{white}
+    \ifdim\b pt<9.5pt \lnbox{\y}{\b}{9.5}{ln-caution!15}\fi
+    \lnbox{\y}{9.5}{10.5}{white}
+    \fill (\a,{\y+0.2}) -- ++(-0.09,0.16) -- ++(0.18,0) -- cycle;
+    \fill (\b,{\y+0.2}) -- ++(-0.09,0.16) -- ++(0.18,0) -- cycle;
+  }
+  % time axis
+  \draw[->, ln-muted] (0,-0.55) -- (10.8,-0.55)
+    node[right, inner sep=2pt] {\iflangja{時間}{time}};
+  % legend
+  \begin{scope}[yshift=-1.0cm]
+    \fill (0.09,-0.02) -- ++(-0.09,0.16) -- ++(0.18,0) -- cycle;
+    \node[anchor=west, font=\scriptsize] at (0.25,0.05) {\iflangja{バリアに到着}{reaches the barrier}};
+    \draw[fill=white] (3.2,-0.07) rectangle ++(0.35,0.25);
+    \node[anchor=west, font=\scriptsize] at (3.6,0.05) {\iflangja{計算}{computing}};
+    \draw[fill=ln-caution!15] (5.4,-0.07) rectangle ++(0.35,0.25);
+    \node[anchor=west, font=\scriptsize] at (5.8,0.05) {\iflangja{バリアで待機}{waiting at the barrier}};
+  \end{scope}
+\end{tikzpicture}

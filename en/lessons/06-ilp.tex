@@ -1,0 +1,494 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{ILP}
+\lessoninfo{
+  video={Lesson 6, videos 1--20},
+  textbook={H\&P \cite{hennessy2017} §3.1, §3.4; \cite{keller1975,wall1991}},
+  keywords={RAW dependence, WAW dependence, false dependence, architectural register, physical register, register renaming, register alias table, instruction-level parallelism, ideal processor, instructions per cycle, processor width, in-order execution, out-of-order execution},
+}
+
+Branch prediction (Lesson 4) and predication (Lesson 5) remove most of the
+cycles that control dependences cost a pipeline, which brings its CPI close
+to the ideal value of~1.  Going below~1 requires executing several
+instructions in the same cycle, and what prevents this are the data
+dependences between instructions.  This lesson shows that only
+read-after-write dependences are fundamental, that the others are removed by
+register renaming, and that the remaining dependences define the
+instruction-level parallelism of a program: the bound against which the
+instructions per cycle of real processors are measured.
+
+\section{All instructions in the same cycle}
+\label{sec:l06-same-cycle}
+
+A pipeline that never stalls or flushes completes one instruction per cycle,
+so its CPI is~1 (\cref{eq:pipeline-cpi}).\source{Lesson 6, videos 1--3; H\&P
+§3.1.}  A lower CPI means that more than one instruction completes per
+cycle.  In the extreme, all $N$ instructions of a program would be fetched in
+the same cycle, decoded together in the next cycle, executed together in the
+cycle after that, and so on (\cref{fig:l06-same-cycle}).  A five-stage
+processor would complete the whole program in 5 cycles, a CPI of $5/N$,
+which tends to~0 for long programs.
+
+A real program cannot be executed this way, because its instructions use
+the results of other instructions.  Consider the following five
+instructions, the running example of the first half of this lesson:%
+\begin{marginfigure}
+  \resizebox{\linewidth}{!}{\input{figures/l06-same-cycle}}
+  \caption{The ideal: all $N$ instructions pass through the stages in the
+    same five cycles.}
+  \label{fig:l06-same-cycle}
+\end{marginfigure}
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+I1:  ADD R3, R1, R2     ; R3 <- R1 + R2
+I2:  SUB R5, R3, R4     ; R5 <- R3 - R4
+I3:  AND R6, R1, R4     ; R6 <- R1 AND R4
+I4:  OR  R4, R2, R7     ; R4 <- R2 OR R7
+I5:  XOR R5, R1, R7     ; R5 <- R1 XOR R7
+\end{lstlisting}
+When all five instructions are in the execute stage in the same cycle, I2
+computes $\text{R3} - \text{R4}$ while I1 is still computing R3, so I2 uses
+the old value of R3.  Forwarding (\cref{fig:forwarding}) cannot correct
+this: it delivers a result computed in one cycle to an instruction that
+executes in a later cycle, whereas here the result and its use fall into the
+same cycle.  How close a processor can come to the ideal is therefore
+determined by the data dependences of the program.
+
+\section{Dependences in same-cycle execution}
+\label{sec:l06-dependences}
+
+The read-after-write dependence of I2 on I1 must be respected: I2 can execute
+no earlier than one cycle after I1, when the result of I1 can be forwarded to
+it.\source{Lesson 6, videos 4--6; H\&P §3.1.}  I3, I4 and I5 read no register
+that an earlier instruction writes, so they can still execute in the same
+cycle as I1.  \Cref{fig:l06-dependences} shows the resulting timing: I2 waits
+one cycle, and I3 to I5 execute before I2 although they follow it in the
+program.  RAW dependences therefore bound how far the CPI can fall even with
+unlimited width: if every instruction read the result of its predecessor,
+one instruction would complete per cycle and the CPI would remain~1.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l06-dependences}
+  \caption{Same-cycle execution of the running example.  The RAW dependence
+    on R3 delays I2 by one cycle; as a consequence I2 writes R5 after I5,
+    which violates their WAW dependence.}
+  \label{fig:l06-dependences}
+\end{figure}
+
+Executing instructions ahead of an earlier one breaks the write-after-write
+dependence between I2 and I5.  Both write R5, and in program order I5 writes
+last, so after these instructions R5 must hold the result of I5; every later
+instruction that reads R5 expects that value.  In \cref{fig:l06-dependences},
+however, I5 writes R5 in cycle~5 and the delayed I2 overwrites it in
+cycle~6.  To keep the correct value, I5 would also have to be delayed until
+after the write of I2, although its computation needs nothing from I2.
+
+A write-after-read dependence is at risk in the same way.  I4 writes R4,
+which I2 reads, and program order requires I2 to use the old value of R4.
+Once I2 is delayed, the new value produced by I4 already exists when I2
+executes, and I2 must be kept from using it.  A single RAW delay thus
+spreads: every later instruction that writes a register the delayed
+instruction reads or writes must be delayed as well, so that every
+instruction still sees the register values of its position in the program.
+
+\section{Removing false dependences}
+\label{sec:l06-false}
+
+The three kinds of data dependence of Lesson 3 differ in
+nature.\source{Lesson 6, videos 7--8; H\&P §3.1.}  In a RAW dependence the
+later instruction uses the value computed by the earlier one: the data
+really flows from one instruction to the other, and no hardware can let the
+reader execute before the writer.\index{read-after-write dependence}  WAW and
+WAR dependences\index{write-after-write dependence}%
+\index{write-after-read dependence} are false
+dependences\index{false dependences}: no value
+passes between the two instructions.  They exist only because the program
+stores different values in the same register, a consequence of the limited
+number of registers and of the fact that an instruction executed
+repeatedly, for example in every iteration of a loop, always writes the
+same register.  In the example, the
+results of I2 and I5 are unrelated values that happen to be named R5.
+
+False dependences therefore disappear if different values are kept in
+different places.  One way to achieve this is to keep several versions of a
+register.  When I2 and I5 both write R5, the processor stores both results
+instead of letting one overwrite the other, and each instruction that reads
+R5 uses the version selected by program order: an instruction located
+between I2 and I5 uses the result of I2, an instruction after I5 the result
+of I5.  The order in which the two writes actually happen no longer matters,
+so I5 can execute as early as if I2 did not exist.  Likewise, I2 reads the
+old version of R4 no matter when I4 produces the new one.
+
+The difficulty is the bookkeeping.  For every read, the processor must find
+the right version, the one produced by the closest preceding writer in
+program order, and it must recognize when a version is no longer needed.
+Register renaming performs this bookkeeping systematically.
+
+\section{Register renaming}
+\label{sec:l06-renaming}
+
+Renaming separates the registers that a program names from the storage in
+which the processor keeps their values.\source{Lesson 6, videos 9--11; H\&P
+§3.1, §3.4; \cite{keller1975}.}
+
+\begin{definition}[Architectural and physical registers]
+  \label{def:l06-registers}
+  A register defined by the instruction set, and therefore named in
+  programs (for example R0 to R31), is an \term{architectural
+  register}[アーキテクチャレジスタ].  A storage location in which the
+  processor actually keeps a register value is a \term{physical
+  register}[物理レジスタ].  A processor that renames has many more
+  physical registers than architectural ones.
+\end{definition}
+
+\begin{definition}[Register renaming]
+  \label{def:l06-renaming}
+  Rewriting each instruction, as it is decoded, so that it reads and writes
+  physical instead of architectural registers, with a newly allocated
+  physical register for every result, is called \term{register
+  renaming}[レジスタリネーミング].
+\end{definition}
+
+\begin{definition}[Register alias table]
+  \label{def:l06-rat}
+  The \term{register alias table}[レジスタエイリアステーブル]%
+  \index{RAT|see{register alias table}} (RAT) has one entry per
+  architectural register.  The entry names the physical register that holds
+  the most recent value of that architectural register, in program order,
+  among the instructions renamed so far.
+\end{definition}
+
+Each instruction is renamed in three steps (\cref{fig:l06-rat}):%
+\margin{The lecture expands RAT as \emph{register allocation table}; both
+names denote the same table.}
+\begin{enumerate}
+  \item For each source register, read its RAT entry; the renamed
+    instruction reads that physical register.
+  \item Allocate a free physical register, one that holds no value still
+    needed, for the result; the renamed instruction writes it.
+  \item Overwrite the RAT entry of the destination register with the new
+    physical register, so that later instructions reading this architectural
+    register use the new result.
+\end{enumerate}
+The sources must be looked up before the destination entry is overwritten;
+otherwise an instruction such as \texttt{ADD R1, R1, R2} would read its own
+result instead of the previous value of R1.\margin{Lessons 7 and~8 show how
+renaming is combined with out-of-order execution in real designs.}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l06-rat}
+  \caption{Renaming \texttt{ADD R3, R1, R2}.  R1 and R2 are looked up in the
+    RAT, the result is given the free physical register P8, and the RAT
+    entry of R3, which held P3, is overwritten with P8.}
+  \label{fig:l06-rat}
+\end{figure}
+
+The physical registers are exactly the versions of \cref{sec:l06-false}.
+Every write creates a new version, and the RAT records which version is
+current in program order, so a reader automatically uses the version
+produced by its closest preceding writer.
+
+\begin{example}
+  \label{ex:l06-rename}
+  We rename the running example.  Before I1, the RAT maps R1 to R7, the
+  registers the example uses, to P1 to P7, and the other architectural
+  registers to physical registers that the example does not use; P8, P9, \ldots\ are free and are
+  allocated in increasing order.  \Cref{tab:l06-rename} lists each renamed instruction
+  and the RAT entries after it.  I2 reads P8, the result of I1, because I1
+  has already updated the entry of R3.  I3 reads P4, the old R4, before I4
+  maps R4 to P11.  The two writes to R5 go to P9 and P12, and at the end the
+  RAT maps R5 to P12, so an instruction that follows reads the result of I5,
+  as program order requires.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Renaming the running example.  Entries changed by an instruction
+    are in bold; R1, R2 and R7 keep P1, P2 and P7 throughout.}
+  \label{tab:l06-rename}
+  \begin{tabular}{@{}lllcccc@{}}
+    \toprule
+    & Instruction & Renamed & R3 & R4 & R5 & R6 \\
+    \midrule
+    & (initial) & & P3 & P4 & P5 & P6 \\
+    I1 & \texttt{ADD R3, R1, R2} & \texttt{ADD P8, P1, P2}
+       & \textbf{P8} & P4 & P5 & P6 \\
+    I2 & \texttt{SUB R5, R3, R4} & \texttt{SUB P9, P8, P4}
+       & P8 & P4 & \textbf{P9} & P6 \\
+    I3 & \texttt{AND R6, R1, R4} & \texttt{AND P10, P1, P4}
+       & P8 & P4 & P9 & \textbf{P10} \\
+    I4 & \texttt{OR~~R4, R2, R7} & \texttt{OR~~P11, P2, P7}
+       & P8 & \textbf{P11} & P9 & P10 \\
+    I5 & \texttt{XOR R5, R1, R7} & \texttt{XOR P12, P1, P7}
+       & P8 & P11 & \textbf{P12} & P10 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Dependences after renaming}
+\label{sec:l06-after-renaming}
+
+In a renamed program every result is written into its own physical
+register.\source{Lesson 6, video 12; H\&P §3.4.}  No two instructions write
+the same location, and no instruction writes a location that an earlier
+instruction reads, so WAW and WAR dependences between register accesses no
+longer exist.\margin{Dependences through memory locations are not affected
+by register renaming; Lesson~9 treats them.}  Every read,
+on the other hand, still refers to the result of the instruction that
+produced the value in the original program, so every RAW dependence is
+preserved.  In \cref{tab:l06-rename} the only dependence left is that of I2
+on I1 through P8.
+
+Same-cycle execution now only has to respect this one dependence.  I1, I3,
+I4 and I5 execute in the first cycle and I2 in the second, with the result
+of I1 forwarded to it.  I2 and I5 write P9 and P12, so the order of their
+writes is irrelevant, and I2 reads P4, which I4 does not touch.  The five
+instructions execute in two cycles, and every later reader still finds the
+correct values through the RAT.
+
+\begin{keypoint}
+  RAW dependences are the only true dependences between instructions.
+  Register renaming removes all WAW and WAR dependences on registers, so the
+  only
+  constraint left on executing instructions in parallel is the flow of data
+  itself.
+\end{keypoint}
+
+\section{Instruction-level parallelism}
+\label{sec:l06-ilp}
+
+Once false dependences are removed, the number of cycles needed to execute a
+program depends only on its RAW dependences.\source{Lesson 6, videos 13--15;
+H\&P ch.~3; \cite{wall1991}.}  This number is a property of the program
+itself, not of a particular processor.  It is measured on a hypothetical
+\term{ideal processor}[理想プロセッサ], which
+\begin{itemize}
+  \item renames registers, so that no false dependences exist;
+  \item executes every instruction in the first cycle in which all the
+    values it reads are available: the first cycle if it depends on no
+    earlier instruction, otherwise the cycle after the latest of the
+    instructions it depends on;
+  \item has no limit on the number of instructions it executes in a cycle;
+  \item has unlimited hardware, so that no instruction waits for a busy
+    execution unit: there are no structural dependences;
+  \item executes every instruction in exactly one cycle, whatever its
+    operation.
+\end{itemize}
+
+\begin{definition}[Instruction-level parallelism]
+  \label{def:l06-ilp}
+  The \term{instruction-level parallelism}[命令レベル並列性]%
+  \index{ILP|see{instruction-level parallelism}} (ILP) of a program that
+  executes $N$ instructions is
+  \begin{equation}
+    \text{ILP} \;=\; \frac{N}{C} ,
+    \label{eq:l06-ilp}
+  \end{equation}
+  where $C$ is the number of cycles in which the ideal processor executes
+  them.
+\end{definition}
+
+The cycle $c(I)$ in which the ideal processor executes instruction $I$
+follows directly from the RAW dependences:
+\begin{equation}
+  c(I) \;=\; 1 + \max_{J \in D(I)} c(J) ,
+  \qquad C = \max_{I} c(I) ,
+  \label{eq:l06-cycle}
+\end{equation}
+where $D(I)$ is the set of instructions whose results $I$ reads, and the
+maximum over an empty set is~0.  $C$ is thus the length of the longest chain
+of RAW dependences in the program.  Since no processor can execute an
+instruction before the values it needs exist, the ILP is an upper bound on the
+rate, in instructions per cycle, at which any processor can execute this
+program (\cref{sec:l06-ipc}).\tip{Renaming need not be done on paper: for
+each register read, find the closest \emph{preceding} writer; later writes
+do not matter.}
+
+\begin{example}
+  \label{ex:l06-ilp}
+  We compute the ILP of the following eight instructions:
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+I1:  ADD R1, R2, R3
+I2:  MUL R4, R1, R5    ; R1 from I1; R5 written later
+I3:  SUB R6, R2, R7    ; R2, R7 written only later
+I4:  ADD R1, R6, R8    ; R6 from I3
+I5:  AND R9, R1, R8    ; R1 from I4, not from I1
+I6:  OR  R2, R8, R3
+I7:  XOR R7, R4, R2    ; R4 from I2, R2 from I6
+I8:  ADD R5, R3, R8
+\end{lstlisting}
+  I1, I3, I6 and I8 read only registers not written before them and execute
+  in cycle~1.  I2 and I4 depend on instructions of cycle~1 and execute in
+  cycle~2.  I5 and I7 each depend on an instruction of cycle~2 and execute
+  in cycle~3 (\cref{fig:l06-ilp-graph}).  Hence $C=3$ and
+  $\text{ILP} = 8/3 \approx 2.67$.  Two pitfalls are visible.  R1 is written
+  by both I1 and I4, and I5 reads the value of I4; taking I1 as its producer
+  would wrongly place I5 in cycle~2.  And I3 reads R2 and R7, which I6 and I7
+  write only later; these are WAR dependences, removed by renaming, and they
+  do not delay I3.
+\end{example}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l06-ilp-graph}
+  \caption{RAW dependences of \cref{ex:l06-ilp}, labelled with the register
+    that carries the value.  Each instruction is placed in the cycle in which
+    the ideal processor executes it; the longest chain has length~3.}
+  \label{fig:l06-ilp-graph}
+\end{figure}
+
+\section{Structural and control dependences}
+\label{sec:l06-control}
+
+Structural dependences, in which an instruction waits for hardware that
+another instruction is using, do not arise on the ideal processor, which
+has enough hardware for every instruction that is ready.\source{Lesson 6,
+video 16; H\&P §3.1.}  Branches, however, add control dependences: whether
+the instructions after a branch are executed depends on its outcome.  The
+ideal processor that defines the ILP is also assumed to predict every
+branch perfectly.  It therefore knows from the start which instructions are
+executed, and the instructions after a branch do not wait for the branch to
+execute.  The branch itself is an instruction like any other: it counts
+towards~$N$ and executes one cycle after the instructions that produce its
+operands.  Instructions skipped because of the branch outcome are not
+executed and do not count.
+
+\begin{example}
+  \label{ex:l06-control}
+  In the following fragment the branch is taken, so I4 is not executed:
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+I1:        ADD R1, R2, R3     ; cycle 1
+I2:        SUB R4, R1, R5     ; cycle 2: R1 from I1
+I3:        BEQ R4, R6, Skip   ; cycle 3: R4 from I2
+I4:        ADD R7, R8, R9     ; not executed
+I5:  Skip: XOR R8, R2, R6     ; cycle 1
+I6:        AND R9, R8, R1     ; cycle 2: R8 from I5
+\end{lstlisting}
+  With perfect branch prediction I5 executes in cycle~1 although the branch
+  executes only in cycle~3.  Five instructions execute in 3 cycles, so
+  $\text{ILP} = 5/3 \approx 1.67$.  If I5 and I6 had to wait for the branch,
+  they would execute in cycles 4 and~5, and the ILP would drop to~1.
+\end{example}
+
+\section{ILP and IPC}
+\label{sec:l06-ipc}
+
+The ILP describes a program on the ideal processor; a real processor is
+described by the rate it actually achieves.\source{Lesson 6, videos 17--20;
+H\&P ch.~3.}
+
+\begin{definition}[Instructions per cycle]
+  \label{def:l06-ipc}
+  The average number of instructions a processor completes per cycle is its
+  \term{instructions per cycle}[サイクル当たり命令数]%
+  \index{IPC|see{instructions per cycle}} (IPC).  It is the reciprocal of
+  the CPI of the iron law (\cref{eq:iron-law}): $\text{IPC} =
+  1/\text{CPI}$.
+\end{definition}
+
+For every processor and program, $\text{IPC} \le \text{ILP}$, because the
+ideal processor executes each instruction as early as the dependences allow.
+A real processor falls short of the ideal for several reasons.
+\begin{description}
+  \item[Width] It can execute only a limited number $w$ of instructions per
+    cycle.  A \emph{narrow} processor executes one or two, a \emph{wide} one
+    four or more.  Whatever the program, $\text{IPC} \le w$.
+  \item[Execution units] It has a limited number of adders, multipliers and
+    other execution units, and operations such as multiplication may take
+    several cycles.  An instruction whose kind of unit is busy waits even
+    when its inputs are ready: a structural dependence, which the ideal
+    processor does not have.
+  \item[Execution order] A processor with \term{in-order
+    execution}[インオーダ実行] never executes an instruction before an
+    instruction that precedes it in the program.  Consecutive independent
+    instructions may execute in the same cycle, but an instruction that has
+    to wait for its inputs also holds back every instruction behind it.  A
+    processor with \emph{out-of-order}\index{out-of-order execution}
+    execution may execute any instruction whose inputs are available
+    (Lesson~7).
+\end{description}
+An out-of-order processor needs renaming to do so; without it, it would
+also have to respect the WAW and WAR dependences of
+\cref{sec:l06-dependences}.  An in-order processor reads and writes
+registers in program order and needs no renaming.
+
+\begin{example}
+  \label{ex:l06-ipc}
+  We run the program of \cref{ex:l06-ilp} on four processors, each
+  executing every instruction in one cycle and having enough execution units
+  of every kind; the out-of-order ones rename
+  registers and, when more instructions are ready than the width allows,
+  execute the oldest ones first.  \Cref{tab:l06-ipc} lists the instructions
+  executed in each cycle.  The in-order processors execute only I1 in
+  cycle~1, because I2 must wait for R1 and blocks I3 to I8.  The same
+  blocking recurs at I4 (waiting for R6), at I5 (waiting for R1 from I4) and
+  at I7 (waiting for R2), so these processors need 5 cycles whatever their
+  width.  The two-wide out-of-order processor executes two
+  ready instructions in every cycle and needs 4 cycles; only the four-wide
+  out-of-order processor reaches the ILP.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Instructions of \cref{ex:l06-ilp} executed in each cycle.  The
+    schedule of the ideal processor equals that of the four-wide
+    out-of-order processor.}
+  \label{tab:l06-ipc}
+  \begin{tabular}{@{}lcccccc@{}}
+    \toprule
+    Processor & Cycle 1 & Cycle 2 & Cycle 3 & Cycle 4 & Cycle 5 & IPC \\
+    \midrule
+    In-order, 2 wide     & 1          & 2, 3 & 4    & 5, 6 & 7, 8 & 1.60 \\
+    In-order, 4 wide     & 1          & 2, 3 & 4    & 5, 6 & 7, 8 & 1.60 \\
+    Out-of-order, 2 wide & 1, 3       & 2, 4 & 5, 6 & 7, 8 &      & 2.00 \\
+    Out-of-order, 4 wide & 1, 3, 6, 8 & 2, 4 & 5, 7 &      &      & 2.67 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+In the example both in-order processors are held back by the order:
+widening from two to four gains nothing.  Out-of-order execution lifts the
+two-wide processor only to its width (from 1.60 to $w = 2$), but the
+four-wide one to the ILP (from 1.60 to 2.67).  In general
+(\cref{tab:l06-limits}), the width is the main limit of a narrow processor
+(with $w = 1$, $\text{IPC} \le 1$ in any order), so out-of-order execution
+raises its IPC only moderately.  In a wide in-order processor, waiting instructions
+block the ones behind them and most of the width stays unused.  Wide
+processors therefore need out-of-order execution to use their width, and
+out-of-order execution pays off fully only in a wide processor.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{What limits the IPC of a processor relative to the ILP of the
+    program.}
+  \label{tab:l06-limits}
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    & In-order & Out-of-order \\
+    \midrule
+    Narrow (1--2 wide) & mainly width & mainly width \\
+    Wide (4 or more)   & mainly order; width unused & little: IPC approaches ILP \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{keypoint}[Lesson summary]
+  Executing many instructions in the same cycle would bring the CPI far below
+  1, but data dependences prevent it.  Only RAW dependences are true
+  dependences; WAW and WAR dependences come from reusing register names.
+  Register renaming, driven by the register alias table, maps architectural
+  registers to newly allocated physical registers and removes all false
+  dependences between register accesses.  The ILP (\cref{eq:l06-ilp}) of a
+  program is the number of instructions per cycle of an ideal processor with
+  renaming, unlimited width, no structural dependences and perfect branch
+  prediction: the instruction count divided by the
+  length of the longest RAW chain; it is a property of the program and bounds
+  the IPC of every processor.  Real processors fall below it, limited by
+  their width, their execution units and in-order execution; approaching the ILP takes a wide
+  out-of-order processor.  The next lesson presents Tomasulo's
+  algorithm, which executes instructions out of order with renaming.
+\end{keypoint}
+
+\end{document}

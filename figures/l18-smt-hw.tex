@@ -1,0 +1,42 @@
+% An out-of-order core with SMT support and separate ROBs: per-thread PC,
+% RAT, ROB and architectural registers; everything else is shared.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  sh/.style={draw, fill=ln-box, minimum height=0.75cm, minimum width=1.5cm, inner sep=2pt, align=center},
+  pt/.style={draw, fill=ln-accent!15, minimum height=0.36cm, minimum width=1.2cm, inner sep=1pt, font=\scriptsize\sffamily}]
+  % ---- front end
+  \node[pt, minimum width=0.9cm] (pc1) at (0,0.22) {PC 1};
+  \node[pt, minimum width=0.9cm] (pc2) at (0,-0.22) {PC 2};
+  \draw[fill=white] (0.85,0.45) -- (1.15,0.3) -- (1.15,-0.3) -- (0.85,-0.45) -- cycle;
+  \draw[->] (pc1.east) -- (0.85,0.22);
+  \draw[->] (pc2.east) -- (0.85,-0.22);
+  \node[sh] (fetch) at (2.3,0) {\iflangja{フェッチ}{fetch}};
+  \node[sh] (dec) at (4.4,0) {\iflangja{デコード}{decode}};
+  \draw[->] (1.15,0) -- (fetch.west);
+  \draw[->] (fetch.east) -- (dec.west);
+  \node[pt] (rat1) at (6.6,0.22) {RAT 1};
+  \node[pt] (rat2) at (6.6,-0.22) {RAT 2};
+  \node[draw, fit=(rat1)(rat2), inner sep=2pt] (ren) {};
+  \node[anchor=south, font=\scriptsize] at (ren.north) {\iflangja{リネーム}{rename}};
+  \draw[->] (dec.east) -- (ren.west);
+  % ---- back end
+  \node[sh] (rs) at (1.1,-1.9) {RS};
+  \node[sh] (ex) at (3.2,-1.9) {\iflangja{実行}{execute}};
+  \node[pt, minimum width=1.6cm] (rob1) at (5.6,-1.68) {ROB 1};
+  \node[pt, minimum width=1.6cm] (rob2) at (5.6,-2.12) {ROB 2};
+  \node[draw, fit=(rob1)(rob2), inner sep=2pt] (robs) {};
+  \node[pt] (arf1) at (8.0,-1.68) {\iflangja{レジスタ 1}{ARF 1}};
+  \node[pt] (arf2) at (8.0,-2.12) {\iflangja{レジスタ 2}{ARF 2}};
+  \draw[->] (ren.south) -- ++(0,-0.35) -| (rs.north);
+  \draw[->] (ren.south) -- ++(0,-0.35) -| (robs.north);
+  \draw[->] (rs.east) -- (ex.west);
+  \draw[->] (ex.east) -- (robs.west |- ex.east) node[midway, above, font=\scriptsize] {CDB};
+  \draw[->] (ex.south) -- ++(0,-0.4) -| (rs.south);
+  \draw[->] (robs.east |- rob1.east) -- (arf1.west);
+  \draw[->] (robs.east |- rob2.east) -- (arf2.west);
+  \node[anchor=north, font=\scriptsize] at (6.95,-2.3) {\iflangja{コミット}{commit}};
+  % ---- legend
+  \draw[fill=ln-accent!15] (0,-3.05) rectangle ++(0.34,-0.25);
+  \node[anchor=west, font=\scriptsize] at (0.4,-3.175) {\iflangja{スレッドごと}{one per thread}};
+  \draw[fill=ln-box] (2.6,-3.05) rectangle ++(0.34,-0.25);
+  \node[anchor=west, font=\scriptsize] at (3.0,-3.175) {\iflangja{スレッド間で共有}{shared by the threads}};
+\end{tikzpicture}

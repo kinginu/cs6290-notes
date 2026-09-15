@@ -1,0 +1,42 @@
+% Instruction scheduling for a two-wide in-order processor: (a) the two
+% statements compiled one after the other; (b) the scheduled order.
+% Arcs: RAW dependences (first statement above, second below); shaded
+% groups: instructions executed in the same cycle; numbers: that cycle.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.6mm]},
+  ins/.style={draw, fill=white, minimum width=0.9cm, minimum height=0.5cm, inner sep=0pt},
+  dep/.style={->, thick, ln-accent},
+  grp/.style={fill=ln-accent!12, rounded corners=2pt},
+  cyc/.style={font=\scriptsize\sffamily, text=ln-muted}]
+  % ---------------- (a) statement by statement
+  \node[anchor=west] at (0.2,1.0)
+    {\iflangja{(a) 文ごとに翻訳した順序：6 命令を 5 サイクルで実行}%
+              {(a) statement by statement: 6 instructions in 5 cycles}};
+  \foreach \xa/\xb in {1.8/1.8, 3.3/3.3, 4.8/6.3, 7.8/7.8, 9.3/9.3}
+    \fill[grp] (\xa-0.6,-0.4) rectangle (\xb+0.6,0.4);
+  \foreach \n/\x in {1/1.8, 2/3.3, 3/4.8, 4/6.3, 5/7.8, 6/9.3}
+    \node[ins] (a\n) at (\x,0) {I\n};
+  \draw[dep] (a1.north) to[bend left=40] (a2.north);
+  \draw[dep] (a2.north) to[bend left=40] (a3.north);
+  \draw[dep] (a4.south) to[bend right=40] (a5.south);
+  \draw[dep] (a5.south) to[bend right=40] (a6.south);
+  \node[cyc, anchor=east] at (1.1,-1.0) {\iflangja{サイクル}{cycle}};
+  \foreach \c/\x in {1/1.8, 2/3.3, 3/4.8, 3/6.3, 4/7.8, 5/9.3}
+    \node[cyc] at (\x,-1.0) {\c};
+  % ---------------- (b) scheduled
+  \begin{scope}[yshift=-2.8cm]
+    \node[anchor=west] at (0.2,1.0)
+      {\iflangja{(b) スケジューリング後：6 命令を 3 サイクルで実行}%
+                {(b) scheduled: 6 instructions in 3 cycles}};
+    \foreach \xa/\xb in {1.8/3.3, 4.8/6.3, 7.8/9.3}
+      \fill[grp] (\xa-0.6,-0.4) rectangle (\xb+0.6,0.4);
+    \foreach \n/\x in {1/1.8, 4/3.3, 2/4.8, 5/6.3, 3/7.8, 6/9.3}
+      \node[ins] (b\n) at (\x,0) {I\n};
+    \draw[dep] (b1.north) to[bend left=25] (b2.north);
+    \draw[dep] (b2.north) to[bend left=25] (b3.north);
+    \draw[dep] (b4.south) to[bend right=25] (b5.south);
+    \draw[dep] (b5.south) to[bend right=25] (b6.south);
+    \node[cyc, anchor=east] at (1.1,-1.0) {\iflangja{サイクル}{cycle}};
+    \foreach \c/\x in {1/1.8, 1/3.3, 2/4.8, 2/6.3, 3/7.8, 3/9.3}
+      \node[cyc] at (\x,-1.0) {\c};
+  \end{scope}
+\end{tikzpicture}

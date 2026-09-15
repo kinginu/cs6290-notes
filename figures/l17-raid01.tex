@@ -1,0 +1,30 @@
+% Block placement in (a) RAID 0 with three disks and (b) RAID 1.
+% Numbers are logical block numbers.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily]
+  \def\blkw{0.95}\def\blkh{0.42}\def\blkgap{1.1}
+  % ---------------- (a) RAID 0
+  \node[anchor=west, font=\footnotesize\bfseries] at (-0.1,0.95)
+    {\iflangja{(a) RAID 0（ストライピング）}{(a) RAID 0 (striping)}};
+  \foreach \d in {0,1,2} {
+    \node[font=\scriptsize, text=ln-muted] at ({\d*\blkgap+\blkw/2},0.3) {\iflangja{ディスク \d}{Disk \d}};
+    \foreach \s in {0,...,3} {
+      \pgfmathtruncatemacro{\b}{3*\s+\d}
+      \draw[fill=white] ({\d*\blkgap},{-\s*\blkh}) rectangle ++(\blkw,-\blkh);
+      \node at ({\d*\blkgap+\blkw/2},{-\s*\blkh-\blkh/2}) {\b};
+    }
+    \node[font=\scriptsize, text=ln-muted] at ({\d*\blkgap+\blkw/2},{-4*\blkh-0.15}) {$\vdots$};
+  }
+  % ---------------- (b) RAID 1
+  \begin{scope}[xshift=5.6cm]
+  \node[anchor=west, font=\footnotesize\bfseries] at (-0.1,0.95)
+    {\iflangja{(b) RAID 1（ミラーリング）}{(b) RAID 1 (mirroring)}};
+  \foreach \d in {0,1} {
+    \node[font=\scriptsize, text=ln-muted] at ({\d*\blkgap+\blkw/2},0.3) {\iflangja{ディスク \d}{Disk \d}};
+    \foreach \s in {0,...,3} {
+      \draw[fill=white] ({\d*\blkgap},{-\s*\blkh}) rectangle ++(\blkw,-\blkh);
+      \node at ({\d*\blkgap+\blkw/2},{-\s*\blkh-\blkh/2}) {\s};
+    }
+    \node[font=\scriptsize, text=ln-muted] at ({\d*\blkgap+\blkw/2},{-4*\blkh-0.15}) {$\vdots$};
+  }
+  \end{scope}
+\end{tikzpicture}

@@ -1,0 +1,15 @@
+% Processor, cache and main memory: every access looks in the cache first;
+% only misses go on to main memory.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  box/.style={draw, align=center, inner sep=3pt}]
+  \node[box, fill=ln-box, minimum width=2.0cm, minimum height=1.2cm] (cpu) at (0,0)
+    {\iflangja{プロセッサ}{processor}};
+  \node[box, fill=ln-accent!15, minimum width=2.0cm, minimum height=1.0cm] (cache) at (4.0,0)
+    {\iflangja{キャッシュ}{cache}\\[-1pt]{\scriptsize\iflangja{小容量・高速}{small, fast}}};
+  \node[box, fill=white, minimum width=2.6cm, minimum height=1.8cm] (mem) at (8.2,0)
+    {\iflangja{主記憶}{main memory}\\[-1pt]{\scriptsize\iflangja{大容量・低速}{large, slow}}};
+  \draw[<->] (cpu) -- node[above, font=\sffamily\scriptsize] {\iflangja{すべてのアクセス}{every access}}
+    node[below, font=\sffamily\scriptsize, text=ln-muted] {\iflangja{ヒット時間}{hit time}} (cache);
+  \draw[<->, dashed] (cache) -- node[above, font=\sffamily\scriptsize] {\iflangja{ミス時のみ}{misses only}}
+    node[below, font=\sffamily\scriptsize, text=ln-muted] {\iflangja{ミスペナルティ}{miss penalty}} (mem);
+\end{tikzpicture}

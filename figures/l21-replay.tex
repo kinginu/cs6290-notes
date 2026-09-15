@@ -1,0 +1,43 @@
+% Sequential consistency with reordered loads.  Core 0 executes, in program
+% order, I1: LW ready and I2: LW data; core 1 stores data (8) and then
+% ready (1).  I2 executes early and reads the old data (3).  While I2 is
+% uncommitted (shaded window) core 0 watches for writes to data by other
+% cores; the invalidation caused by core 1's store makes it replay I2.
+\begin{tikzpicture}[x=0.95cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.6mm]},
+  row/.style={ln-muted, line width=0.6pt},
+  ev/.style={circle, fill=black, inner sep=1.3pt},
+  lab/.style={font=\scriptsize, align=center, inner sep=1pt},
+  win/.style={fill=ln-accent!20, draw=none}]
+  % ---- row names
+  \node[anchor=east] at (-0.15,1.4) {\iflangja{コア}{core}~0};
+  \node[anchor=east] at (-0.15,0) {\iflangja{コア}{core}~1};
+  % ---- monitoring windows of I2 (executed, not yet committed)
+  \fill[win] (0.6,1.27) rectangle (2.6,1.53);
+  \fill[win] (6.6,1.27) rectangle (9.8,1.53);
+  \draw[row] (0,1.4) -- (10.5,1.4);
+  \draw[row] (0,0) -- (10.5,0);
+  % ---- core 0
+  \node[ev] at (0.6,1.4) {};
+  \node[lab, anchor=south] at (0.6,1.62) {\iflangja{I2: LW data\\3 を読む}{I2: LW data\\reads 3}};
+  \node[ev, ln-caution] at (2.6,1.4) {};
+  \node[lab, anchor=south, text=ln-caution] at (2.6,1.62) {\iflangja{I2 を\\再実行へ}{I2 must\\be replayed}};
+  \node[ev] at (5.0,1.4) {};
+  \node[lab, anchor=south] at (5.0,1.62) {\iflangja{I1: LW ready\\1 を読む}{I1: LW ready\\reads 1}};
+  \node[ev] at (6.6,1.4) {};
+  \node[lab, anchor=south] at (6.6,1.62) {\iflangja{I2: LW data\\8 を読む}{I2: LW data\\reads 8}};
+  \node[ev] at (8.2,1.4) {};
+  \node[lab, anchor=south] at (8.2,1.62) {\iflangja{I1\\コミット}{I1\\commits}};
+  \node[ev] at (9.8,1.4) {};
+  \node[lab, anchor=south] at (9.8,1.62) {\iflangja{I2\\コミット}{I2\\commits}};
+  % ---- core 1
+  \node[ev] at (2.6,0) {};
+  \node[lab, anchor=north] at (2.6,-0.12) {\iflangja{SW data\\（8）}{SW data\\(8)}};
+  \node[ev] at (4.1,0) {};
+  \node[lab, anchor=north] at (4.1,-0.12) {\iflangja{SW ready\\（1）}{SW ready\\(1)}};
+  % ---- invalidation seen by core 0
+  \draw[->, ln-caution, dashed] (2.6,0.1) -- (2.6,1.28)
+    node[pos=0.45, left, lab, text=ln-caution] {\iflangja{data の\\無効化}{invalidation\\of data}};
+  % ---- time axis
+  \draw[->, ln-muted] (0,-0.95) -- (10.5,-0.95)
+    node[below left, inner sep=2pt, font=\scriptsize] {\iflangja{時間}{time}};
+\end{tikzpicture}

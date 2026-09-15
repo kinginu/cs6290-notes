@@ -1,0 +1,43 @@
+% Store-to-load forwarding for a sequence of seven loads and stores: each load
+% receives the value of the nearest earlier store with the same address, or
+% the value in memory if there is none.  A store's value reaches the later
+% loads with its address up to the next store with that address.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  hd/.style={font=\footnotesize\bfseries\sffamily},
+  row/.style={draw, minimum height=0.45cm, inner sep=0pt},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted}]
+  % column headings
+  \node[hd] at (0.35,0.45) {\iflangja{命令}{Entry}};
+  \node[hd] at (1.05,0.45) {L/S};
+  \node[hd] at (1.95,0.45) {Addr};
+  \node[hd] at (2.9,0.45) {Value};
+  \foreach \r/\n/\t/\a/\v/\f in {1/S1/S/0x40/5/ln-accent!12, 2/L2/L/0x48/30/ln-tip!12,
+      3/S3/S/0x48/6/ln-tip!12, 4/L4/L/0x40/5/ln-accent!12, 5/S5/S/0x40/9/ln-accent!12,
+      6/L6/L/0x48/6/ln-tip!12, 7/L7/L/0x40/9/ln-accent!12} {
+    \pgfmathsetmacro{\y}{-(\r-1)*0.45}
+    \node[row, fill=ln-box, minimum width=0.7cm, text=ln-muted] at (0.35,\y) {\n};
+    \node[row, fill=\f, minimum width=0.7cm] at (1.05,\y) {\t};
+    \node[row, fill=\f, minimum width=1.1cm, font=\scriptsize\ttfamily] at (1.95,\y) {\a};
+    \node[row, fill=\f, minimum width=0.8cm] at (2.9,\y) {\v};
+  }
+  % address 0x40 (blue): S1 -> L4, S5 -> L7 (right side)
+  \draw[thick, ln-accent] (3.3,0.0) -- (3.75,0.0) -- (3.75,-1.35);
+  \draw[->, thick, ln-accent] (3.75,-1.35) -- (3.3,-1.35);
+  \draw[thick, ln-accent] (3.3,-1.8) -- (3.75,-1.8) -- (3.75,-2.7);
+  \draw[->, thick, ln-accent] (3.75,-2.7) -- (3.3,-2.7);
+  \node[font=\scriptsize\sffamily, text=ln-accent, anchor=west, align=left] at (3.95,-0.675)
+    {\iflangja{S1 の値：\\S5 の手前まで}{value of S1:\\up to S5}};
+  \node[font=\scriptsize\sffamily, text=ln-accent, anchor=west, align=left] at (3.95,-2.25)
+    {\iflangja{S5 の値}{value of S5}};
+  % address 0x48 (green): memory -> L2, S3 -> L6 (left side)
+  \node[draw, fill=white, font=\scriptsize\sffamily, inner sep=2pt] (mem) at (-1.35,-0.45)
+    {\iflangja{メモリ}{memory}};
+  \draw[->, thick, ln-tip!80!black] (mem.east) -- (0.0,-0.45);
+  \draw[thick, ln-tip!80!black] (0.0,-0.9) -- (-0.45,-0.9) -- (-0.45,-2.25);
+  \draw[->, thick, ln-tip!80!black] (-0.45,-2.25) -- (0.0,-2.25);
+  \node[font=\scriptsize\sffamily, text=ln-tip!80!black, anchor=east, align=right] at (-0.6,-1.575)
+    {\iflangja{S3 の値}{value of S3}};
+  % program order
+  \draw[->, ln-muted] (5.75,0.2) -- (5.75,-2.9);
+  \node[lab, rotate=-90] at (6.0,-1.35) {\iflangja{プログラム順}{program order}};
+\end{tikzpicture}

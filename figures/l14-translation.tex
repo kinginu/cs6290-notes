@@ -1,0 +1,40 @@
+% Where address translation sits relative to the cache lookup:
+% (a) physically accessed, (b) virtually accessed, (c) VIPT cache.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  blk/.style={draw, fill=ln-box, minimum height=0.6cm, inner sep=2pt},
+  cch/.style={draw, fill=ln-accent!15, minimum height=0.7cm, minimum width=2.2cm, inner sep=2pt},
+  fld/.style={draw, fill=white, minimum height=0.5cm, inner sep=1pt, font=\scriptsize\sffamily},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted, align=left},
+  ttl/.style={font=\footnotesize\sffamily, align=center}]
+  % ---------------- (a) physically accessed
+  \node (va) at (1.6,0) {\iflangja{仮想アドレス}{virtual address}};
+  \node[blk, minimum width=1.4cm] (tlb) at (1.6,-1.2) {TLB};
+  \node[cch] (c) at (1.6,-2.7) {\iflangja{キャッシュ}{cache}};
+  \node (d) at (1.6,-3.8) {\iflangja{データ}{data}};
+  \draw[->] (va) -- (tlb);
+  \draw[->] (tlb) -- node[lab, right] {\iflangja{物理\\アドレス}{physical\\address}} (c);
+  \draw[->] (c) -- (d);
+  \node[ttl] at (1.6,-4.55) {\iflangja{(a) 物理アドレスキャッシュ}{(a) physically accessed}};
+  % ---------------- (b) virtually accessed
+  \node (vb) at (5.2,0) {\iflangja{仮想アドレス}{virtual address}};
+  \node[cch] (cb) at (4.9,-2.7) {\iflangja{キャッシュ}{cache}};
+  \node (db) at (4.9,-3.8) {\iflangja{データ}{data}};
+  \node[blk, dashed, fill=white, minimum width=1.2cm] (tb) at (6.3,-1.2) {TLB};
+  \node[lab, anchor=north] at (6.3,-1.5) {\iflangja{変換は\\ミス時のみ}{translation\\only on a miss}};
+  \draw[->] (4.9,-0.25) -- (cb);
+  \draw[->, dashed] (6.3,-0.25) -- (tb);
+  \draw[->] (cb) -- (db);
+  \node[ttl] at (5.3,-4.55) {\iflangja{(b) 仮想アドレスキャッシュ}{(b) virtually accessed}};
+  % ---------------- (c) VIPT
+  \node[fld, minimum width=1.3cm] (vpn) at (9.05,0) {VPN};
+  \node[fld, minimum width=1.3cm, anchor=west] (idx) at (vpn.east) {\iflangja{インデックス}{index}};
+  \node[lab, anchor=south] at (9.7,0.25) {\iflangja{仮想アドレス}{virtual address}};
+  \node[blk, minimum width=1.2cm] (tc) at (9.05,-1.2) {TLB};
+  \node[cch, minimum width=2.6cm] (cc) at (9.7,-2.7) {\iflangja{キャッシュ}{cache}};
+  \node (dc) at (9.7,-3.8) {\iflangja{データ}{data}};
+  \draw[->] (vpn) -- (tc);
+  \draw[->] (tc) -- node[lab, left] {\iflangja{フレーム\\番号}{frame\\number}} (tc.south |- cc.north);
+  \draw[->] (idx.south) -- (idx.south |- cc.north);
+  \draw[->] (cc) -- (dc);
+  \node[ttl] at (9.7,-4.55) {(c) VIPT};
+\end{tikzpicture}

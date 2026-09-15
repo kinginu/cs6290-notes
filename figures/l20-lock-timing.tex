@@ -1,0 +1,34 @@
+% Two threads that use the same lock.  Thread B calls lock() while thread A
+% is in its critical section, waits, and enters when A calls unlock().
+\begin{tikzpicture}[x=0.9cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.6mm]},
+  ev/.style={font=\scriptsize\ttfamily, inner sep=1pt}]
+  \def\lnbox#1#2#3#4{% y, x0, x1, fill
+    \draw[fill=#4] (#2,{#1-0.25}) rectangle (#3,{#1+0.25});}
+  % ---- thread A
+  \node[anchor=east] at (-0.15,1) {\iflangja{スレッド A}{thread A}};
+  \lnbox{1}{0}{1.5}{white}
+  \lnbox{1}{1.5}{4.5}{ln-accent!20}
+  \lnbox{1}{4.5}{10}{white}
+  \node[font=\scriptsize] at (3,1) {\iflangja{クリティカルセクション}{critical section}};
+  \node[ev, anchor=south] at (1.5,1.3) {lock()};
+  \node[ev, anchor=south] at (4.5,1.3) {unlock()};
+  \draw (1.5,1.25) -- (1.5,1.32);
+  \draw (4.5,1.25) -- (4.5,1.32);
+  % ---- thread B
+  \node[anchor=east] at (-0.15,0) {\iflangja{スレッド B}{thread B}};
+  \lnbox{0}{0}{2.5}{white}
+  \lnbox{0}{2.5}{4.5}{ln-caution!15}
+  \lnbox{0}{4.5}{7.5}{ln-accent!20}
+  \lnbox{0}{7.5}{10}{white}
+  \node[font=\scriptsize] at (3.5,0) {\iflangja{待機}{waiting}};
+  \node[font=\scriptsize] at (6,0) {\iflangja{クリティカルセクション}{critical section}};
+  \node[ev, anchor=north] at (2.5,-0.3) {lock()};
+  \node[ev, anchor=north] at (7.5,-0.3) {unlock()};
+  \draw (2.5,-0.25) -- (2.5,-0.32);
+  \draw (7.5,-0.25) -- (7.5,-0.32);
+  % ---- hand-over of the lock
+  \draw[->, ln-caution] (4.5,0.75) -- (4.5,0.25);
+  % ---- time axis
+  \draw[->, ln-muted] (0,-0.95) -- (10.3,-0.95)
+    node[right, inner sep=2pt] {\iflangja{時間}{time}};
+\end{tikzpicture}

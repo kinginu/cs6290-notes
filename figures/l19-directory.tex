@@ -1,0 +1,39 @@
+% Directory-based coherence: the directory entry of block X records whether
+% one cache holds X exclusively and which caches hold a copy.  A write by
+% core 3 is sent to the directory, which forwards the invalidation only to
+% the caches that hold X.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  core/.style={draw, fill=ln-accent!15, minimum width=2.1cm, minimum height=0.55cm, inner sep=2pt},
+  cache/.style={draw, fill=ln-box, minimum width=2.1cm, minimum height=0.55cm, inner sep=2pt},
+  cell/.style={draw, fill=white, minimum width=0.55cm, minimum height=0.5cm, inner sep=0pt},
+  hd/.style={font=\scriptsize, text=ln-muted},
+  lab/.style={font=\scriptsize, inner sep=2pt},
+  msg/.style={->, dashed, ln-accent, thick}]
+  \foreach \i/\s in {0/S, 1/O, 2/I, 3/S} {
+    \node[core] (c\i) at (\i*2.8,0) {\iflangja{コア}{core}~\i};
+    \node[cache] (k\i) at (\i*2.8,-0.75) {\iflangja{キャッシュ}{cache}: X (\s)};
+    \draw (c\i.south) -- (k\i.north);
+    \draw (k\i.south) -- (\i*2.8,-1.55);
+  }
+  \draw[line width=1.4pt] (-1.15,-1.55) -- (9.55,-1.55)
+    node[right, font=\scriptsize, inner sep=2pt] {\iflangja{ネットワーク}{network}};
+  % directory entry of X
+  \node[font=\footnotesize] at (2.85,-3.1) {X};
+  \foreach \j/\h/\v in {0/Ex/0, 1/C0/1, 2/C1/1, 3/C2/0, 4/C3/1} {
+    \node[cell] (e\j) at (3.4+\j*0.55,-3.1) {\v};
+    \node[hd, above] at (e\j.north) {\h};
+  }
+  \fill[ln-accent!15] (e0.south west) rectangle (e0.north east);
+  \node[font=\footnotesize] at (e0) {0};
+  \draw (e0.south west) rectangle (e0.north east);
+  \node[draw=ln-rule, rounded corners=2pt, fit=(e0)(e4), inner xsep=16pt, inner ysep=14pt,
+        yshift=2pt, xshift=-5pt] (dir) {};
+  \node[lab, text=ln-muted, anchor=north] at (dir.south) {\iflangja{ディレクトリ}{directory}};
+  % messages for a write by core 3
+  \draw[msg, rounded corners=4pt] (k3.south) ++(0.35,0) |- node[lab, pos=0.25, right]
+    {\iflangja{(1) X に書き込み}{(1) write X}} (dir.east);
+  \draw[msg, rounded corners=4pt] (dir.west) -| node[lab, pos=0.75, left]
+    {\iflangja{(2) 無効化}{(2) invalidate}} ([xshift=0.35cm]k0.south);
+  \draw[msg] (dir.north -| k1.south) ++(0.35,0) -- node[lab, pos=0.2, right]
+    {\iflangja{(2) 無効化}{(2) invalidate}} ([xshift=0.35cm]k1.south);
+\end{tikzpicture}
