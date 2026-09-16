@@ -113,7 +113,9 @@ accomplishment} the delivered service matches the specified service; in
 \emph{service interruption} it does not.  A failure moves the system from
 the first state to the second, and a restoration (repair) moves it back
 (\cref{fig:l17-service-timeline}).  The time spent in each state gives two
-different measures of dependability.
+different measures of dependability.\margin{The model admits no third state:
+a service that is slow but still correct, or interrupted for some users only,
+has to be counted as one or the other.}
 
 \begin{figure}[htbp]
   \centering
@@ -151,7 +153,9 @@ failure--repair cycle, the \term{mean time between failures}[平均故障間隔]
   \label{eq:l17-mtbf}
 \end{equation}
 When repairs are short compared with the periods of service, the MTBF and
-the MTTF are nearly equal.
+the MTTF are nearly equal.\caution{Disk and server datasheets print as
+\enquote{MTBF} the quantity defined here as MTTF: no repair time is included
+in it.}
 
 \begin{example}
   \label{ex:l17-availability}
@@ -159,7 +163,11 @@ the MTTF are nearly equal.
   \SI{900}{\hour}, is down for \SI{10}{\hour}, runs for \SI{1500}{\hour} and is
   down for \SI{8}{\hour}.  Its MTTF is $(1200+900+1500)/3 = \SI{1200}{\hour}$,
   its MTTR is $(6+10+8)/3 = \SI{8}{\hour}$, its MTBF is \SI{1208}{\hour}, and
-  its availability is $1200/1208 \approx \SI{99.34}{\percent}$.  A second
+  its availability is $1200/1208 \approx \SI{99.34}{\percent}$.\tip{Availability
+  is quoted in \enquote{nines}.  Of the \SI{8766}{\hour} in a year,
+  \SI{99.9}{\percent} leaves \SI{8.8}{\hour} of interruption,
+  \SI{99.99}{\percent} \SI{53}{\minute} and \SI{99.999}{\percent}
+  \SI{5}{\minute}.}  A second
   server that fails ten times as often (MTTF $=\SI{120}{\hour}$) but is
   restored within \SI{0.8}{\hour} on average has the same availability but
   only one tenth of the MTTF, so it is far less reliable.
@@ -201,7 +209,11 @@ last.\source{Lesson 17, videos 8--9; H\&P §D.3.}
     becomes hot.
   \item[Transient] A \term{transient fault}[過渡フォールト] occurs once and
     goes away by itself, e.g.\ a bit of memory flipped by a high-energy
-    particle; rewriting the bit restores correct operation.
+    particle; rewriting the bit restores correct operation.\caution{Most
+    memory errors are not of this kind: a field study of Google's servers
+    found over \SI{8}{\percent} of DIMMs hit by a correctable error per year,
+    dominated by hard faults rather than particle strikes
+    \cite{schroeder2009}.}
 \end{description}
 
 The two classifications describe different properties of a fault.  A
@@ -209,7 +221,9 @@ hardware fault, for instance, can be permanent (a burnt-out chip),
 intermittent (a cracked solder joint that loses contact only when warm) or
 transient (a flipped memory bit).  A design fault, in contrast, is present in
 every copy of the design until the design is corrected, so it is permanent,
-even if it is activated only occasionally.
+even if it is activated only occasionally.\margin{Five entries of the
+\num{2048}-entry lookup table in the Pentium divider held a wrong value;
+replacing the chips cost Intel \$475 million.}
 
 \section{Improving reliability and availability}
 \label{sec:l17-improving}
@@ -252,9 +266,15 @@ Saving the complete state of a system at regular intervals, so that
 execution can later resume from a saved state, is called
 \term{checkpointing}[チェックポインティング].  When an error is detected,
 the system restores the most recent checkpoint and executes again from
-there.  The re-execution is likely to succeed if the fault was transient,
+there.\margin{A processor does this every few instructions: branch
+misprediction recovery in Lesson 8 restores a checkpoint of the register map
+and re-executes.  Only the granularity differs.}  The re-execution is likely
+to succeed if the fault was transient,
 and often if it was intermittent; a permanent fault is activated again and
-cannot be tolerated this way.  Recovery also takes time.  If restoring the
+cannot be tolerated this way.\caution{\enquote{Transient} describes the
+fault, not the error it leaves behind: the wrong value persists until
+something overwrites it.  Re-execution helps only because the checkpoint
+predates the error.}  Recovery also takes time.  If restoring the
 checkpoint and repeating the lost work is quick, users perceive only a delay;
 if it takes too long, the recovery itself counts as a service interruption.
 
@@ -309,7 +329,10 @@ no margin is left: a third faulty module would outvote the two correct ones,
 and the vote would produce a wrong result.  Operation is therefore stopped
 before that can happen.  The Space Shuttle, with its five flight computers,
 followed this policy: after one computer failed the mission continued
-normally, and after a second one failed it was cut short.
+normally, and after a second one failed it was cut
+short.\sidenote{Only four of the five identical IBM AP-101 machines voted on
+the same program; the fifth ran software written independently, against a
+shared design fault.}
 
 \section{Codes for memory and storage}
 \label{sec:l17-codes}
@@ -346,7 +369,9 @@ flipped bits cancel each other and go unnoticed.  For example, the byte
 Memory modules with ECC typically use a SECDED code (single error
 correction, double error detection), for example 8 check bits for every 64
 data bits: any single flipped bit in a word is corrected, and any two
-flipped bits are detected.  Disks protect each sector with considerably
+flipped bits are detected.\tip{Check bits: the smallest $r$ with
+$2^r \ge k+r+1$ locates one flip among $k$ data bits, one more detects two.
+$k=64$ gives 8, a 72-bit word.}  Disks protect each sector with considerably
 stronger codes, such as Reed--Solomon codes, that correct many flipped bits,
 in particular bursts of adjacent bits caused by defects on the recording
 surface.  These codes handle damaged bits within a sector; they cannot help
@@ -412,7 +437,9 @@ $i \bmod N$ (\cref{fig:l17-raid01}a).
 
 \subsection{Performance}
 
-The array has $N$ times the capacity of one disk.  Requests for blocks on
+The array has $N$ times the capacity of one disk.\margin{The unit striped is
+a \emph{chunk} of tens to hundreds of kilobytes, not a single sector; each
+block drawn in the figures stands for one chunk.}  Requests for blocks on
 different disks are served simultaneously, and a large transfer is split
 into $N$ transfers that proceed in parallel, so the throughput is up to $N$
 times that of one disk.  An access to a single block still needs a seek and
@@ -485,7 +512,9 @@ $\mathrm{MTTF}_1$ on average.  Only then is data lost:
 
 In practice a failed disk is replaced and the data is copied onto the new
 disk from the surviving one.  Let $\mathrm{MTTR}_1$ be the average time from
-the failure until the new disk holds a complete copy.  Data is lost only if
+the failure until the new disk holds a complete copy.\margin{$\mathrm{MTTR}_1$
+is a copy time, not a service call: a 16~TB disk refilled at 150~MB/s takes
+about \SI{30}{\hour}, the figure used in the examples below.}  Data is lost only if
 the second disk fails within this window (\cref{fig:l17-raid-repair} with
 $N=2$).  Since $\mathrm{MTTR}_1 \ll \mathrm{MTTF}_1$, the probability of that
 is about $\mathrm{MTTR}_1/\mathrm{MTTF}_1$, so on average
@@ -510,7 +539,11 @@ working, hence
 
 \begin{example}
   \label{ex:l17-raid1}
-  With the disks of \cref{ex:l17-raid0} ($\mathrm{MTTF}_1 = \SI{120000}{\hour}$),
+  With the disks of \cref{ex:l17-raid0} ($\mathrm{MTTF}_1 = \SI{120000}{\hour}$),%
+  \margin{Datasheet MTTFs of \num{1000000}--\num{1500000}~h imply an annual
+  failure rate below \SI{1}{\percent}.  Replacement rates measured in the
+  field are \SIrange{2}{4}{\percent}, an MTTF nearer \num{300000}~h
+  \cite{schroeder2007}.}
   a RAID 1 array without repair has an MTTF of \SI{180000}{\hour}, about
   20.5 years.  If a failed disk is replaced and its copy restored within
   $\mathrm{MTTR}_1 = \SI{30}{\hour}$, the MTTF becomes
@@ -545,7 +578,10 @@ $D_0,\dots,D_{N-2}$, applying \cref{eq:l17-parity} bit by bit gives
 
 Because $x \oplus x = 0$, XORing both sides of \cref{eq:l17-raid4-parity}
 with all surviving blocks shows that a lost block is the XOR of all other
-blocks of its stripe, parity included.  If a disk fails, every block on it
+blocks of its stripe, parity included.\caution{Coding theory calls a loss at
+a known position an \emph{erasure}.  One check symbol repairs one erasure,
+but locating \emph{and} repairing one error of unknown position needs two.}
+If a disk fails, every block on it
 can be reconstructed from the other $N-1$ disks.  If the failed disk is the
 parity disk, the parity is simply recomputed.  The redundancy costs one disk
 out of $N$, much less than the second copy of mirroring.
@@ -562,7 +598,9 @@ adding the new data (\cref{fig:l17-raid4-write}b):
 \end{equation}
 A write therefore reads the old data block and the old parity block, and
 then writes the new data block and the new parity block: two reads and two
-writes, independently of $N$.
+writes, independently of $N$.\margin{This read--modify--write sequence is
+known as the \emph{small-write problem}.  A write that covers a whole stripe
+escapes it: the new parity follows from the new data alone, with no read.}
 
 \begin{figure}[htbp]
   \centering
@@ -684,7 +722,10 @@ two.\source{Lesson 17, videos 30--32; H\&P §D.2.}  It adds a second check
 block to every stripe (\cref{fig:l17-raid5-6}b): one check block, $P$, is the
 parity; the other, $Q$, is computed with a different code.  This
 organization is called \term{RAID 6}[RAID 6].  $P$ and $Q$ give two
-independent equations per stripe, so any two lost blocks of a stripe can be
+independent equations per stripe,\margin{$Q$ is normally a Reed--Solomon
+check over $\mathrm{GF}(2^8)$, $Q = \sum_i g^i D_i$ for a fixed $g$.  The
+differing weights are what make the second equation independent; a second
+XOR would only repeat the first.} so any two lost blocks of a stripe can be
 reconstructed: a single lost block is rebuilt from the parity as in RAID 5,
 and two lost blocks are obtained by solving both equations.
 
@@ -695,7 +736,10 @@ and two lost blocks are obtained by solving both equations.
   \item \textbf{Writes} must update both check blocks: three reads (old
     data, $P$, $Q$) and three writes, compared with two of each in RAID 5.
     With six accesses per write spread over $N$ disks, the write throughput
-    is about $N/6$ times that of one disk; reads remain $N$ times as fast.
+    is about $N/6$ times that of one disk; reads remain $N$ times as
+    fast.\tip{The write column of \cref{tab:l17-raid} is $N$ divided by the
+    accesses one write costs: four for RAID 4 and 5, six for RAID 6.  RAID 4
+    is $1/2$ instead because all four hit the one parity disk.}
 \end{itemize}
 
 \subsection{RAID 6 and correlated failures}
@@ -709,7 +753,10 @@ of the example.  Against independent
 failures, RAID 6 is overkill.
 
 Its value lies in failures that are \emph{not} independent of the first
-one.  The typical case is an operation fault during the repair: the
+one.\margin{Repair also reads every surviving disk end to end.  Consumer
+datasheets allow one unrecoverable read error per $10^{14}$ bits; seven 4~TB
+disks hold twice that, so a RAID 5 rebuild may itself lose a block.}
+The typical case is an operation fault during the repair: the
 operator replaces a working disk instead of the failed one.  A RAID 5 array
 now misses two disks and has lost data; a RAID 6 array keeps working and can
 still be repaired.
