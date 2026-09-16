@@ -1,0 +1,633 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Compiler ILP}
+\lessoninfo{
+  video={Lesson 10, videos 1--20},
+  textbook={H\&P \cite{hennessy2017} §3.2, Appendix H},
+  keywords={instruction-level parallelism, instructions per cycle, dependence chain, tree height reduction, instruction scheduling, in-order execution, if-conversion, loop unrolling, function call inlining, code bloat, instruction count, software pipelining, trace scheduling},
+}
+
+Lessons 6--9 raised the instructions per cycle (IPC) of a processor with
+hardware: register renaming, out-of-order execution with a reorder buffer, and
+out-of-order load-store execution let the IPC approach the instruction-level
+parallelism (ILP) of the program.  The hardware, however, can exploit only the
+parallelism that the program contains and that lies within its reach.  This
+lesson shows how the compiler improves both: tree height reduction shortens
+the dependence chains that bound the ILP, instruction scheduling places
+independent instructions next to each other, and if-conversion, loop unrolling
+and function call inlining remove the branches, calls and returns that keep
+them apart.
+
+\section{How the compiler can raise IPC}
+\label{sec:l10-limits}
+
+The IPC of every processor is bounded by the ILP of the program it executes
+(\cref{sec:l06-ipc}).\source{Lesson 10, videos 1--2; H\&P §3.2.}  Two limits
+on the IPC are not determined by the processor alone, and the compiler
+influences both.
+\begin{description}
+  \item[The ILP of the program] The ILP is the number of instructions divided
+    by the length of the longest chain of RAW dependences
+    (\cref{eq:l06-ilp,eq:l06-cycle}).  How long the chains are depends on how
+    the compiler has translated the source program: the same computation can
+    often be expressed by instructions that form shorter chains.
+  \item[The parallelism a processor can find] A processor looks for
+    instructions to execute only among a limited number of instructions that
+    follow the oldest unexecuted one.  An out-of-order processor considers the
+    instructions that fit into its reorder buffer (Lesson 8); an in-order
+    processor considers only the next few and stops at the first one that must
+    wait (Lesson 6).  Independent instructions that lie farther apart in
+    program order than this window cannot execute in the same cycle, however
+    high the ILP.  The compiler can place such instructions close together, and
+    it can remove the branches, calls and returns that stand between them.
+\end{description}
+The compiler sees the whole program rather than a window of it, and it runs
+before the program executes, so it can afford analyses that a processor could
+never carry out within a clock cycle.  \Cref{tab:l10-overview} lists the
+techniques of this lesson.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Limits on the IPC and the compiler techniques that address them.}
+  \label{tab:l10-overview}
+  \begin{tabular}{@{}llc@{}}
+    \toprule
+    Limit & Compiler technique & Section \\
+    \midrule
+    long dependence chains lower the ILP    & tree height reduction
+      & \ref{sec:l10-thr} \\
+    independent instructions lie far apart  & instruction scheduling
+      & \ref{sec:l10-scheduling} \\
+    branches separate instructions          & if-conversion, trace scheduling
+      & \ref{sec:l10-if-conversion}, \ref{sec:l10-other} \\
+    loop branches separate iterations       & loop unrolling, software pipelining
+      & \ref{sec:l10-unrolling}, \ref{sec:l10-other} \\
+    calls and returns separate instructions & function call inlining
+      & \ref{sec:l10-inlining} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Tree height reduction}
+\label{sec:l10-thr}
+
+A compiler translates an arithmetic expression by way of its \emph{expression
+tree}, in which every operation is a node whose children are its
+operands.\source{Lesson 10, videos 3--4; H\&P Appendix H.}  Each operation
+becomes one instruction, and the instruction of a node reads the results of
+the instructions of its children.  The longest chain of RAW dependences among
+these instructions therefore equals the \emph{height} of the tree, the number
+of operations on the longest path from the root to a leaf, and on the ideal
+processor of Lesson 6 each level of the tree takes one cycle.
+
+A straightforward translation follows the order in which the source program
+writes the operands.  For a sum of six variables held in R1 to R6, with the
+result in R10, it produces
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+ADD R10, R1, R2      ; cycle 1
+ADD R10, R10, R3     ; cycle 2
+ADD R10, R10, R4     ; cycle 3
+ADD R10, R10, R5     ; cycle 4
+ADD R10, R10, R6     ; cycle 5
+\end{lstlisting}
+Every addition uses the result of the previous one.  The tree degenerates into
+a chain of height~5 (\cref{fig:l10-tree-height}a): the five instructions take
+five cycles on any processor, and their ILP is~1.
+
+\begin{definition}[Tree height reduction]
+  \label{def:l10-thr}
+  Rewriting an expression into an equivalent one whose expression tree has
+  fewer levels, by using the associativity and commutativity of its
+  operations, is called \term{tree height reduction}[木の高さ削減].  The number
+  of operations, and hence of instructions, does not change.
+\end{definition}
+
+\begin{example}
+  \label{ex:l10-thr}
+  Grouped as $((\text{R1}+\text{R2}) + (\text{R3}+\text{R4})) +
+  (\text{R5}+\text{R6})$, the same sum becomes
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+ADD R10, R1, R2      ; cycle 1
+ADD R11, R3, R4      ; cycle 1
+ADD R12, R5, R6      ; cycle 1
+ADD R10, R10, R11    ; cycle 2
+ADD R10, R10, R12    ; cycle 3
+\end{lstlisting}
+  The three additions of pairs depend on nothing and execute in cycle~1, the
+  sum of the first two pairs follows in cycle~2 and the final addition in
+  cycle~3 (\cref{fig:l10-tree-height}b).  There are still five instructions,
+  now in three cycles: the ILP rises from 1 to $5/3 \approx 1.67$.  The price
+  is two further registers, R11 and R12, for intermediate results.
+\end{example}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l10-tree-height}
+  \caption{Expression trees of the sum of R1 to R6.  (a) The left-to-right
+    translation is a chain of five additions.  (b) The balanced tree of
+    \cref{ex:l10-thr} has height~3.  Each level of additions executes in one
+    cycle of the ideal processor.}
+  \label{fig:l10-tree-height}
+\end{figure}
+
+For $n$ operands combined by one associative operation, the left-to-right
+translation has height $n-1$, whereas a balanced tree has height $\lceil
+\log_2 n \rceil$.  Addition and multiplication are associative, and so are
+AND, OR and XOR.\caution{Floating-point addition is not associative (rounding);
+compilers regroup it only when permitted.}
+Subtraction is not, since $(a-b)-c \ne a-(b-c)$, but an
+expression with subtractions can still be regrouped when the signs are
+adjusted.  Because $a - b = a + (-b)$, the terms can be grouped freely as long
+as each keeps its sign, and the signs inside a group that follows a minus sign
+are inverted: for example $a-b-c-d = (a-b)-(c+d)$, which reduces the height
+from 3 to~2.
+
+\begin{keypoint}
+  Tree height reduction changes the dependences between instructions, not
+  their number.  It shortens the chain that bounds the ILP, which pays off on
+  processors that can execute several instructions per cycle.
+\end{keypoint}
+
+\section{Instruction scheduling}
+\label{sec:l10-scheduling}
+
+A processor executes independent instructions in the same cycle only if it
+finds them.\source{Lesson 10, videos 5--7; H\&P §3.2.}  A compiler usually
+translates a program statement by statement, so the instructions of one
+statement are followed by those of the next.  When each statement forms a
+chain, the independent instructions of different statements are separated by
+the rest of the chain.  An out-of-order processor whose window covers both
+chains finds them anyway, but an out-of-order processor with a shorter window
+does not, and neither does an in-order processor, which executes the next
+instructions only up to the first one that must wait.  Three compiler
+techniques make independent instructions easier to find: instruction
+scheduling, loop unrolling (\cref{sec:l10-unrolling}) and trace scheduling
+(\cref{sec:l10-other}).
+
+\begin{definition}[Instruction scheduling]
+  \label{def:l10-scheduling}
+  Reordering the instructions of a program, without changing its results, so
+  that instructions that can execute in the same cycle are adjacent in program
+  order is called \term{instruction scheduling}[命令スケジューリング].
+\end{definition}
+
+For an in-order processor, scheduling fills the cycles in which the processor
+would otherwise wait with instructions that do not depend on the waiting one.
+To schedule for a processor that executes up to $w$ instructions per cycle,
+the compiler can determine for every instruction the cycle in which the ideal
+processor would execute it (\cref{eq:l06-cycle}) and emit the instructions in
+the order of these cycles, in groups of at most $w$.  Every instruction then
+still follows the instructions whose results it reads, but the reordered
+program must also compute the same results as the original.  A move that
+breaks a WAW or WAR dependence changes a value that some instruction uses; the
+compiler then either keeps the original order or compensates:
+\begin{description}
+  \item[Destination register] When a moved instruction would overwrite a
+    register whose old value a later instruction still reads, it writes its
+    result to another, otherwise unused register instead, and the instructions
+    that read the result are changed accordingly.
+  \item[Address offset] When an instruction that adds a constant to a
+    register, such as an index increment, moves ahead of an instruction that
+    uses this register as the base of an address, the displacement of the
+    address is reduced by the constant: \texttt{SW R3, 0(R1)} placed after
+    \texttt{ADDI R1, R1, 4} becomes \texttt{SW R3, -4(R1)}.
+\end{description}
+
+\begin{example}
+  \label{ex:l10-scheduling}
+  With $a$ to $h$ in R1 to R8, the statements $x = (a+b)\times c - d$ and
+  $y = (e-f)\times g + h$ compile into
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+I1:  ADD R9, R1, R2      ; a + b
+I2:  MUL R9, R9, R3      ; (a + b) * c
+I3:  SUB R9, R9, R4      ; x <- (a + b) * c - d
+I4:  SUB R10, R5, R6     ; e - f
+I5:  MUL R10, R10, R7    ; (e - f) * g
+I6:  ADD R10, R10, R8    ; y <- (e - f) * g + h
+\end{lstlisting}
+  The instructions form two chains, I1--I3 and I4--I6, so the ideal processor
+  executes I1 and I4 in cycle~1, I2 and I5 in cycle~2, and I3 and I6 in
+  cycle~3: the ILP is~2.  A two-wide in-order processor executes only I1 in
+  cycle~1, because I2 must wait for it, and only I2 in cycle~2.  In cycle~3 it
+  executes I3 together with I4, but then I5 and I6 again need a cycle each.
+  It takes five cycles, an IPC of $6/5 = 1.2$
+  (\cref{fig:l10-scheduling}a).  Scheduled in the order I1, I4, I2, I5, I3,
+  I6, every pair of adjacent instructions is independent, and the same
+  processor needs three cycles, an IPC of~2, equal to the ILP
+  (\cref{fig:l10-scheduling}b).  The two statements use different registers,
+  so the reordering breaks no WAW or WAR dependence.
+\end{example}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l10-scheduling}
+  \caption{The program of \cref{ex:l10-scheduling} on a two-wide in-order
+    processor.  Arcs are RAW dependences; shaded groups execute in the same
+    cycle.  (a) In the order of the statements, the chain I1--I3 holds back
+    I4.  (b) After scheduling, both chains advance in every cycle.}
+  \label{fig:l10-scheduling}
+\end{figure}
+
+\begin{example}
+  \label{ex:l10-loop}
+  The loop
+  \begin{lstlisting}[language=C, numbers=none]
+for (i = 0; i < n; i++)
+    a[i] = a[i] + x;
+\end{lstlisting}
+  adds $x$ to each of the $n$ elements of an integer array.  With R1 pointing
+  to the current element, R2 holding $x$, and R5 holding the address just past
+  the last element, it compiles into
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+Loop: LW   R3, 0(R1)      ; R3 <- a[i]
+      ADD  R3, R3, R2     ; R3 <- a[i] + x
+      SW   R3, 0(R1)      ; a[i] <- R3
+      ADDI R1, R1, 4      ; next element
+      BNE  R1, R5, Loop   ; repeat until the end
+\end{lstlisting}
+  A four-wide in-order processor with perfect branch prediction executes the
+  LW alone, because the ADD waits for it, and then the ADD alone, because the
+  SW waits for it.  The SW and the ADDI execute together, and the BNE, which
+  waits for the ADDI, executes together with the LW of the next iteration.
+  Every iteration takes three cycles, a CPI of $3/5 = 0.6$.  Moved up behind
+  the LW, the ADDI no longer waits behind the chain, and the SW, which now
+  follows the increment, needs the displacement $-4$:
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+Loop: LW   R3, 0(R1)
+      ADDI R1, R1, 4
+      ADD  R3, R3, R2
+      SW   R3, -4(R1)     ; R1 already advanced
+      BNE  R1, R5, Loop
+\end{lstlisting}
+  This is the order of the ideal cycles, with the branch kept at the end of
+  the iteration.  The LW and the ADDI now execute together, the ADD follows,
+  and the SW, the BNE and the LW and ADDI of the next iteration fill all four
+  places of the next cycle.  Every iteration takes two cycles, a CPI of
+  $2/5 = 0.4$.
+\end{example}
+
+Scheduling thus matters for in-order processors, for out-of-order processors
+whose window is short compared with the chains in the program, and for
+out-of-order processors whenever more instructions are ready than their width,
+since the order decides which of them execute first (Lesson 6).
+
+\section{Scheduling and if-conversion}
+\label{sec:l10-if-conversion}
+
+Instruction scheduling can move instructions only within a stretch of code
+that is executed as a whole, and a conditional branch ends such a
+stretch.\source{Lesson 10, videos 8--9; H\&P §3.2.}  An instruction that
+follows the branch is executed on only one of its paths.  Moving it ahead of
+the branch would execute it on the other path as well, and instructions of the
+two paths cannot be placed in the same group, because only one of the paths is
+executed.  The compiler therefore cannot group instructions across a branch,
+even when the instructions before and after it are independent.
+
+If-conversion\index{if-conversion} (Lesson 5) removes this boundary for a small
+if-then-else.  The converted code computes the condition and both parts
+unconditionally and selects the results with conditional moves, all in one
+branch-free sequence, which the compiler can schedule like any other: the
+instructions that compute the condition and the two parts do not depend on
+the selections, so they are scheduled into the first groups according to
+their own dependences, and the selections follow.  The if-converted code of \cref{ex:l05-movzn}
+already has this shape.  Its first four instructions are independent of each
+other and the three conditional moves depend only on them, so a four-wide
+in-order processor executes all seven instructions in two cycles.
+
+\subsection{Loops}
+
+A loop ends every iteration with a branch back to its beginning, and this
+branch cannot usefully be if-converted.  Removing it would mean executing the
+body as many times as the loop could ever iterate, and each copy would need
+its own predicate telling whether its iteration should have been executed; the
+instructions that compute and apply these predicates would cost more than
+scheduling could gain.  Loop branches are, moreover, predicted accurately, and
+predicating one would execute the code that follows the loop in every
+iteration (\cref{tab:l05-which}).  The loop branch therefore stays, and it
+confines instruction scheduling to a single iteration: the scheduled body of
+\cref{ex:l10-loop}, with two cycles per iteration on the four-wide in-order
+processor, is the best order for that processor.  When the body is short, most
+of the independent instructions of the loop lie in different iterations, where
+the compiler cannot bring them together.  Loop unrolling addresses this
+limitation.
+
+\section{Loop unrolling}
+\label{sec:l10-unrolling}
+
+In a loop with a short body, a large fraction of the instructions executed are
+loop overhead, and the work is spread over many iterations separated by the
+loop branch.\source{Lesson 10, videos 10--15; H\&P §3.2.}  In the loop of
+\cref{ex:l10-loop}, three of the five instructions do the work; the ADDI and
+the BNE are overhead.
+
+\begin{definition}[Loop unrolling]
+  \label{def:l10-unrolling}
+  Rewriting a loop so that each iteration of the new loop performs the work of
+  $k$ iterations of the original loop, by repeating the body $k$ times with
+  adjusted indices and advancing the index by $k$, is called \term{loop
+  unrolling}[ループ展開].  The number $k$ is the \emph{unrolling factor}:
+  unrolling a loop once gives $k=2$, unrolling it twice $k=3$.
+\end{definition}
+
+Unrolled with $k=2$, for an even $n$, the loop becomes
+\begin{lstlisting}[language=C, numbers=none]
+for (i = 0; i < n; i += 2) {
+    a[i]   = a[i]   + x;
+    a[i+1] = a[i+1] + x;
+}
+\end{lstlisting}
+and compiles into
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+Loop: LW   R3, 0(R1)      ; a[i] <- a[i] + x
+      ADD  R3, R3, R2
+      SW   R3, 0(R1)
+      LW   R3, 4(R1)      ; a[i+1] <- a[i+1] + x
+      ADD  R3, R3, R2
+      SW   R3, 4(R1)
+      ADDI R1, R1, 8      ; two elements further
+      BNE  R1, R5, Loop
+\end{lstlisting}
+Each iteration now processes two elements with eight instructions, of which
+the index increment and the branch are executed once.\margin{If $n$ is not a
+multiple of $k$, the compiler adds code, typically a copy of the original
+loop, for the remaining elements.}  The two copies of the body are adjacent
+and separated by no branch, so the compiler can schedule them together once
+the second copy keeps its intermediate result in a register of its own
+(\cref{sec:l10-unrolling-cpi}).
+
+\subsection{Instruction count and ILP}
+\label{sec:l10-unrolling-ilp}
+
+Unrolling does not affect the clock period, but it changes the other two
+factors of the iron law (\cref{eq:iron-law}).  The original loop executes 5
+instructions per element, the unrolled loop 8 per two elements, or 4 per
+element: the overhead instructions are executed half as often, and the
+instruction count falls by \SI{20}{\percent}.  With a factor~$k$ the loop
+executes $(3k+2)/k$ instructions per element, which approaches 3, the work
+alone.
+
+The ILP rises as well.  On the ideal processor (\cref{eq:l06-cycle}) the
+ADDIs of successive iterations form a chain of one cycle per iteration.  Every
+LW of an iteration reads R1 from the ADDI of the previous iteration and
+executes in the same cycle as the ADDI of its own iteration, and its ADD and
+SW follow in the next two cycles; the second write to R3 in the unrolled body
+is a WAW dependence that renaming removes.  The ideal processor thus executes
+one iteration, or $k$ elements, per cycle, and the ILP of a long loop
+approaches the number of instructions per iteration: 5 for the original loop,
+8 for the unrolled one.  This relies on iterations that depend on each other
+only through the index: in a loop that accumulates, such as
+\texttt{s = s + a[i]}, the additions to \texttt{s} form a chain of one cycle
+per element in either version.
+
+\subsection{Cycles per instruction}
+\label{sec:l10-unrolling-cpi}
+
+Whether the CPI falls as well depends on the processor.
+\Cref{tab:l10-unrolling} compares four versions of the loop on the four-wide
+in-order processor of \cref{ex:l10-loop} and on the ideal processor, both with
+perfect branch prediction.\margin{A loop branch is mispredicted about once per
+run, at the exit; a remainder loop adds at most one more.}  The first two versions are
+those of \cref{ex:l10-loop}.  Unrolled but not scheduled, the loop still
+executes one LW--ADD--SW chain after the other: the second LW joins the first
+SW, the ADDI joins the second SW, and the BNE joins the LW of the next
+iteration, so every iteration of eight instructions takes five cycles.  The
+CPI rises from 0.6 to $5/8 = 0.625$, although the time per element falls from
+3 to 2.5 cycles with the instruction count.  Scheduled in the order of the
+ideal cycles, the unrolled body becomes
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+Loop: LW   R3, 0(R1)
+      LW   R4, 4(R1)      ; second copy uses R4
+      ADDI R1, R1, 8
+      ADD  R3, R3, R2
+      ADD  R4, R4, R2
+      SW   R3, -8(R1)     ; R1 already advanced
+      SW   R4, -4(R1)
+      BNE  R1, R5, Loop
+\end{lstlisting}
+Both compensations of \cref{sec:l10-scheduling} are needed.  The second LW
+now precedes the ADD and the SW of the first copy, which still need R3, so the
+second copy computes its value in R4; and both stores follow the increment, so
+their displacements are reduced by 8.  The processor executes both LWs and the
+ADDI in the first cycle and both ADDs in the second, and the two SWs, the BNE
+and the first LW of the next iteration fill the third.  From then on the
+groups no longer coincide with the iterations, and in the steady state 16
+instructions, two iterations, take 5 cycles: 1.25 cycles per element, a CPI of $5/16 = 0.3125$.  Compared
+with the scheduled original loop, the time per element falls from 2 to 1.25
+cycles, a speedup of 1.6, of which $5/4 = 1.25$ comes from the instruction
+count and $0.4/0.3125 = 1.28$ from the CPI.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{The loop of \cref{ex:l10-loop} before and after unrolling with
+    $k=2$, each as compiled and scheduled: instructions per element, and
+    cycles per element and CPI on two processors with perfect branch
+    prediction.}
+  \label{tab:l10-unrolling}
+  \begin{tabular}{@{}lccccc@{}}
+    \toprule
+    & & \multicolumn{2}{c}{Four-wide in-order} & \multicolumn{2}{c}{Ideal} \\
+    \cmidrule(lr){3-4}\cmidrule(l){5-6}
+    Version & Instructions & Cycles & CPI & Cycles & CPI \\
+    \midrule
+    Original               & 5 & 3.00 & 0.600  & 1.00 & 0.200 \\
+    Scheduled              & 5 & 2.00 & 0.400  & 1.00 & 0.200 \\
+    Unrolled               & 4 & 2.50 & 0.625  & 0.50 & 0.125 \\
+    Unrolled and scheduled & 4 & 1.25 & 0.3125 & 0.50 & 0.125 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+On the in-order processor, unrolling thus lowers the CPI through the
+scheduling it makes possible: the loop branch no longer keeps the instructions
+of two iterations apart, and the compiler interleaves them.  On the ideal
+processor the order of the instructions does not matter.  There the CPI falls
+because the ILP rises from 5 to 8, and together with the lower instruction
+count the time per element halves; an out-of-order processor with a large
+window profits in the same way, up to its width.  A processor that completes
+one instruction per cycle has a CPI of~1 in every version and gains only the
+factor 1.25 from the instruction count.  Loop unrolling therefore lowers the
+instruction count on every processor, and the CPI on processors that execute
+several instructions per cycle.
+
+\subsection{Downsides of unrolling}
+\label{sec:l10-bloat}
+
+The body grows linearly with $k$, from 5 instructions to $3k+2$, whereas the
+gain levels off: the instructions per element approach~3, and a real
+processor cannot raise its IPC beyond its width, however high the ILP.  Going
+from $k=4$ (14 instructions, 3.5 per element) to $k=8$ (26 instructions, 3.25
+per element) nearly doubles the body to execute only \SI{7}{\percent} fewer
+instructions, an instance of the diminishing returns of Lesson 2.
+
+\begin{definition}[Code bloat]
+  \label{def:l10-bloat}
+  The growth of the program size caused by a transformation such as loop
+  unrolling is called \term{code bloat}[コード肥大化].
+\end{definition}
+
+Larger code occupies more memory, and, as the lessons on caches will show, it
+causes more cache misses when its instructions are fetched, which can cancel
+the gain.  Two further problems concern the number of iterations.  When $n$ is
+not a multiple of $k$, the remaining iterations need additional code.  And
+unrolling presumes that the number of remaining iterations is known when an
+iteration of the unrolled loop starts.  A loop whose exit is decided inside
+the body, such as a search that stops at the first zero element, cannot
+simply execute $k$ copies of the body per iteration, because the later copies
+could perform iterations that the original loop would not; it needs additional
+exit checks.  Compilers therefore unroll with small factors, and only loops
+whose bodies are short.
+
+\begin{keypoint}
+  Loop unrolling executes the index increment and the loop branch once per $k$
+  iterations of the original loop, which lowers the instruction count on every
+  processor.  It also lowers the CPI on processors that execute several
+  instructions per cycle: on in-order processors because the compiler can
+  schedule the instructions of several iterations together, on processors
+  that find the parallelism themselves because the ILP of loops with
+  independent iterations rises.  Its costs are code that grows with $k$ and
+  extra code when the number of iterations is not a multiple of $k$ or not
+  known in advance.
+\end{keypoint}
+
+\section{Function call inlining}
+\label{sec:l10-inlining}
+
+A call separates the instructions of the caller from those of the called
+function, much as a branch separates the two paths of an
+if-then-else.\source{Lesson 10, videos 16--18; H\&P Appendix A.}  In addition,
+every call executes instructions that perform none of the function's work: the
+call and the return themselves, the copying of the arguments into the
+registers prescribed by the calling convention and of the result out of them,
+and often the saving and restoring of registers on the stack.
+
+\begin{definition}[Function call inlining]
+  \label{def:l10-inlining}
+  Replacing a call by a copy of the body of the called function, adapted to
+  the operands of the caller, is called \term{function call
+  inlining}[インライン展開].
+\end{definition}
+
+\begin{example}
+  \label{ex:l10-inlining}
+  The function
+  \begin{lstlisting}[language=C, numbers=none]
+int sqdiff(int x, int y) { int d = x - y; return d * d; }
+\end{lstlisting}
+  is called as \texttt{c = sqdiff(a, b)}, with $a$, $b$ and $c$ in R8, R9 and
+  R10.  The calling convention passes the arguments in R4 and R5 and returns
+  the result in R2:
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+        ADD  R4, R8, R0     ; x <- a
+        ADD  R5, R9, R0     ; y <- b
+        CALL SqDiff
+        ADD  R10, R2, R0    ; c <- result
+        ...
+SqDiff: SUB  R2, R4, R5     ; d <- x - y
+        MUL  R2, R2, R2     ; result <- d * d
+        RET
+\end{lstlisting}
+  Inlined, the call becomes
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+        SUB  R10, R8, R9    ; c <- a - b
+        MUL  R10, R10, R10  ; c <- c * c
+\end{lstlisting}
+  Each call executes seven instructions, the inlined code two.  The argument
+  and result copies also lengthen the dependence chain from $a$ and $b$ to
+  $c$: on the ideal processor the call takes four cycles, the inlined code two
+  (\cref{fig:l10-inlining}).
+\end{example}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l10-inlining}
+  \caption{\Cref{ex:l10-inlining} before and after inlining.  Shaded
+    instructions only implement the call; dashed arrows are the transfers of
+    control; circled numbers give the cycle in which the ideal processor
+    executes each instruction.}
+  \label{fig:l10-inlining}
+\end{figure}
+
+Inlining thus lowers the instruction count, since the call, the return and
+the copying of arguments and results disappear, and it shortens dependence
+chains, since the body reads the caller's operands directly and delivers its
+result where the caller needs it.  Moreover, the body becomes part of the
+caller's code: the compiler can schedule its instructions together with those
+of the caller and apply tree height reduction across the former call, and the
+processor no longer has to predict the call and the return (Lesson 4).
+
+\subsection{Code bloat from inlining}
+\label{sec:l10-inlining-bloat}
+
+Inlining places a separate copy of the body at every call site, and for large
+functions called from many sites the code grows considerably.
+
+\begin{example}
+  \label{ex:l10-inlining-size}
+  A function with a body of 20 instructions and a return is called from 10
+  sites, each of which spends 4 instructions on the call (two argument copies,
+  the call and a result copy).  Without inlining the code holds $10 \times 4 +
+  21 = 61$ instructions, and each call executes $4 + 21 = 25$.  Inlined at all
+  sites, the function and the call sequences disappear, but every site
+  receives the 20 instructions of the body: 200 instructions, more than three
+  times the code, to save 5 of the 25 instructions (\SI{20}{\percent}) of each
+  call.  For the function of \cref{ex:l10-inlining}, whose body has two
+  instructions, the same 10 sites need $10 \times 4 + 3 = 43$ instructions
+  without inlining and only $10 \times 2 = 20$ with it: the code shrinks, and
+  each call executes 2 instructions instead of 7.
+\end{example}
+
+As with loop unrolling, the larger code causes more cache misses and can
+cancel the gain.  Compilers therefore inline small functions, whose call
+overhead is large compared with their body, and functions called from a single
+site, whose one copy replaces the original; large functions called from many
+sites remain calls.
+
+\begin{keypoint}
+  Function call inlining removes the call, the return and the passing of
+  arguments and results, lowering the instruction count and shortening
+  dependence chains, and it lets the compiler optimize the body together with
+  the caller.  It pays off for small functions; for large functions called
+  from many sites, code bloat outweighs the gain.
+\end{keypoint}
+
+\section{Other compiler techniques}
+\label{sec:l10-other}
+
+The techniques of this lesson are examples of a larger body of compiler
+transformations that raise the IPC.\source{Lesson 10, videos 19--20;
+\cite{lam1988}; \cite{fisher1981}.}  Two further techniques carry instruction
+scheduling across the boundaries that confine it; they are only outlined here.
+In \term{software pipelining}[ソフトウェアパイプライニング] the compiler treats
+a loop like a pipeline: it schedules the instructions of successive iterations
+so that the iterations overlap, and every cycle combines independent
+instructions of several iterations while the results stay those of the
+original loop \cite{lam1988}.  The second, \term{trace
+scheduling}[トレーススケジューリング], carries if-conversion further: the
+compiler uses a profile to select the most frequently executed path through
+several branches, schedules this path as one block of code, and adds checks
+that branch to compensation code, which corrects the results, when execution
+leaves the path \cite{fisher1981}.  Carried to its end, scheduling by the
+compiler leads to processors that leave the grouping of operations into
+parallel steps entirely to the compiler: the VLIW processors of Lesson 11.
+
+\begin{keypoint}[Lesson summary]
+  The IPC is limited by the ILP of the program and by the independent
+  instructions a processor can find within its window; the compiler influences
+  both.  Tree height reduction regroups expressions so that their instructions
+  form shorter chains, raising the ILP at the same instruction count.
+  Instruction scheduling makes independent instructions adjacent, changing
+  destination registers and address offsets where instructions move past each
+  other; it helps in-order and small-window processors.  Branches confine it,
+  and if-conversion removes them from small if-then-else constructs.  Loop
+  unrolling executes the index increment and the loop branch once per $k$
+  iterations, lowering the instruction count; it also lowers the CPI, because
+  the compiler can schedule the instructions of several iterations together
+  and because the ILP of loops with independent iterations rises.  Function
+  call inlining removes calls, returns and argument copying.  Both cause code
+  bloat, so compilers reserve them for short loops and small functions.
+  Software pipelining and trace scheduling extend scheduling across loop
+  iterations and across branches.
+\end{keypoint}
+
+\end{document}

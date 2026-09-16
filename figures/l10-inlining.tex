@@ -1,0 +1,38 @@
+% Function call inlining: (a) the call with its argument and result copies,
+% CALL and RET (shaded: instructions that only implement the call);
+% (b) the inlined body.  Circled numbers: cycle in which the ideal processor
+% executes each instruction.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.6mm]},
+  ins/.style={draw, fill=white, minimum width=2.5cm, minimum height=0.5cm,
+    inner sep=2pt, font=\scriptsize\ttfamily},
+  ovh/.style={ins, fill=ln-box, draw=ln-rule, text=ln-muted},
+  cyc/.style={circle, draw=ln-accent, text=ln-accent, inner sep=0pt,
+    minimum size=0.38cm, font=\scriptsize\sffamily},
+  ctl/.style={->, thick, dashed, ln-muted},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted}]
+  % ---------------- (a) with a call
+  \node[align=center] at (1.75,0.95)
+    {\iflangja{(a) 呼び出し：7 命令，4 サイクル}{(a) call: 7 instructions, 4 cycles}};
+  \node[lab] at (0,0.45) {\iflangja{呼び出し側}{caller}};
+  \node[ovh] (c1) at (0,0.0)  {ADD  R4, R8, R0};
+  \node[ovh] (c2) at (0,-0.6) {ADD  R5, R9, R0};
+  \node[ovh] (c3) at (0,-1.2) {CALL SqDiff};
+  \node[ovh] (c4) at (0,-2.4) {ADD  R10, R2, R0};
+  \node[lab] at (3.5,-0.15) {SqDiff};
+  \node[ins] (f1) at (3.5,-0.6) {SUB  R2, R4, R5};
+  \node[ins] (f2) at (3.5,-1.2) {MUL  R2, R2, R2};
+  \node[ovh] (f3) at (3.5,-1.8) {RET};
+  \foreach \n/\c in {c1/1, c2/1, c3/1, c4/4}
+    \node[cyc] at ([xshift=-0.3cm]\n.west) {\c};
+  \foreach \n/\c in {f1/2, f2/3, f3/2}
+    \node[cyc] at ([xshift=0.3cm]\n.east) {\c};
+  \draw[ctl] (c3.east) -- ++(0.35,0) |- (f1.west);
+  \draw[ctl] (f3.west) -- ++(-0.35,0) |- (c4.east);
+  % ---------------- (b) inlined
+  \node[align=center] at (7.3,0.95)
+    {\iflangja{(b) インライン展開後：2 命令，2 サイクル}{(b) inlined: 2 instructions, 2 cycles}};
+  \node[ins] (i1) at (7.3,-0.6) {SUB  R10, R8, R9};
+  \node[ins] (i2) at (7.3,-1.2) {MUL  R10, R10, R10};
+  \foreach \n/\c in {i1/1, i2/2}
+    \node[cyc] at ([xshift=0.3cm]\n.east) {\c};
+\end{tikzpicture}

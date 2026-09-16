@@ -151,8 +151,12 @@ load-store queue	ロードストアキュー	ろーどすとあきゅー	9
 LSQ	LSQ	LSQ	9	see: load-store queue
 store-to-load forwarding	ストアロードフォワーディング	すとあろーどふぉわーでぃんぐ	9	
 tree height reduction	木の高さ削減	きのたかささくげん	10	
+instruction scheduling	命令スケジューリング	めいれいすけじゅーりんぐ	10	
 loop unrolling	ループ展開	るーぷてんかい	10	
+code bloat	コード肥大化	こーどひだいか	10	
 function call inlining	インライン展開	いんらいんてんかい	10	
+software pipelining	ソフトウェアパイプライニング	そふとうぇあぱいぷらいにんぐ	10	
+trace scheduling	トレーススケジューリング	とれーすすけじゅーりんぐ	10	
 very long instruction word	VLIW	VLIW	11	
 VLIW	VLIW	VLIW	11	see: very long instruction word
 backward compatibility	後方互換性	こうほうごかんせい	11	
