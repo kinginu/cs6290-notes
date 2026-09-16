@@ -36,7 +36,9 @@ remedy:
     instructions reuse register names.  Register renaming (Lesson~6) removes
     them.
   \item[True data dependences] RAW dependences cannot be removed: an
-    instruction has to wait until the values it reads have been computed.
+    instruction has to wait until the values it reads have been
+    computed.\caution{A dependence is a property of the program; a hazard is a
+    property of the pipeline that has to resolve it.  H\&P §3.1.}
     What can be avoided is that instructions which do not depend on it wait as
     well.
   \item[Structural dependences] Instructions also compete for hardware:
@@ -73,13 +75,20 @@ IBM System/360 Model~91.\source{Lesson 7, video 3; H\&P §3.4;
   computed, is called \term{Tomasulo's algorithm}[Tomasulo のアルゴリズム].
 \end{definition}
 
-Current processors schedule instructions in essentially the same way.  The
+Current processors schedule instructions in essentially the same
+way.\margin{Scale today: Skylake holds 97 instructions in its scheduler and
+224 in its reorder buffer (Lesson~8).  Intel optimization manual.}  The
 differences are listed in \cref{tab:l07-modern}.  The first two concern only
-the scope of the algorithm; the third changes its mechanism.  Tomasulo's
-algorithm has no provision for exceptions: once instructions have executed
-out of order, the registers need not correspond to any point in the program
-at which an exception could be taken.  Supporting exceptions requires an
-additional structure, the subject of Lesson~8.
+the scope of the algorithm; the third changes its mechanism.
+Tomasulo's algorithm has no provision for exceptions: once instructions have
+executed out of order, the registers need not correspond to any point in
+the program at which an exception could be taken.  Supporting exceptions
+requires an additional structure, the subject of
+Lesson~8.\sidenote{The Model~91 (1967) ran at a \SI{60}{\nano\second} clock
+and applied the algorithm to floating point only, where an add took 2 cycles
+and a multiply~3; its interrupts were imprecise for exactly this reason.  The
+idea then saw little use until the mid-1990s, when the Pentium~Pro and the
+PowerPC~604 brought it back.}
 
 \begin{table}[htbp]
   \centering\small
@@ -131,7 +140,9 @@ order until they can be moved on to the reservation stations.
 Reservation stations are grouped by the execution unit that serves them.  The
 examples of this lesson use three stations AD1, AD2 and AD3 for additions and
 subtractions, served by one adder, and two stations ML1 and ML2 for
-multiplications and divisions, served by one multiplier.  The name of a
+multiplications and divisions, served by one multiplier.\margin{The 360/91
+had exactly this arrangement: three reservation stations on its floating-point
+adder and two on its multiplier--divider \cite{tomasulo1967}.}  The name of a
 station is the \emph{tag} under which the result of its instruction will be
 broadcast.
 
@@ -243,7 +254,10 @@ values.\source{Lesson 7, video 8; H\&P §3.5.}  Whenever a result appears
 on the CDB, every reservation station compares the tags of its operands with
 the tag on the bus and, where they match, replaces the tag with the value
 from the bus; this is called \emph{capturing} the value.  A station whose
-operands are all values holds a \emph{ready} instruction.  When the execution
+operands are all values holds a \emph{ready} instruction.\caution{Other texts
+swap the names: \emph{dispatch} for placing an instruction in a station and
+\emph{issue} for sending it to a unit.  H\&P's steps are issue, execute and
+write result.}  When the execution
 unit that serves the station is free, a ready instruction is dispatched: its
 operation and operand values are sent to the unit, which starts executing it.
 The station remains busy while the instruction executes, because its name is
@@ -254,7 +268,13 @@ the tag under which the result will be broadcast.
 Several instructions may be ready when an execution unit becomes free, and
 one of them must be chosen.\source{Lesson 7, videos 9--10.}  Every choice is
 correct, since a ready instruction has all the values it needs; the choice
-affects only performance and hardware cost.
+affects only performance and hardware cost.\sidenote{Wakeup, the comparison of
+the broadcast tag against every waiting operand, and select, the choice of one
+ready instruction per unit, must together fit in one cycle; otherwise
+dependent instructions cannot execute back to back.  The cost of that loop
+grows with the number of stations, which is why schedulers hold about a
+hundred instructions where reorder buffers hold hundreds
+\cite{palacharla1997}.}
 \begin{description}
   \item[Oldest first]\index{oldest first} Dispatch the instruction that was
     issued first.  Other things being equal, more of the instructions in
@@ -420,18 +440,23 @@ dependence through memory.  Two stores to the same address have a WAW
 dependence, and a store to an address that an earlier load reads has a WAR
 dependence.  The RAT cannot remove the false ones, because it renames
 registers, not memory locations, and whether two memory accesses conflict is
-known only once both addresses have been computed.
+known only once both addresses have been computed.\margin{Skylake can have 72
+loads and 56 stores in flight.  Intel optimization manual.}
 
 Tomasulo's algorithm therefore performs loads and stores in program order.
 They are issued like other instructions, with their operands resolved through
 the RAT, and the address adder computes the address.  A load then waits in a
 load buffer and a store in a store buffer (\cref{fig:l07-tomasulo}); a store
-whose value has not been computed yet captures it from the CDB.  The memory
-accesses are made from these buffers in the order in which the loads and
-stores were issued.  A load broadcasts the value it reads on the CDB under its
-own tag, exactly like an arithmetic result.  Modern processors also execute
-loads and stores out of order, which requires the processor to detect and
-handle the memory dependences; Lesson~9 covers this.
+whose value has not been computed yet captures it from the CDB.  The
+memory accesses are made from these buffers in the order in which the loads
+and stores were issued.\caution{\enquote{In program order} refers to the memory
+accesses.  The addresses themselves are computed as soon as their operands are
+ready, and therefore out of order.}  A load broadcasts the value it reads on
+the CDB under its own tag, exactly like an arithmetic result.  Modern
+processors also execute loads and stores out of order, which requires the
+processor to detect and handle the memory dependences; Lesson~9 covers this.\margin{Lesson~9 lets a
+load overtake a store whose address is not yet known, and checks afterwards
+whether the two addresses overlapped.}
 
 \section{A complete example}
 \label{sec:l07-example}
@@ -443,10 +468,14 @@ the simplest design of \cref{sec:l07-cycle}, together with the following:
   \item At most one instruction is issued per cycle, into the free station of
     the required kind with the lowest number.
   \item The adder executes ADD and SUB in 2 cycles; the multiplier executes
-    MUL and DIV in 4 cycles.  An instruction dispatched in cycle $D$ with an
-    execution time of $k$ cycles executes in cycles $D$ to $D+k-1$ and
-    broadcasts in cycle $D+k$, in which its unit can already accept the next
-    instruction.
+    MUL and DIV in 4 cycles.\margin{For scale: on Skylake a floating-point add
+    or multiply takes 4 cycles, a double-precision divide 13--14 and an
+    integer add~1.  Agner Fog, \emph{Instruction tables}.}  An instruction
+    dispatched in cycle $D$ with an execution time of $k$ cycles executes in
+    cycles $D$ to $D+k-1$ and broadcasts in cycle $D+k$, in which its unit
+    can already accept the next instruction.\margin{The units here are not pipelined: each is busy in
+    cycles $D$ to $D+k-1$.  Real adders and multipliers accept a new operation
+    every cycle.}
   \item There is one CDB, and the multiplier has priority over the adder
     (\cref{sec:l07-cdb-conflict}); a unit whose result waits for the bus
     accepts no new instruction.  Ready instructions are dispatched oldest
@@ -538,7 +567,9 @@ I5 starts on the multiplier in cycle~8, and I4 on the adder in cycle~9, when I2
 releases it.  I6 needs the results of I2 (cycle~9) and I4 (cycle~11) and the
 multiplier, which I5 releases in cycle~12; I7 needs the result of I6,
 broadcast in cycle~16.  After the last broadcast, in cycle~19, the register
-file holds R1 $=10$, R2 $=2$, R3 $=620$, R4 $=62$, R5 $=618$ and R6 $=8$,
+file holds R1 $=10$, R2 $=2$, R3 $=620$, R4 $=62$, R5 $=618$ and R6
+$=8$,\margin{IPC here is $7/19 \approx 0.37$: even with unlimited stations and
+units the chain I1$\to$I2$\to$I6$\to$I7 would need 17 cycles.}
 exactly the values produced by executing the program in order.
 
 \begin{keypoint}
@@ -576,7 +607,9 @@ execution time.  Under the assumptions of \cref{sec:l07-example}:
     cycle by a result with priority.
 \end{description}
 A unit or the bus may be taken by a \emph{later} instruction that became ready
-earlier, so the rows cannot simply be completed in program order.  Units and
+earlier, so the rows cannot simply be completed in program order.\tip{Each
+step waits for one resource: issue for a free station, dispatch for the
+operands and a free unit, write result for the bus.}  Units and
 the bus are assigned in cycle order across all instructions: in each cycle a
 free unit takes the oldest of the instructions ready in that cycle, and the
 bus the result with priority.  A unit never stays idle for an older
@@ -607,7 +640,9 @@ instruction that is not yet ready.
   come from I2 and I4, and \cref{eq:l07-dispatch} gives
   $D_6 \ge 1 + \max(7, 9, 11) = 12$, which is also the cycle in which the
   multiplier is released by I5, so $D_6 = 12$ and $W_6 = 16$.  The table
-  agrees with the full trace of \cref{tab:l07-trace}.
+  agrees with the full trace of \cref{tab:l07-trace}.\tip{With a single bus no
+  two instructions broadcast in the same cycle: two equal entries in the $W_n$
+  column mean that a bus conflict was missed.}
 \end{example}
 
 \begin{table}[htbp]
@@ -646,7 +681,9 @@ instruction that is not yet ready.
   dispatch and write-result cycles of every instruction follow from its
   operands, the available stations and units, and the bus.  Tomasulo's
   algorithm does not support exceptions; the reorder buffer of the next lesson
-  adds this.
+  adds this.\margin{Issue, dispatch and write result stay exactly as
+  described; Lesson~8 adds a fourth step, commit, which writes the register
+  file in program order.}
 \end{keypoint}
 
 \end{document}
