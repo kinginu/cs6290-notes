@@ -1,0 +1,38 @@
+% Same-cycle execution of the five-instruction program: the RAW dependence
+% delays I2, which then overwrites the later write of I5 to R5 (WAW).
+\begin{tikzpicture}[x=1.2cm,y=0.9cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  st/.style={draw, minimum width=0.95cm, minimum height=0.5cm, inner sep=0pt, fill=ln-box},
+  bad/.style={st, fill=ln-caution!15, draw=ln-caution},
+  stall/.style={draw=ln-rule, dashed, minimum width=0.95cm, minimum height=0.5cm,
+    inner sep=0pt, font=\scriptsize\sffamily, text=ln-muted}]
+  \foreach \c in {1,...,6} { \node at (\c,0.7) {\c}; }
+  \node[anchor=east] at (0.45,0.7) {\iflangja{サイクル}{cycle}};
+  \foreach \r/\txt in {1/{ADD R3,R1,R2},2/{SUB R5,R3,R4},3/{AND R6,R1,R4},
+                       4/{OR~~R4,R2,R7},5/{XOR R5,R1,R7}} {
+    \node[anchor=east] at (0.45,1-\r) {I\r\enspace\texttt{\txt}};
+  }
+  % I1, I3, I4: undelayed
+  \foreach \s/\lab in {1/IF,2/ID,4/MEM,5/WB} { \node[st] at (\s,0) {\lab}; }
+  \node[st] (e1) at (3,0) {EX};
+  \foreach \r in {3,4} {
+    \foreach \s/\lab in {1/IF,2/ID,3/EX,4/MEM,5/WB} { \node[st] at (\s,1-\r) {\lab}; }
+  }
+  % I2: waits one cycle for R3
+  \node[st] at (1,-1) {IF};
+  \node[st] at (2,-1) {ID};
+  \node[stall] at (3,-1) {\iflangja{待ち}{wait}};
+  \node[st] (e2) at (4,-1) {EX};
+  \node[st] at (5,-1) {MEM};
+  \node[bad] (w2) at (6,-1) {WB};
+  % I5: independent, but writes R5 before I2 does
+  \foreach \s/\lab in {1/IF,2/ID,3/EX,4/MEM} { \node[st] at (\s,-4) {\lab}; }
+  \node[bad] (w5) at (5,-4) {WB};
+  % forwarding of R3 from I1 to I2
+  \draw[->, thick, ln-accent] (e1.south) -- (3,-0.5)
+    -- node[fill=white, inner sep=0.6pt, font=\scriptsize\sffamily] {R3} (4,-0.5)
+    -- (e2.north);
+  % WAW violation
+  \draw[->, dashed, thick, ln-caution] (w2.south) -- (w5.north east);
+  \node[anchor=west, font=\scriptsize\sffamily, text=ln-caution, align=left] at (6.0,-2.5)
+    {\iflangja{R5 を\\上書き}{overwrites\\R5}};
+\end{tikzpicture}

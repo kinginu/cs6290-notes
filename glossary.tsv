@@ -117,15 +117,18 @@ MOVN	MOVN	MOVN	5	MIPS move-if-not-zero instruction
 CMOVcc	CMOVcc	CMOVcc	5	x86 conditional move instructions
 condition code	条件コード	じょうけんこーど	5	
 full predication	完全プレディケーション	かんぜんぷれでぃけーしょん	5	condition field on every instruction
+predicate register	述語レジスタ	じゅつごれじすた	5	IA-64 one-bit register selected by the qualifying predicate
 architectural register	アーキテクチャレジスタ	あーきてくちゃれじすた	6	register visible to the programmer
 physical register	物理レジスタ	ぶつりれじすた	6	
 register renaming	レジスタリネーミング	れじすたりねーみんぐ	6	
 register alias table	レジスタエイリアステーブル	れじすたえいりあすてーぶる	6	
 RAT	RAT	RAT	6	see: register alias table
+ideal processor	理想プロセッサ	りそうぷろせっさ	6	ILP reference machine: renaming, unlimited width, perfect prediction
 instruction-level parallelism	命令レベル並列性	めいれいれべるへいれつせい	6	
 ILP	ILP	ILP	6	see: instruction-level parallelism
 instructions per cycle	サイクル当たり命令数	さいくるあたりめいれいすう	6	reciprocal of CPI
 IPC	IPC	IPC	6	see: instructions per cycle
+in-order execution	インオーダ実行	いんおーだじっこう	6	
 out-of-order execution	アウトオブオーダ実行	あうとおぶおーだじっこう	7	
 Tomasulo's algorithm	Tomasulo のアルゴリズム	とますろのあるごりずむ	7	
 instruction queue	命令キュー	めいれいきゅー	7	
@@ -185,6 +188,7 @@ replacement policy	置換アルゴリズム	ちかんあるごりずむ	12	cache
 least recently used	LRU	LRU	12	replacement policy
 LRU	LRU	LRU	12	see: least recently used
 write-through policy	ライトスルー方式	らいとするーほうしき	12	cache write policy
+write-allocate policy	ライトアロケート方式	らいとあろけーとほうしき	12	cache write policy
 write-back policy	ライトバック方式	らいとばっくほうしき	12	cache write policy
 dirty bit	ダーティビット	だーてぃびっと	12	
 virtual memory	仮想記憶	かそうきおく	13	

@@ -1,0 +1,14 @@
+% Thought experiment: all N instructions pass through the five stages in
+% the same five cycles.
+\begin{tikzpicture}[x=0.9cm,y=0.55cm, font=\footnotesize\sffamily,
+  st/.style={draw, minimum width=0.82cm, minimum height=0.46cm, inner sep=0pt, fill=ln-box}]
+  \foreach \c in {1,...,5} { \node at (\c,0.8) {\c}; }
+  \node[anchor=east] at (0.5,0.8) {\iflangja{サイクル}{cycle}};
+  \foreach \r/\name in {0/I1,1/I2,2/I3,4/I$N$} {
+    \node[anchor=east] at (0.5,-\r) {\name};
+    \foreach \s/\lab in {1/IF,2/ID,3/EX,4/MEM,5/WB} {
+      \node[st] at (\s,-\r) {\lab};
+    }
+  }
+  \foreach \s in {1,...,5} { \node at (\s,-3) {$\vdots$}; }
+\end{tikzpicture}
