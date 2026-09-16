@@ -9,14 +9,14 @@ activity factor	活性化率	かっせいかりつ	1	fraction of capacitance swi
 static power	静的電力	せいてきでんりょく	1	also: leakage power
 threshold voltage	しきい値電圧	しきいちでんあつ	1	
 fabrication cost	製造コスト	せいぞうこすと	1	
-wafers	ウェハ	うぇは	1	
-dies	ダイ	だい	1	
+wafer	ウェハ	うぇは	1	
+die	ダイ	だい	1	
 defect	欠陥	けっかん	1	manufacturing defect on a wafer
 yield	歩留まり	ぶどまり	1	
 latency	レイテンシ	れいてんし	2	
 throughput	スループット	するーぷっと	2	
 speedup	高速化率	こうそくかりつ	2	
-benchmarks	ベンチマーク	べんちまーく	2	
+benchmark	ベンチマーク	べんちまーく	2	
 benchmark suite	ベンチマークスイート	べんちまーくすいーと	2	
 real application	実アプリケーション	じつあぷりけーしょん	2	benchmark type
 kernel	カーネル	かーねる	2	benchmark type (not the OS kernel)
@@ -45,7 +45,7 @@ make the common case fast	頻出ケースを速くせよ	ひんしゅつけー�
 Lhadma's law	Lhadma の法則	らどまのほうそく	2	do not make the uncommon case too slow
 diminishing returns	収穫逓減	しゅうかくていげん	2	
 pipelining	パイプライン化	ぱいぷらいんか	3	
-stages	ステージ	すてーじ	3	
+stage	ステージ	すてーじ	3	
 latch	ラッチ	らっち	3	pipeline register between stages
 five-stage pipeline	5 段パイプライン	5だんぱいぷらいん	3	
 instruction fetch stage	命令フェッチステージ	めいれいふぇっちすてーじ	3	
@@ -71,7 +71,7 @@ write-after-read dependence	WAR 依存	WAR いぞん	3	also: anti-dependence
 WAR	WAR	WAR	3	see: write-after-read dependence
 write-after-write dependence	WAW 依存	WAW いぞん	3	also: output dependence
 WAW	WAW	WAW	3	see: write-after-write dependence
-false dependences	偽の依存	ぎのいぞん	3	also: name dependence
+false dependence	偽の依存	ぎのいぞん	3	also: name dependence
 hazard	ハザード	はざーど	3	
 control hazard	制御ハザード	せいぎょはざーど	3	
 data hazard	データハザード	でーたはざーど	3	
@@ -94,9 +94,10 @@ one-bit predictor	1 ビット予測器	1びっとよそくき	4
 1BP	1BP	1BP	4	see: one-bit predictor
 two-bit predictor	2 ビット予測器	2びっとよそくき	4	
 2BP	2BP	2BP	4	see: two-bit predictor
+2BC	2BC	2BC	4	see: two-bit predictor
 saturating counter	飽和カウンタ	ほうわかうんた	4	
 history-based predictor	履歴ベース予測器	りれきべーすよそくき	4	
-N-bit history predictor	N ビット履歴予測器	Nびっとりれきよそくき	4	
+N-bit history predictor	N ビット履歴予測器	N びっとりれきよそくき	4	
 pattern history table	パターン履歴テーブル	ぱたーんりれきてーぶる	4	table of shared counters indexed by history
 PHT	PHT	PHT	4	see: pattern history table
 private branch history	ローカル分岐履歴	ろーかるぶんきりれき	4	per-branch history; also: local history
@@ -139,10 +140,14 @@ CDB	CDB	CDB	7	see: common data bus
 issue	発行	はっこう	7	Tomasulo step: instruction queue to reservation station
 dispatch	ディスパッチ	でぃすぱっち	7	Tomasulo step: reservation station to execution
 write result	結果書き込み	けっかかきこみ	7	Tomasulo step; also: broadcast
+oldest first	最古優先	さいこゆうせん	7	dispatch policy: oldest ready instruction first
+stale result	古くなった結果	ふるくなったけっか	7	result of an instruction that a later write has superseded
 precise exception	正確な例外	せいかくなれいがい	8	
 phantom exception	ファントム例外	ふぁんとむれいがい	8	exception raised by a mispredicted instruction
 reorder buffer	リオーダバッファ	りおーだばっふぁ	8	
 ROB	ROB	ROB	8	see: reorder buffer
+issue pointer	発行ポインタ	はっこうぽいんた	8	next free ROB entry
+commit pointer	コミットポインタ	こみっとぽいんた	8	oldest instruction still in the ROB
 commit	コミット	こみっと	8	also: retirement
 branch misprediction recovery	分岐予測ミス回復	ぶんきよそくみすかいふく	8	
 unified reservation station	統合リザベーションステーション	とうごうりざべーしょんすてーしょん	8	
@@ -150,6 +155,8 @@ superscalar	スーパースカラ	すーぱーすから	8
 load-store queue	ロードストアキュー	ろーどすとあきゅー	9	
 LSQ	LSQ	LSQ	9	see: load-store queue
 store-to-load forwarding	ストアロードフォワーディング	すとあろーどふぉわーでぃんぐ	9	
+out-of-order load-store execution	ロードストアのアウトオブオーダ実行	ろーどすとあのあうとおぶおーだじっこう	9	
+in-order load-store execution	ロードストアのインオーダ実行	ろーどすとあのいんおーだじっこう	9	
 tree height reduction	木の高さ削減	きのたかささくげん	10	
 instruction scheduling	命令スケジューリング	めいれいすけじゅーりんぐ	10	
 loop unrolling	ループ展開	るーぷてんかい	10	
@@ -207,8 +214,10 @@ page frame	ページフレーム	ぺーじふれーむ	13
 page table	ページテーブル	ぺーじてーぶる	13	
 page fault	ページフォールト	ぺーじふぉーると	13	
 virtual page number	仮想ページ番号	かそうぺーじばんごう	13	
+VPN	VPN	VPN	13	see: virtual page number
 page offset	ページオフセット	ぺーじおふせっと	13	
 physical frame number	物理フレーム番号	ぶつりふれーむばんごう	13	
+PFN	PFN	PFN	13	see: physical frame number
 flat page table	単一レベルページテーブル	たんいつれべるぺーじてーぶる	13	
 page table entry	ページテーブルエントリ	ぺーじてーぶるえんとり	13	
 PTE	PTE	PTE	13	see: page table entry
@@ -220,6 +229,7 @@ TLB	TLB	TLB	13	see: translation lookaside buffer
 TLB miss	TLB ミス	TLB みす	13	
 page table walk	ページテーブルウォーク	ぺーじてーぶるうぉーく	13	
 pipelined cache	パイプライン化キャッシュ	ぱいぷらいんかきゃっしゅ	14	
+physically accessed cache	物理アドレスキャッシュ	ぶつりあどれすきゃっしゅ	14	
 virtually accessed cache	仮想アドレスキャッシュ	かそうあどれすきゃっしゅ	14	
 virtually indexed physically tagged cache	仮想インデックス物理タグキャッシュ	かそういんでっくすぶつりたぐきゃっしゅ	14	
 VIPT	VIPT	VIPT	14	see: virtually indexed physically tagged cache
@@ -240,7 +250,12 @@ stride prefetcher	ストライドプリフェッチャ	すとらいどぷりふ�
 correlating prefetcher	相関プリフェッチャ	そうかんぷりふぇっちゃ	14	
 loop interchange	ループ交換	るーぷこうかん	14	
 overlap miss	オーバーラップミス	おーばーらっぷみす	14	cache misses in progress at the same time
+blocking cache	ブロッキングキャッシュ	ぶろっきんぐきゃっしゅ	14	
+non-blocking cache	ノンブロッキングキャッシュ	のんぶろっきんぐきゃっしゅ	14	
 miss-under-miss support	ミスアンダーミス対応	みすあんだーみすたいおう	14	
+miss status handling register	ミス状態管理レジスタ	みすじょうたいかんりれじすた	14	
+MSHR	MSHR	MSHR	14	see: miss status handling register
+half-miss	ハーフミス	はーふみす	14	second miss to a block already being fetched
 cache hierarchy	キャッシュ階層	きゃっしゅかいそう	14	also: multilevel caches
 L2 cache	L2 キャッシュ	L2 きゃっしゅ	14	second-level cache
 last-level cache	最終レベルキャッシュ	さいしゅうれべるきゃっしゅ	14	
@@ -250,7 +265,9 @@ global hit rate	大域ヒット率	たいいきひっとりつ	14
 local miss rate	局所ミス率	きょくしょみすりつ	14	
 global miss rate	大域ミス率	たいいきみすりつ	14	
 misses per 1000 instructions	1000 命令当たりミス数	1000めいれいあたりみすすう	14	
+MPKI	MPKI	MPKI	14	see: misses per 1000 instructions
 inclusion property	包含性	ほうがんせい	14	
+random access	ランダムアクセス	らんだむあくせす	15	
 static random-access memory	SRAM	SRAM	15	
 SRAM	SRAM	SRAM	15	see: static random-access memory
 dynamic random-access memory	DRAM	DRAM	15	
@@ -264,11 +281,15 @@ row decoder	行デコーダ	ぎょうでこーだ	15
 sense amplifier	センスアンプ	せんすあんぷ	15	
 column multiplexer	列マルチプレクサ	れつまるちぷれくさ	15	
 destructive read	破壊読み出し	はかいよみだし	15	
+row address strobe	行アドレスストローブ	ぎょうあどれすすとろーぶ	15	abbreviated RAS; not the return address stack of Lesson 4
+column address strobe	列アドレスストローブ	れつあどれすすとろーぶ	15	
+CAS	CAS	CAS	15	see: column address strobe
 fast page mode	ファストページモード	ふぁすとぺーじもーど	15	
 front-side bus	フロントサイドバス	ふろんとさいどばす	15	
 FSB	FSB	FSB	15	see: front-side bus
 northbridge	ノースブリッジ	のーすぶりっじ	15	
-magnetic disk	磁気ディスク	じきでぃすく	16	
+memory controller	メモリコントローラ	めもりこんとろーら	15	
+magnetic disk	磁気ディスク	じきでぃすく	16	also: hard disk
 platter	プラッタ	ぷらった	16	
 spindle	スピンドル	すぴんどる	16	
 disk head	磁気ヘッド	じきへっど	16	
@@ -285,6 +306,7 @@ solid-state disk	SSD	SSD	16
 SSD	SSD	SSD	16	see: solid-state disk
 hybrid disk	ハイブリッドディスク	はいぶりっどでぃすく	16	magnetic disk with flash cache
 I/O bus	I/O バス	IO ばす	16	
+mezzanine bus	メザニンバス	めざにんばす	16	
 southbridge	サウスブリッジ	さうすぶりっじ	16	
 dependability	ディペンダビリティ	でぃぺんだびりてぃ	17	
 fault	フォールト	ふぉーると	17	defect that may cause an error
@@ -312,7 +334,7 @@ N-module redundancy	N モジュール冗長	N もじゅーるじょうちょう	
 parity	パリティ	ぱりてぃ	17	
 error-correcting code	誤り訂正符号	あやまりていせいふごう	17	
 ECC	ECC	ECC	17	see: error-correcting code
-redundant array of independent disks	RAID	RAID	17	
+redundant array of independent disks	RAID	RAID	17	ja index cross-reference: 独立ディスク冗長アレイ
 RAID	RAID	RAID	17	see: redundant array of independent disks
 RAID 0	RAID 0	RAID 0	17	striping
 striping	ストライピング	すとらいぴんぐ	17	
@@ -362,13 +384,17 @@ directory-based coherence	ディレクトリ方式	でぃれくとりほうし�
 coherence miss	コヒーレンスミス	こひーれんすみす	19	
 true sharing	真共有	しんきょうゆう	19	
 false sharing	偽共有	ぎきょうゆう	19	also: フォールスシェアリング
-lock	ロック	ろっく	20	
+lock	ロック	ろっく	20	also: mutex
 mutual exclusion	相互排除	そうごはいじょ	20	
 critical section	クリティカルセクション	くりてぃかるせくしょん	20	
+spin lock	スピンロック	すぴんろっく	20	
+Lamport's bakery algorithm	Lamport のパン屋のアルゴリズム	らんぽーとのぱんやのあるごりずむ	20	software mutual exclusion without atomic instructions
 atomic instruction	アトミック命令	あとみっくめいれい	20	
+atomic exchange	アトミック交換	あとみっくこうかん	20	
 test-and-set	テストアンドセット	てすとあんどせっと	20	
 load-linked/store-conditional	LL/SC	LL SC	20	
 LL/SC	LL/SC	LL SC	20	see: load-linked/store-conditional
+link register	リンクレジスタ	りんくれじすた	20	holds the address reserved by a load-linked
 barrier synchronization	バリア同期	ばりあどうき	20	
 memory consistency	メモリ一貫性	めもりいっかんせい	21	
 sequential consistency	逐次一貫性	ちくじいっかんせい	21	
@@ -378,6 +404,12 @@ consistency model	一貫性モデル	いっかんせいもでる	21
 strong consistency	強い一貫性	つよいいっかんせい	21	
 causal consistency	因果一貫性	いんがいっかんせい	21	
 weak consistency	弱い一貫性	よわいいっかんせい	21	
+processor consistency	プロセッサ一貫性	ぷろせっさいっかんせい	21	
+release consistency	リリース一貫性	りりーすいっかんせい	21	
+lazy release consistency	遅延リリース一貫性	ちえんりりーすいっかんせい	21	
+scope consistency	スコープ一貫性	すこーぷいっかんせい	21	
+MSYNC	MSYNC	MSYNC	21	memory fence instruction used in the lecture
+MFENCE	MFENCE	MFENCE	21	x86 memory fence instruction
 many-core processor	メニーコアプロセッサ	めにーこあぷろせっさ	22	
 network on chip	ネットワークオンチップ	ねっとわーくおんちっぷ	22	
 mesh	メッシュ	めっしゅ	22	network topology

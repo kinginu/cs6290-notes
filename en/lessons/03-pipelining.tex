@@ -19,7 +19,7 @@ reached.
 \section{The idea of pipelining}
 
 Executing an instruction involves a sequence of steps that use different
-pieces of hardware.  If the steps are arranged as \term{stages}[ステージ]
+pieces of hardware.  If the steps are arranged as \term{stage}[ステージ]s
 separated by latches, then as soon as instruction $I_1$ leaves stage~1 for
 stage~2, instruction $I_2$ can enter stage~1.  With $k$ stages, up to $k$
 instructions are in flight at once.\source{Lesson 3, videos 2--3; H\&P
@@ -173,18 +173,24 @@ writes it.\source{Lesson 3, videos 11--12; H\&P §C.2.}  There are three
 kinds, named by the order of the accesses in program order:
 
 \begin{description}
-  \item[RAW (read after write)] the later instruction \emph{reads} a value
+  \item[RAW (read after write)]%
+    \index{read-after-write dependence}%
+    the later instruction \emph{reads} a value
     that the earlier one \emph{writes}.  Also called a \emph{true} or
     \emph{flow} dependence: the data really has to flow from one to the
     other.
-  \item[WAR (write after read)] the later instruction \emph{writes} a
+  \item[WAR (write after read)]%
+    \index{write-after-read dependence}%
+    the later instruction \emph{writes} a
     location that the earlier one \emph{reads}.  An \emph{anti} dependence.
-  \item[WAW (write after write)] both instructions \emph{write} the same
+  \item[WAW (write after write)]%
+    \index{write-after-write dependence}%
+    both instructions \emph{write} the same
     location; the later write must be the one that survives.  An
     \emph{output} dependence.
 \end{description}
 
-WAR and WAW are called \term{false dependences}[偽の依存] or \emph{name}
+WAR and WAW are called \term{false dependence}[偽の依存]s or \emph{name}
 dependences: no data moves between the instructions; they merely reuse the
 same register name.  They can be removed by renaming (Lesson 6).  A RAW
 dependence cannot.\margin{RAR---two reads of the same register---is not a

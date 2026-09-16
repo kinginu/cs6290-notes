@@ -5,7 +5,7 @@
 \lessoninfo{
   video={Lesson 3，動画 1--18},
   textbook={H\&P \cite{hennessy2017} 付録 C.1--C.3},
-  keywords={パイプライン，ステージ，パイプライン CPI，ストール，フラッシュ，制御依存，データ依存，RAW，WAR，WAW，ハザード，フォワーディング，パイプライン深さ},
+  keywords={パイプライン，ステージ，パイプライン CPI，ストール，フラッシュ，制御依存，データ依存，RAW，WAR，WAW，ハザード，フォワーディング，パイプライン段数},
 }
 
 パイプライン化はスループットを高めるための最初にして最も基本的な技法で
@@ -165,12 +165,18 @@ Release~6（2014）はこれを廃止した．}その時点で後続の 2 命令
 でのアクセスの順序にちなんで名付けられた 3 種類がある．
 
 \begin{description}
-  \item[RAW（read after write）] 後の命令が，先の命令が\emph{書く}値を
+  \item[RAW（read after write）]%
+    \index{RAW いぞん@RAW 依存}%
+    後の命令が，先の命令が\emph{書く}値を
     \emph{読む}．\emph{真の依存}あるいは\emph{フロー依存}とも呼ばれる．
     データが実際に一方から他方へ流れなければならない．
-  \item[WAR（write after read）] 後の命令が，先の命令が\emph{読む}位置に
+  \item[WAR（write after read）]%
+    \index{WAR いぞん@WAR 依存}%
+    後の命令が，先の命令が\emph{読む}位置に
     \emph{書く}．\emph{逆依存}．
-  \item[WAW（write after write）] 両命令が同じ位置に\emph{書く}．後の
+  \item[WAW（write after write）]%
+    \index{WAW いぞん@WAW 依存}%
+    両命令が同じ位置に\emph{書く}．後の
     書き込みが残らなければならない．\emph{出力依存}．
 \end{description}
 
