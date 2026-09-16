@@ -186,7 +186,9 @@ execution time relative to perfect prediction is
   (\text{instructions flushed per misprediction}) ,
   \label{eq:l04-relative}
 \end{equation}
-which for $w=1$ is exactly the CPI of \cref{eq:l04-cpi}.
+which for $w=1$ is exactly the CPI of \cref{eq:l04-cpi}.\margin{Real
+numbers: a Skylake-class core loses about 17 cycles per misprediction, with a
+224-entry reorder buffer to refill (Intel optimization manual).}
 
 \begin{example}
   \label{ex:l04-better}
@@ -195,7 +197,10 @@ which for $w=1$ is exactly the CPI of \cref{eq:l04-cpi}.
   \Cref{tab:l04-better} evaluates \cref{eq:l04-relative} for three
   predictors and three pipelines: a five-stage pipeline (2 instructions
   flushed), a pipeline resolving branches in stage~13 (12 flushed), and the
-  same depth with 3 instructions per stage (36 flushed).
+  same depth with 3 instructions per stage (36
+  flushed).\caution{Mispredictions are counted per \emph{instruction}, not per
+  branch: multiply $1-\text{accuracy}$ by the fraction of instructions that
+  are branches.}
 \end{example}
 
 \begin{table}[htbp]
@@ -214,7 +219,9 @@ which for $w=1$ is exactly the CPI of \cref{eq:l04-cpi}.
   \end{tabular}
 \end{table}
 
-Three observations follow.  In the shallow pipeline even predict not taken
+Three observations follow.\tip{(mispredictions per instruction) $\times$
+(instructions flushed) is the slowdown itself: $0.015 \times 12 = 0.18$, the
+\SI{18}{\percent} of the middle row.}  In the shallow pipeline even predict not taken
 costs only \SI{21}{\percent}, and improving from \SI{90}{\percent} to
 \SI{99}{\percent} accuracy gains less than \SI{3}{\percent}.  In the deep
 pipeline predict not taken more than doubles the execution time, and the
@@ -257,7 +264,9 @@ of the same instruction is predicted with the new target.
 
 A BTB cannot have one entry for every possible instruction address.  It must
 be read within the fetch cycle, in addition to the fetch itself, which
-limits it to a small table---hundreds to a few thousand entries.  The PC is
+limits it to a small table---hundreds to a few thousand entries.\margin{Real
+capacities: about 4096 BTB entries on Intel Skylake; AMD's Zen~2 uses two
+levels, 512 entries in front of 7168 (vendor optimization guides).}  The PC is
 therefore mapped to an entry by a simple hash: a few of its low-order bits.
 Instructions executed close together in time, such as those of a loop, lie
 close together in memory; they share their high-order bits but differ in the
@@ -267,7 +276,9 @@ less likely to be active at the same time.
 
 With fixed-length 4-byte instructions aligned to word boundaries, the two
 lowest bits of every PC are zero and carry no information, so a BTB with
-$2^k$ entries is indexed by bits $k+1$ to~2 (\cref{fig:l04-btb}).  With
+$2^k$ entries is indexed by bits $k+1$ to~2 (\cref{fig:l04-btb}).\tip{Entry
+number $= (\text{PC} \gg 2) \mathbin{\&} (\text{entries} - 1)$: drop the two
+always-zero bits, then keep the $k$ low bits.}  With
 variable-length instructions (x86) the index starts at bit~0.
 
 \begin{figure}[htbp]
@@ -312,7 +323,9 @@ When a branch resolves, its BHT entry is set to the actual outcome, and, if
 the branch was taken, the target is written into the BTB
 (\cref{fig:l04-bht-btb}).  This organization has three advantages.  The BHT
 entry of a non-branch instruction is never written, stays~0, and correctly
-predicts PC+4.  The BTB needs entries only for taken branches, which are far
+predicts PC+4.\caution{Neither table is tagged: if a taken branch maps to the
+same entry, that non-branch is predicted taken too, and the error is caught
+only at decode.}  The BTB needs entries only for taken branches, which are far
 fewer than all instructions.  And since a BHT entry is a single bit, the BHT
 can have many more entries than the BTB at the same cost, so that different
 branches rarely share an entry.
@@ -396,7 +409,9 @@ incremented and at 00 when decremented.  Its more significant bit is the
 strongly the counter believes its prediction: the counter is in a strong
 state when the two bits are equal and in a weak state when they differ, so
 the four states are strong not taken (00), weak not taken (01), weak taken
-(10) and strong taken (11) (\cref{fig:l04-2bc}).  From a
+(10) and strong taken (11) (\cref{fig:l04-2bc}).\tip{Read the two bits as a
+number 0--3: T adds one, N subtracts one, both clamped, and the prediction is
+taken iff the value is at least~2.}  From a
 strong state, two consecutive outcomes against the prediction are needed to
 change it, so a single exception costs a single misprediction.
 
@@ -432,7 +447,9 @@ change it, so a single exception costs a single misprediction.
 counter has reached strong taken (11, before execution~6), a single loop
 exit only moves it down to weak taken (10) and the next taken outcome
 restores it, so only the exit is mispredicted: one misprediction per run of
-the loop instead of two.
+the loop instead of two.\caution{From a \emph{weak} state one contrary
+outcome is enough: a two-bit counter does not always need two mispredictions
+to change its prediction.}
 
 \subsection{Initialization and more bits}
 
@@ -634,13 +651,18 @@ Skip1:  BEQ  R1, R0, Skip2   ; skip if R1 == 0
 Skip2:  ...
 \end{lstlisting}
   If the value in R1 depends on the data, the private history of either
-  branch looks random, and PShare predicts it poorly.  The global history
+  branch looks random, and PShare predicts it poorly.\margin{A branch whose
+  outcome depends on data may be cheaper to remove than to predict: Lesson 5
+  replaces such branches with predication.}  The global history
   seen by the second branch contains the outcome of the first, so once the
   PHT counters for these histories have been trained, GShare predicts the
   second branch perfectly, barring aliasing in the PHT.
 \end{example}
 
-Neither is better for all branches.  GShare can in principle learn a branch's
+Neither is better for all branches.\caution{Only GShare is a standard name
+(McFarling): what the lecture calls PShare is a local- or private-history
+predictor in the literature, as in Yeh and Patt's PAs schemes.}  GShare can in
+principle learn a branch's
 own pattern as well, but the outcomes of the other branches executed in
 between are interleaved in the global history, so the same pattern needs a
 considerably longer history---and a larger PHT---than in PShare.  Since
@@ -671,7 +693,9 @@ branch which of them to trust.
 Both component predictors are trained on every branch as usual.  The
 meta-predictor counter changes only when the components disagree in
 correctness: it moves towards the component that was right.  When both are
-right or both are wrong, it stays unchanged.
+right or both are wrong, it stays unchanged.\margin{The Alpha 21264 combined
+1024 local histories of 10 bits, a 4096-entry global table indexed by 12
+history bits and a 4096-entry chooser: about 29 kilobits (H\&P §3.3).}
 
 \begin{figure}[htbp]
   \centering
@@ -696,7 +720,9 @@ predict.
 
 Because the expensive predictor has far fewer branches to learn, it can be
 much smaller than in a tournament predictor for the same accuracy, or more
-accurate for the same size.
+accurate for the same size.\margin{AMD's Zen~2 layers by speed instead: a fast
+perceptron predicts, a slower TAGE predictor overrides it---about
+\SI{30}{\percent} fewer mispredictions than Zen~1 (AMD).}
 
 A typical arrangement has three levels (\cref{fig:l04-hierarchical}).  A large
 table of two-bit counters indexed by the PC predicts every branch.  Above it,
@@ -709,8 +735,12 @@ the branch is updated as well; a branch that the counter table mispredicts
 is given an entry in the local predictor, and a branch that the local
 predictor mispredicts is given one in the global predictor.  Branches that
 the counters predict well take entries in the expensive levels only rarely,
-so those small tables are left for the branches that need them.\margin{Commercial processors have used predictors of this layered
-kind, for example Intel's Pentium~M.}
+so those small tables are left for the branches that need
+them.\sidenote{Intel's Pentium~M (2003) is the classic example: a table of
+two-bit counters covering all branches, backed by tagged local-history and
+global-history predictors, a loop detector that learns how many iterations a
+loop branch runs, and a separate predictor for indirect branches (Gochman et
+al., \emph{Intel Technology Journal}~7(2), 2003).}
 
 \begin{figure}[htbp]
   \centering
@@ -775,7 +805,9 @@ mispredicted.
 \end{definition}
 
 Since calls and returns nest, the RAS predicts returns almost perfectly
-(\cref{fig:l04-ras}).  Being small, it can fill up when calls nest deeply.
+(\cref{fig:l04-ras}).  Being small, it can fill up when calls nest
+deeply.\margin{Real return stacks hold 16 entries per hardware thread on
+Intel cores and 32 on AMD's Zen~2 (vendor documentation).}
 When a call finds the RAS full, the push wraps around and overwrites the
 oldest entry.  Returns occur in reverse order of the calls, so the entries
 needed soonest are the most recent ones, and most calls and returns happen
