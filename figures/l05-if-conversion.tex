@@ -1,0 +1,36 @@
+% If-conversion: a small if-then-else (control flow) becomes a straight
+% sequence that computes both parts and selects the results (data flow).
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  blk/.style={draw, fill=ln-box, align=left, inner sep=3pt, font=\footnotesize\ttfamily},
+  sel/.style={blk, fill=ln-accent!15},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted}]
+  % ---- (a) control flow
+  \node[blk] (c) at (2.1,0) {c = (v < t)};
+  \node[draw, diamond, aspect=1.6, inner sep=1pt, fill=white] (br) at (2.1,-1.05) {c?};
+  \node[blk] (th) at (1.0,-2.45) {lo = lo + v\\n\ \ = n + 1};
+  \node[blk] (el) at (3.3,-2.45) {hi = hi + v};
+  \node[circle, draw, fill=white, inner sep=1.3pt] (j) at (2.1,-3.65) {};
+  \draw[->] (c) -- (br);
+  \draw[->] (br.west) -| node[pos=0.25, above, font=\scriptsize\sffamily] {T} (th.north);
+  \draw[->] (br.east) -| node[pos=0.25, above, font=\scriptsize\sffamily] {N} (el.north);
+  \draw[->] (th.south) |- (j.west);
+  \draw[->] (el.south) |- (j.east);
+  \draw[->] (j.south) -- ++(0,-0.35);
+  \node[font=\footnotesize\sffamily] at (2.1,-4.55) {\iflangja{(a) 分岐}{(a) branch}};
+  % ---- transformation arrow
+  \draw[-{Stealth[length=2.6mm]}, very thick, ln-accent] (4.45,-1.8) -- (5.55,-1.8)
+    node[midway, above, font=\scriptsize\sffamily, text=ln-accent, align=center]
+    {\iflangja{if 変換}{if-\\conversion}};
+  % ---- (b) data flow
+  \node[blk, anchor=north west, minimum width=3.3cm] (c2) at (5.9,0.3) {c = (v < t)};
+  \node[blk, anchor=north west, minimum width=3.3cm] (t2) at (5.9,-0.45) {lo1 = lo + v\\n1\ \ = n + 1};
+  \node[blk, anchor=north west, minimum width=3.3cm] (e2) at (5.9,-1.55) {hi1 = hi + v};
+  \node[sel, anchor=north west, minimum width=3.3cm] (s2) at (5.9,-2.3) {lo = c ? lo1 : lo\\n\ \ = c ? n1\ \ : n\\hi = c ? hi\ \ : hi1};
+  \draw[->] (c2) -- (t2); \draw[->] (t2) -- (e2); \draw[->] (e2) -- (s2);
+  \draw[->, dashed, ln-accent] (c2.east) -- ++(0.25,0) |- (s2.east);
+  \node[lab, anchor=west] at (9.5,-0.75) {\iflangja{then 部}{then part}};
+  \node[lab, anchor=west] at (9.5,-1.7) {\iflangja{else 部}{else part}};
+  \node[lab, anchor=west] at (9.5,-2.9) {\iflangja{選択}{select}};
+  \draw[->] (s2.south) -- ++(0,-0.35);
+  \node[font=\footnotesize\sffamily] at (7.55,-4.55) {\iflangja{(b) if 変換後}{(b) if-converted}};
+\end{tikzpicture}

@@ -1,0 +1,36 @@
+% Slots per execution of the example fragment as a function of the
+% misprediction rate: branch version (4 instructions on average, penalties
+% 20 and 40), MOVZ/MOVN version (7 instructions), fully predicated version
+% (4 instructions).
+\begin{tikzpicture}[x=26cm, y=0.42cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]}]
+  % grid and axes
+  \foreach \yv in {2,4,6,8,10} { \draw[ln-rule!50, very thin] (0,\yv) -- (0.3,\yv); }
+  \draw[->] (0,0) -- (0.315,0);
+  \node[font=\scriptsize\sffamily] at (0.15,-1.75)
+    {\iflangja{実行当たり予測ミス数 $m$}{mispredictions per execution, $m$}};
+  \draw[->] (0,0) -- (0,10.8) node[above, font=\scriptsize\sffamily]
+    {\iflangja{実行当たりのスロット数}{slots per execution}};
+  \foreach \xv/\xl in {0/0,0.05/0.05,0.1/0.10,0.15/0.15,0.2/0.20,0.25/0.25,0.3/0.30} {
+    \draw (\xv,0) -- (\xv,-0.2) node[below, font=\scriptsize\sffamily] {\xl};
+  }
+  \foreach \yv in {0,2,4,6,8,10} {
+    \draw (0,\yv) -- (-0.004,\yv) node[left, font=\scriptsize\sffamily] {\yv};
+  }
+  % break-even guides (drawn first, under the lines)
+  \foreach \xb/\yb in {0.075/7,0.15/7} {
+    \draw[ln-muted, densely dotted] (\xb,\yb) -- (\xb,0);
+  }
+  % lines
+  \draw[very thick, ln-caution] (0,4) -- (0.3,4)
+    node[pos=0.8, below, font=\scriptsize\sffamily, text=ln-caution] {\iflangja{完全プレディケーション}{full predication}};
+  \draw[very thick, ln-tip] (0,7) -- (0.3,7)
+    node[pos=0.82, below, font=\scriptsize\sffamily, text=ln-tip] {MOVZ/MOVN};
+  \draw[very thick, ln-accent] (0,4) -- (0.3,10)
+    node[pos=0.8, above left, font=\scriptsize\sffamily, text=ln-accent] {\iflangja{分岐，$P=20$}{branch, $P=20$}};
+  \draw[very thick, ln-accent, dashed] (0,4) -- (0.15,10)
+    node[pos=0.85, left, font=\scriptsize\sffamily, text=ln-accent, xshift=-1mm] {\iflangja{分岐，$P=40$}{branch, $P=40$}};
+  % break-even points
+  \foreach \xb/\yb in {0.075/7,0.15/7,0/4} {
+    \fill (\xb,\yb) circle (1.4pt);
+  }
+\end{tikzpicture}

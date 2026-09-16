@@ -1,0 +1,47 @@
+% Full predication in IA-64: the 6-bit qualifying predicate (qp) of every
+% 41-bit instruction selects one of 64 one-bit predicate registers, and the
+% instruction runs in either case, but its result is written only if that
+% register holds 1; otherwise it is annulled (no write, no exception).
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  box/.style={draw, fill=ln-box, align=center, minimum height=0.8cm, inner sep=3pt},
+  pr/.style={draw, fill=white, minimum width=0.42cm, minimum height=0.42cm, inner sep=0pt, font=\scriptsize\ttfamily},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted}]
+  % ---- instruction word, bits 40..0
+  \draw[fill=ln-box] (0,0) rectangle (7.0,0.6);
+  \draw[fill=ln-accent!15] (7.0,0) rectangle (8.4,0.6);
+  \node at (3.5,0.3) {\iflangja{オペコードとオペランド}{opcode and operands}};
+  \node at (7.7,0.3) {qp};
+  \foreach \x/\b in {0.15/40,6.85/6,7.15/5,8.25/0} {
+    \node[lab, above] at (\x,0.6) {\b};
+  }
+  % ---- operation and write
+  \node[box, minimum width=3.3cm] (op) at (1.75,-1.3) {\iflangja{演算を実行}{perform the operation}};
+  \node[box, minimum width=3.3cm] (wr) at (1.75,-3.0)
+    {\iflangja{結果を書き込む}{write the result}\\[-1pt]
+     {\scriptsize\iflangja{（レジスタまたはメモリ）}{(register or memory)}}};
+  \draw[->] (1.75,0) -- (op.north);
+  \draw[->] (op.south) -- (wr.north);
+  \node[draw, dashed, ln-caution, inner sep=5pt, fit=(wr)] (fr) {};
+  % ---- predicate registers PR0..PR63 (one bit each), PR3 selected
+  \foreach \v [count=\k from 0] in {1,0,1,1,0} {
+    \node[pr] (p\k) at (7.7+0.42*\k-1.26,-1.3) {\v};
+  }
+  \node[pr, draw=none, fill=none] at (7.7+0.42*5-1.26,-1.3) {$\cdots$};
+  \node[pr] (p63) at (7.7+0.42*6-1.26,-1.3) {0};
+  \node[pr, fill=ln-accent!15] at (p3) {1};
+  \node[lab, below] at (p0.south) {0};
+  \node[lab, below] at (p63.south) {63};
+  \node[lab, left, align=right] at ([xshift=-1mm]p0.west)
+    {\iflangja{述語レジスタ}{predicate registers}\\\iflangja{（各 1 ビット）}{(1 bit each)}};
+  \node[lab, anchor=north west, align=left] at (8.0,-2.0)
+    {\iflangja{比較命令が設定\\0 番は常に 1}{set by compare instructions;\\register 0 always holds 1}};
+  % qp selects a register
+  \draw[->, ln-accent, thick] (7.7,0) -- (p3.north)
+    node[midway, right, font=\scriptsize\sffamily, text=ln-accent] {qp = 3};
+  % enable
+  \draw[->, ln-caution, thick] (p3.south) |- (fr.east |- wr.east)
+    node[pos=0.75, above, font=\scriptsize\sffamily, text=ln-caution]
+    {\iflangja{1 のときのみ結果を書き込む}{result written only if the bit is 1}}
+    node[pos=0.75, below, font=\scriptsize\sffamily, text=ln-caution, align=center]
+    {\iflangja{0 なら無効化\\（書き込みも例外もなし）}{if 0: annulled\\(no write, no exception)}};
+\end{tikzpicture}

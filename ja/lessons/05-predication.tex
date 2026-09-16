@@ -1,0 +1,415 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{プレディケーション}
+\lessoninfo{
+  video={Lesson 5，動画 1--12},
+  textbook={H\&P \cite{hennessy2017} §A.6，§C.2，§H.4，§H.6},
+  keywords={プレディケーション，予測困難な分岐，if 変換，条件付きムーブ，MOVZ，MOVN，CMOVcc，条件コード，損益分岐予測ミス率，完全プレディケーション，Itanium，述語レジスタ},
+}
+
+第4章の予測器はほとんどの分岐を正しく予測するが，どの予測器にとっても
+予測が困難な分岐が残る．典型的には，分岐の方向が処理対象のデータに依存
+するためである．また深いパイプラインでは，予測ミスのたびに数十命令が
+フラッシュされる．この章では，そのような分岐に対する代替手段である
+\emph{プレディケーション}を調べる．プレディケーションは分岐の両方向の
+処理を実行し，正しい方向の結果だけを残すので，予測ミスの対象となるものが
+何も残らない．どの分岐がその恩恵を受けるか，コンパイラが if~変換によって
+分岐をどのように除去するか，それが前提とする条件付きムーブ命令はどのような
+ものか，この変換が有利になるのはどのような場合か，そしてすべての命令を
+条件付きにできる命令セットはどのようなものかを，順に調べる．
+
+\section{予測とプレディケーション}
+\label{sec:l05-predication}
+
+分岐予測器は，分岐がどこへ進むかをフェッチステージで推測し，プロセッサは
+推測した経路に沿ってフェッチを続ける．\source{Lesson 5，動画 1--2；
+H\&P §C.2．}推測が正しければコストはかからない．推測が誤っていれば，分岐の
+後にフェッチされたすべての命令がフラッシュされる．幅が数命令で段数も多い
+現代のプロセッサでは，これは数十命令に達する（\cref{ex:l04-better}）．
+したがって分岐のコストは，ほとんどの場合ゼロであり，ときどき大きくなる．
+
+\begin{definition}[プレディケーション]
+  \label{def:l05-predication}
+  分岐の\emph{両方}の方向の処理を実行し，誤りと判明した方向の結果を捨てる
+  ことを\term[ぷれでぃけーしょん]{プレディケーション}[predication]という．
+\end{definition}
+
+プレディケーションは何も予測しないので予測ミスペナルティがないが，不要な
+方向の処理を常に無駄にする．両方向の命令数が等しければ，処理の半分が捨て
+られる．分岐の実行 1 回当たり，プレディケーションは不要な方向の命令を無駄
+にし，予測は予測ミスペナルティに予測ミスの確率を掛けた分を無駄にする．
+どちらが小さいかは分岐の種類に依存する（\cref{tab:l05-which}）．
+プレディケーションがよりよい選択となりうるのは，各方向の命令数が予測ミス
+でフラッシュされる命令数よりはるかに少ない，小さな if-then-else だけで
+ある．
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{分岐の種類ごとの予測とプレディケーション．}
+  \label{tab:l05-which}
+  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.15\linewidth}>{\raggedright\arraybackslash}p{0.25\linewidth}>{\raggedright\arraybackslash}p{0.25\linewidth}>{\raggedright\arraybackslash}p{0.25\linewidth}@{}}
+    \toprule
+    分岐 & 予測 & プレディケーション & 有利な方 \\
+    \midrule
+    ループ               & 正確
+                         & 反復のたびにループの後のコードも実行する
+                         & 予測 \\
+    \addlinespace
+    コール，\newline リターン & 常に成立．BTB と RAS が分岐先を与える
+                         & もう一方の経路の処理が常に無駄になる
+                         & 予測 \\
+    \addlinespace
+    大きな if-then-else & ときどき数十命令をフラッシュする
+                         & 大きな方向を毎回無駄にする
+                         & 予測 \\
+    \addlinespace
+    小さな if-then-else & 予測ミスごとに数十命令をフラッシュする
+                         & 数命令を毎回無駄にする
+                         & 予測困難なら\newline プレディケーション \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+小さな if-then-else では，どちらを選ぶかは分岐がどれだけよく予測されるか
+に依存する．予測ミスが 40 命令をフラッシュし，不要な方向が 4 命令からなる
+なら，実行の 10 回に 1 回より多く予測ミスが起こる時点で，プレディケーション
+の無駄は予測の無駄より少なくなる．\cref{sec:l05-performance}では，
+コンパイラが実際に生成するコードについてこの比較を厳密に行う．
+
+\begin{keypoint}
+  予測は，正しければコストがかからず，誤れば数十命令のコストがかかる．
+  プレディケーションは不要な方向を常に無駄にする．そのため分岐は原則として
+  予測され，プレディケーションを検討する価値があるのは，予測が困難な小さな
+  if-then-else の分岐だけである．
+\end{keypoint}
+
+\section{if 変換}
+\label{sec:l05-if-conversion}
+
+プレディケーションには，両方向の処理が，間に分岐を挟まずに次々と実行される
+命令の形になっている必要がある．\source{Lesson 5，動画 3；H\&P §H.4；
+\cite{allen1983}．}そのようなコードを生成するのはコンパイラの役割である．
+次の if-then-else を考える．これはしきい値未満の値としきい値以上の値を
+別々に合計し，しきい値未満の値の個数を数える．\texttt{v} の値が \texttt{t}
+のどちら側になるかに規則性がなければ，この分岐は予測が困難である．
+\begin{lstlisting}[language=C, numbers=none]
+if (v < t) {
+  lo = lo + v;
+  n  = n + 1;
+} else {
+  hi = hi + v;
+}
+\end{lstlisting}
+
+\begin{definition}[if 変換]
+  \label{def:l05-if-conversion}
+  両方向の文の制御依存（第3章）を分岐条件に対するデータ依存に変換すること
+  で，そのような分岐を除去するコンパイラの変換を
+  \term[if へんかん]{if 変換}[if-conversion]という．
+\end{definition}
+
+通常の命令を用いる場合，変換後のコード（\cref{fig:l05-if-conversion}）は
+両方向の文を無条件に実行してその結果を一時変数に書き込み，次に条件~\texttt{c}
+をデータとして用いて，いずれかの方向で代入されるすべての変数の新しい値を
+選択する．\caution{不要な方向も実行されるので，その方向がメモリにストア
+したり，例えば無効なポインタを介したロードでフォールトを起こしたりしては
+ならない．}両方向が変数~\texttt{x} に代入する場合，選択は2つの一時変数の
+どちらかを選ぶ（\texttt{x = c ? x1 : x2}）．この例の各変数のように一方の
+方向だけが代入する場合，もう一方の選択肢は元の値である．変換後のコードには
+分岐がない．
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l05-if-conversion}
+  \caption{小さな if-then-else の if~変換．(a) 元のコードは~\texttt{c} で
+    分岐する．(b) 変換後のコードは両方向を一時変数に計算し，\texttt{c} を
+    データとして用いて結果を選択する．}
+  \label{fig:l05-if-conversion}
+\end{figure}
+
+この変換で何かが得られるのは，選択を分岐なしで実行できる場合だけである．
+通常の分岐命令に翻訳すると，各選択はそれ自体が~\texttt{c} による
+if-then-else となり，除去した分岐と同じく予測が困難である．そのため変換後
+のコードは依然として予測ミスを起こし，そのうえ両方向の処理も実行することに
+なる．通常の算術演算でも，両方の選択肢を AND と OR でマスクすれば分岐なしに
+選択できるが，選択 1つ当たり数命令を要する．if~変換が安価になるのは，命令の
+効果を条件付きにできる命令セットの場合だけである．
+
+\section{条件付きムーブ命令}
+\label{sec:l05-cmov}
+
+そのような命令のうち最も単純なものは，コピーだけを条件付きにする．
+\source{Lesson 5，動画 4--5；H\&P §H.4，§A.6．}
+
+\begin{definition}[条件付きムーブ]
+  \label{def:l05-cmov}
+  \term[じょうけんつきむーぶ]{条件付きムーブ}[conditional move]とは，条件
+  が成り立てば値を宛先にコピーし，成り立たなければ宛先を変更しない命令で
+  ある．
+\end{definition}
+
+この命令はどちらの場合も実行され，書き込むかどうかだけが条件に依存する．
+制御の流れを変えないので，予測すべきものは何もない．
+
+MIPS の命令セットには，レジスタの内容を条件とする条件付きムーブが2つある．
+命令 \term{MOVZ}[MOVZ]（move if zero）はレジスタ Rt がゼロを保持していれば
+レジスタ Rs をレジスタ Rd にコピーし，命令 \term{MOVN}[MOVN]（move if not
+zero）は Rt がゼロでなければコピーする．
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+MOVZ Rd, Rs, Rt     ; if (Rt == 0) Rd <- Rs
+MOVN Rd, Rs, Rt     ; if (Rt != 0) Rd <- Rs
+\end{lstlisting}
+選択 \texttt{x = c ? x1 : x2} は \texttt{x} のレジスタへの2つのムーブと
+なり，そのうちちょうど1つが書き込む．\texttt{c} が R3，\texttt{x1} と
+\texttt{x2} が R1 と R2，\texttt{x} が R4 にあるとすると次のようになる．
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+MOVN R4, R1, R3     ; if c != 0: x <- x1
+MOVZ R4, R2, R3     ; if c == 0: x <- x2
+\end{lstlisting}
+条件を保持するレジスタは通常，\texttt{SLT} のような比較によって設定される．
+\texttt{SLT} は条件が成り立てば 1 を，成り立たなければ 0 を書き込む．
+
+\begin{example}
+  \label{ex:l05-movzn}
+  \texttt{v} が R1，\texttt{t} が R2，\texttt{lo}，\texttt{n}，\texttt{hi}
+  が R4，R5，R6 にあるとすると，\cref{sec:l05-if-conversion}のコードは
+  分岐を使うと次のようにコンパイルされ，
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+      SLT  R3, R1, R2     ; R3 <- (v < t)
+      BEQ  R3, R0, Skip   ; v >= t なら else 部へ
+      ADD  R4, R4, R1     ; lo <- lo + v
+      ADDI R5, R5, 1      ; n  <- n + 1
+      J    Cont           ; else 部を飛ばす
+Skip: ADD  R6, R6, R1     ; hi <- hi + v
+Cont: ...
+\end{lstlisting}
+  if~変換すると次のようになる．
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+      SLT  R3, R1, R2     ; R3 <- (v < t)
+      ADD  R7, R4, R1     ; then 部を R7, R8 に計算
+      ADDI R8, R5, 1
+      ADD  R9, R6, R1     ; else 部を R9 に計算
+      MOVN R4, R7, R3     ; lo <- R7 if v < t
+      MOVN R5, R8, R3     ; n  <- R8 if v < t
+      MOVZ R6, R9, R3     ; hi <- R9 if v >= t
+\end{lstlisting}
+  一時変数 R7--R9 が必要なのは，どれを変更するかをムーブが決めるまで，
+  R4--R6 が元の値を保持しなければならないからである．ここでは各変数が一方の
+  方向でしか代入されないので，変数当たり 1つのムーブで足りる．
+\end{example}
+
+他の命令セットでは，条件付きムーブの条件はレジスタの内容ではなくフラグに
+基づく．
+
+\begin{definition}[条件コード]
+  \label{def:l05-condition-code}
+  \term[じょうけんこーど]{条件コード}[condition code]（フラグ）とは，算術
+  命令や比較命令が副作用として設定し，後続の命令が検査する 1 ビットの状態値
+  である．例えばゼロ，負，キャリー，オーバーフローがある．
+\end{definition}
+
+x86 の命令セットには条件付きムーブの一群 \term{CMOVcc}[CMOVcc] があり，
+\texttt{cc} は条件コードに対する条件を表す．\texttt{CMOVZ} はゼロフラグが
+セットされていればムーブし，\texttt{CMOVNZ} はクリアされていればムーブ
+する．\texttt{CMOVG} は直前の比較の結果が「より大きい」ならば，
+\texttt{CMOVL} は「より小さい」ならばムーブする，といった具合である．
+よく使われるパターンは，一方の選択肢を無条件に代入し，1つの条件付きムーブ
+でそれをもう一方の選択肢で上書きするものである．$m = \max(a,b)$ の次の
+計算がその例である．
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+MOV   EAX, EBX      ; m <- a
+CMP   EBX, ECX      ; a - b でフラグを設定
+CMOVL EAX, ECX      ; if a < b: m <- b
+\end{lstlisting}
+
+\section{if 変換の性能}
+\label{sec:l05-performance}
+
+if~変換にはコストがかかる．変換後のコードは，毎回の実行で両方向の処理と
+条件付きムーブを実行する．\source{Lesson 5，動画 6--7；H\&P §C.2．}コード
+断片の 2つの版を比較するため，第3章と同様にパイプラインのスロットを数える．
+実行される命令はそれぞれ 1 スロットを占め，予測ミスはそれがフラッシュする
+命令数と同じだけのスロットを無駄にする．分岐版は実行 1 回当たり平均
+$n_b$ 命令を実行し，1 回当たり $m$ 回の予測ミスを起こし，予測ミス 1 回の
+ペナルティは $P$ 命令であるとする．また変換版は $n_c$ 命令を実行するとする．
+if~変換が有利になるのは次の場合である．
+\begin{equation}
+  n_c \;<\; n_b + mP
+  \qquad\Longleftrightarrow\qquad
+  m \;>\; \frac{n_c - n_b}{P} .
+  \label{eq:l05-break-even}
+\end{equation}
+右辺が\emph{損益分岐予測ミス率}であり，変換後のコードで増える命令数を，
+予測ミスペナルティを単位として測ったものである．\cref{sec:l05-predication}%
+の大まかな比較と比べると，増える命令には条件付きムーブが含まれ，変換で
+除去される分岐命令とジャンプ命令の分が差し引かれる．
+
+\begin{example}
+  \label{ex:l05-performance}
+  \cref{ex:l05-movzn} の分岐版は，then~部が実行されるときは 5 命令
+  （\texttt{SLT}，\texttt{BEQ}，\texttt{ADD}，\texttt{ADDI}，\texttt{J}），
+  そうでないときは 3 命令（\texttt{SLT}，\texttt{BEQ}，\texttt{ADD}）を
+  実行する．両方の部分が同じ頻度で実行されるなら $n_b = 4$ であり，変換版は
+  常に $n_c = 7$ 命令を実行する．この分岐に対する予測器の精度が
+  \SI{75}{\percent} で，$P = 20$ であるとする．分岐版のコストは実行 1 回
+  当たり $4 + 0.25 \times 20 = 9$ スロット，変換版は 7 スロットであり，
+  この断片の高速化率は $9/7 \approx 1.29$ である．\cref{eq:l05-break-even}
+  より損益分岐率は $m = 3/20 = 0.15$ であり，分岐版が速いのは予測器の精度が
+  \SI{85}{\percent} を超える場合だけである．$P = 40$ なら損益分岐率は半分の
+  $0.075$，精度にして \SI{92.5}{\percent} となる．
+\end{example}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l05-break-even}
+  \caption{\cref{ex:l05-performance} の断片の実行当たりスロット数を，予測
+    ミス率の関数として示す．点は損益分岐率を表す．完全プレディケーション版
+    については\cref{sec:l05-full}で述べる．}
+  \label{fig:l05-break-even}
+\end{figure}
+
+\cref{fig:l05-break-even} は，この比較を~$m$ の関数として示す．分岐版の
+コストは予測ミス率に対して線形に増え，その傾きはペナルティに等しい．一方，
+変換版のコストはどの~$m$ でも同じである．パイプラインが深く，あるいは幅広く
+なるとペナルティが増えるので if~変換が有利になり，then~部と else~部が大きく
+なると $n_c - n_b$ が増えるので分岐が有利になる．
+
+\begin{keypoint}
+  if~変換は，ときどき生じる大きなペナルティを一定のオーバーヘッドに置き
+  換える．実行当たりの予測ミス数とペナルティの積が，変換後のコードで増える
+  命令数を上回るとき，if~変換は有利になる（\cref{eq:l05-break-even}）．
+\end{keypoint}
+
+\needspace{8\baselineskip}
+\section{条件付きムーブの利点とコスト}
+\label{sec:l05-cmov-summary}
+
+条件付きムーブで分岐を除去することには，1つの利点といくつかのコストがある．
+\source{Lesson 5，動画 8；H\&P §H.4．}
+\begin{itemize}
+  \item \textbf{利点．}予測困難な分岐が消え，それとともにその予測ミスも
+    なくなる．
+  \item \textbf{コンパイラのサポート}が必要である．プロセッサは与えられた
+    コードを実行するだけであり，分岐が除去されるのは，コンパイラが適切な
+    if-then-else を認識して変換した場合だけである．
+  \item \textbf{より多くのレジスタ}が必要である．すべての結果はまず一時変数
+    に計算される．
+  \item \textbf{より多くの命令}が実行される．分岐が正しく予測されたはずの
+    実行でも両方向の処理が実行され，さらに結果を選択する条件付きムーブも
+    実行される．
+\end{itemize}
+
+このうち，コンパイラのサポート，分岐の除去，両方向の実行はプレディケー
+ションに本質的なものだが，追加のレジスタとムーブはそうではない．これらが
+生じるのは，条件付きなのがムーブだけだからである．結果を残すかどうかを
+条件付きムーブが決められるように，すべての結果を一時変数に計算しておかな
+ければならない．結果を計算する命令そのものを条件付きにできれば，一時変数
+もムーブも不要になる．
+
+\section{完全プレディケーション}
+\label{sec:l05-full}
+
+条件付きムーブは独立したオペコードであり，それが条件付きにする操作は
+コピーだけである．\source{Lesson 5，動画 9--12；H\&P §H.4，§H.6；
+\cite{mahlke1995}．}その代わりとなるのは，すべての命令を条件付きにする
+機能を命令セットでサポートすることである．
+
+\begin{definition}[完全プレディケーション]
+  \label{def:l05-full-predication}
+  すべての命令に条件ビットが付加され，各命令はその条件が成り立つときにだけ
+  効果を持ち，成り立たなければ何の効果も持たないとき，その命令セットは
+  \term[かんぜんぷれでぃけーしょん]{完全プレディケーション}[full predication]%
+  を提供するという．
+\end{definition}
+
+Intel の Itanium プロセッサの IA-64 命令セットがその例である\index{Itanium}%
+（\cref{fig:l05-qp}）．IA-64 のほとんどの命令では，41 ビットの命令の下位
+6 ビットが\emph{限定述語}（qualifying predicate）を保持する．これは 64 個
+ある 1 ビットのレジスタのうちの 1つの番号であり，それぞれのレジスタを
+\term[じゅつごれじすた]{述語レジスタ}[predicate register]と呼ぶ．命令は
+どちらの場合もフェッチされてパイプラインのスロットを占めるが，効果を持つ
+のは選択された述語レジスタが~1 を保持するときだけである．そうでなければ
+命令は無効化され，結果を書き込まず，例外も発生させない．述語レジスタ~0 は
+常に~1 を保持するので，限定述語が~0 の命令は無条件に実行される．述語
+レジスタは比較命令によって設定される．比較命令は，条件に対するものとその
+否定に対するものという，互いに相補的な値を持つ述語の対を書き込む．
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l05-qp}
+  \caption{IA-64 における完全プレディケーション．命令の限定述語（qp）が，
+    64 個の 1 ビット述語レジスタのうち 1つを選択する．命令はどちらの場合も
+    パイプラインを通過するが，結果が書き込まれるのはそのレジスタが~1 を
+    保持するときだけである．そうでなければ命令は無効化され，書き込みも
+    例外も起こらない．}
+  \label{fig:l05-qp}
+\end{figure}
+
+\needspace{8\baselineskip}
+\begin{example}
+  \label{ex:l05-full}
+  完全プレディケーションがあれば，if~変換は両方向の各文を条件またはその
+  否定によって直接条件付けし，\cref{sec:l05-if-conversion}のコードは
+  次のようになる．
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+      CMPLT P1, P2, R1, R2 ; P1 <- (v < t), P2 <- !P1
+(P1)  ADD   R4, R4, R1     ; lo <- lo + v  if v < t
+(P1)  ADDI  R5, R5, 1      ; n  <- n + 1   if v < t
+(P2)  ADD   R6, R6, R1     ; hi <- hi + v  if v >= t
+\end{lstlisting}
+  ここで限定述語は命令の前の括弧内に書かれており，\texttt{CMPLT} は，R1 が
+  R2 より小さければ P1 を~1，P2 を~0 に設定し，そうでなければその逆に設定
+  する比較命令を表す．加算そのものが条件付きなので，結果は変数に直接書き
+  込まれ，比較命令が \texttt{SLT} と分岐の両方を置き換える．
+  \cref{tab:l05-versions} は，\cref{ex:l05-performance} の数値を用いて
+  3つの版を比較したものである．
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{精度 \SI{75}{\percent} の予測器と $P = 20$ における，例の断片の
+    3つの版．}
+  \label{tab:l05-versions}
+  \begin{tabular}{@{}lccccc@{}}
+    \toprule
+    版 & 命令数 & 一時変数 & ムーブ & 予測ミス & スロット \\
+    \midrule
+    分岐                   & 5 または 3 & 0 & 0 & 0.25 & 9 \\
+    MOVZ/MOVN              & 7          & 3 & 3 & 0    & 7 \\
+    完全プレディケーション & 4          & 0 & 0 & 0    & 4 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+完全プレディケーション版が実行するのは，比較命令と両方向の命令だけである．
+分岐版と比べると，不要な方向を実行する代わりに分岐もジャンプも実行しない．
+ここでは両者が釣り合い，その $n_c = 4$ は分岐版の平均 $n_b$ に等しい．
+\cref{eq:l05-break-even} による損益分岐率は $m = (4-4)/20 = 0$ である．
+すなわち，完全な予測を用いても分岐版は速くならず，予測ミスが起こるたびに
+遅くなる（\cref{fig:l05-break-even}）．一般に，完全プレディケーション版は
+条件付きムーブ 1つ当たり MOVZ/MOVN 版より 1 命令少なく実行するので，ムーブ
+が $M$ 個なら損益分岐率は $M/P$ だけ低い．条件付きムーブが条件をすでに保持
+しているレジスタを検査する場合には，条件付きムーブ版は比較を必要としないの
+に対し，完全プレディケーションは依然として比較を必要とするので，その差は
+$(M-1)/P$ となる．損益分岐率を下げることで，完全プレディケーションは，
+条件付きムーブでは引き合わないほどよく予測される分岐に対しても if~変換を
+有利にする．
+
+\begin{keypoint}[章のまとめ]
+  分岐予測は，正しければコストがかからず，誤れば数十命令のコストがかかる．
+  プレディケーションは分岐の両方向を実行して予測ミスを起こさないが，その
+  代償として不要な処理を常に行う．そのため分岐は原則として予測され，
+  コンパイラがプレディケーションを使うのは小さく予測困難な if-then-else
+  の分岐に対してだけであり，ループ，コール，リターン，大きな if-then-else
+  の分岐には使わない．if~変換は，制御依存を条件に対するデータ依存に変換
+  することでそのような分岐を除去する．通常の命令を用いる場合，if~変換は
+  両方向を一時変数に計算し，MIPS の MOVZ と MOVN や，x86 の条件コードに
+  基づく CMOVcc といった条件付きムーブで結果を選択する．実行当たりの予測
+  ミス数とペナルティの積が増える命令数を上回るとき，if~変換は有利になり
+  （\cref{eq:l05-break-even}），パイプラインが深いほど有利になる．IA-64 の
+  ようにすべての命令に条件を付ける完全プレディケーションは，一時変数と
+  ムーブを不要にし，損益分岐予測ミス率を下げる．
+\end{keypoint}
+
+\end{document}
