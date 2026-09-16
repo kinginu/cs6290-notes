@@ -1,0 +1,46 @@
+% Two out-of-order cores run the two-flag program.  In program order each
+% core stores 1 into its own flag and then loads the other core's flag.
+% Both loads read memory before either store commits, so both read 0.
+% Arrows: data read from memory (up/down towards a core) and stores written
+% to memory at commit (towards the memory row).
+\begin{tikzpicture}[x=0.95cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.6mm]},
+  row/.style={ln-muted, line width=0.6pt},
+  ev/.style={circle, fill=black, inner sep=1.3pt},
+  lab/.style={font=\scriptsize, align=center, inner sep=1pt},
+  mem/.style={draw, fill=ln-box, minimum height=0.5cm, inner sep=1pt, font=\scriptsize}]
+  % ---- row names
+  \node[anchor=east] at (-0.15,1.5) {\iflangja{コア}{core}~0};
+  \node[anchor=east] at (-0.15,0) {\iflangja{メモリ}{memory}};
+  \node[anchor=east] at (-0.15,-1.5) {\iflangja{コア}{core}~1};
+  \draw[row] (0,1.5) -- (10.2,1.5);
+  \draw[row] (0,-1.5) -- (10.2,-1.5);
+  % ---- memory contents over time
+  \node[mem, minimum width=5.0*0.95cm, anchor=west] at (0,0) {X $=$ 0, Y $=$ 0};
+  \node[mem, minimum width=2.2*0.95cm, anchor=west] at (5.0,0) {X $=$ 1, Y $=$ 0};
+  \node[mem, minimum width=3.0*0.95cm, anchor=west] at (7.2,0) {X $=$ 1, Y $=$ 1};
+  % ---- core 0: labels above its row
+  \node[ev] at (0.7,1.5) {};
+  \node[lab, anchor=south] at (0.7,1.62) {\iflangja{SW X\\実行}{SW X\\executes}};
+  \node[ev, ln-caution] at (2.4,1.5) {};
+  \node[lab, anchor=south, text=ln-caution] at (2.4,1.62) {\iflangja{LW Y\\0 を読む}{LW Y\\reads 0}};
+  \draw[->, ln-caution] (2.4,0.27) -- (2.4,1.4);
+  \node[ev] at (5.0,1.5) {};
+  \node[lab, anchor=south] at (5.0,1.62) {\iflangja{SW X\\コミット}{SW X\\commits}};
+  \draw[->] (5.0,1.4) -- (5.0,0.27);
+  \node[ev, ln-caution] at (8.4,1.5) {};
+  \node[lab, anchor=south, text=ln-caution] at (8.4,1.62) {\iflangja{LW Y コミット，\\作業を実行}{LW Y commits,\\does the work}};
+  % ---- core 1: labels below its row
+  \node[ev] at (1.3,-1.5) {};
+  \node[lab, anchor=north] at (1.3,-1.62) {\iflangja{SW Y\\実行}{SW Y\\executes}};
+  \node[ev, ln-caution] at (3.6,-1.5) {};
+  \node[lab, anchor=north, text=ln-caution] at (3.6,-1.62) {\iflangja{LW X\\0 を読む}{LW X\\reads 0}};
+  \draw[->, ln-caution] (3.6,-0.27) -- (3.6,-1.4);
+  \node[ev] at (7.2,-1.5) {};
+  \node[lab, anchor=north] at (7.2,-1.62) {\iflangja{SW Y\\コミット}{SW Y\\commits}};
+  \draw[->] (7.2,-1.4) -- (7.2,-0.27);
+  \node[ev, ln-caution] at (9.4,-1.5) {};
+  \node[lab, anchor=north, text=ln-caution] at (9.4,-1.62) {\iflangja{LW X コミット，\\作業を実行}{LW X commits,\\does the work}};
+  % ---- time axis
+  \draw[->, ln-muted] (0,-2.45) -- (10.2,-2.45)
+    node[below left, inner sep=2pt, font=\scriptsize] {\iflangja{時間}{time}};
+\end{tikzpicture}

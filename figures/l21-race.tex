@@ -1,0 +1,34 @@
+% Data race versus accesses ordered by synchronization.  Left: a load and a
+% store of A on different cores with nothing between them; either may take
+% effect first.  Right: a barrier after the load on core 0 and before the
+% store on core 1 forces the load to take effect first.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.6mm]},
+  acc/.style={draw, fill=ln-box, minimum width=1.5cm, minimum height=0.5cm, inner sep=1pt, font=\footnotesize\ttfamily},
+  bar/.style={draw, fill=ln-accent!20, minimum width=1.5cm, minimum height=0.5cm, inner sep=1pt, font=\scriptsize\ttfamily},
+  hd/.style={font=\scriptsize, text=ln-muted},
+  ttl/.style={font=\footnotesize\sffamily\bfseries}]
+  % ================= left: data race
+  \node[hd] at (0,0.6) {\iflangja{コア}{core}~0};
+  \node[hd] at (3,0.6) {\iflangja{コア}{core}~1};
+  \node[acc] (l0) at (0,0) {LW A};
+  \node[acc] (s1) at (3,-1.1) {SW A};
+  \draw[<->, ln-caution, line width=0.8pt] (l0.east) to[bend left=25] (s1.north);
+  \node[font=\scriptsize, align=center, text=ln-caution] at (0.75,-1.1)
+    {\iflangja{どちらが先かは\\タイミング次第}{either order,\\depending on timing}};
+  \node[ttl, text=ln-caution] at (1.5,-2.5) {\iflangja{データ競合}{data race}};
+  % ================= right: ordered by a barrier
+  \begin{scope}[xshift=6.2cm]
+    \node[hd] at (0,0.6) {\iflangja{コア}{core}~0};
+    \node[hd] at (3,0.6) {\iflangja{コア}{core}~1};
+    \node[acc] (l0b) at (0,0) {LW A};
+    \node[bar] (b0) at (0,-0.8) {BARRIER};
+    \node[bar] (b1) at (3,-0.8) {BARRIER};
+    \node[acc] (s1b) at (3,-1.6) {SW A};
+    \draw[ln-accent, densely dashed] (b0.east) -- (b1.west);
+    \draw[->, ln-tip, line width=0.8pt] (l0b.south east) -- (s1b.north west);
+    \node[ttl, text=ln-tip] at (1.5,-2.5) {\iflangja{データ競合なし}{no data race}};
+  \end{scope}
+  % ---- time runs downwards
+  \draw[->, ln-muted] (-1.1,0.3) -- (-1.1,-2.0)
+    node[below, font=\scriptsize, inner sep=2pt] {\iflangja{時間}{time}};
+\end{tikzpicture}

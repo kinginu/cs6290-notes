@@ -1,0 +1,35 @@
+% Relaxed consistency with MSYNC.  The accesses of one core, in program
+% order, are divided into groups by MSYNC instructions.  Accesses within a
+% group may take effect in a different order; no access takes effect before
+% an access that precedes it across an MSYNC.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.6mm]},
+  acc/.style={draw, fill=ln-box, minimum width=1.05cm, minimum height=0.55cm, inner sep=1pt, font=\footnotesize\ttfamily},
+  fence/.style={fill=ln-accent, minimum width=0.14cm, minimum height=1.1cm, inner sep=0pt},
+  lab/.style={font=\scriptsize, align=center, inner sep=1pt}]
+  % ---- accesses in program order
+  \node[acc] (a1) at (0.0,0) {LW A};
+  \node[acc] (a2) at (1.25,0) {SW B};
+  \node[acc] (a3) at (2.5,0) {LW C};
+  \node[fence] (f1) at (3.45,0) {};
+  \node[acc] (a4) at (4.4,0) {LW D};
+  \node[acc] (a5) at (5.65,0) {SW E};
+  \node[acc] (a6) at (6.9,0) {LW F};
+  \node[fence] (f2) at (7.85,0) {};
+  \node[acc] (a7) at (8.8,0) {SW G};
+  \node[acc] (a8) at (10.05,0) {LW H};
+  \node[lab, anchor=south, text=ln-accent] at (f1.north) {MSYNC};
+  \node[lab, anchor=south, text=ln-accent] at (f2.north) {MSYNC};
+  % ---- reorderings allowed within a group
+  \draw[<->, ln-tip] (a1.north) to[bend left=40] (a3.north);
+  \draw[<->, ln-tip] (a4.north) to[bend left=40] (a6.north);
+  \draw[<->, ln-tip] (a7.north) to[bend left=40] (a8.north);
+  % ---- a reordering across MSYNC is not allowed
+  \draw[->, ln-caution, dashed] (a5.south) to[bend left=35]
+    node[pos=0.5, fill=white, inner sep=0.5pt, font=\small\bfseries] {$\times$} (a2.south);
+  \node[lab, text=ln-caution, anchor=north] at (3.45,-1.15) {\iflangja{MSYNC をまたぐ\\順序変更は不可}{no reordering\\across MSYNC}};
+  \node[lab, text=ln-tip, anchor=south] at (1.25,0.8) {\iflangja{グループ内は順序変更可}{reordering allowed}};
+  \node[lab, text=ln-tip, anchor=south] at (5.65,0.8) {\iflangja{グループ内は順序変更可}{reordering allowed}};
+  % ---- program order
+  \draw[->, ln-muted] (-0.5,-1.95) -- (10.6,-1.95)
+    node[below left, inner sep=2pt, font=\scriptsize] {\iflangja{プログラム順序}{program order}};
+\end{tikzpicture}
