@@ -38,7 +38,9 @@ processed one at a time, strictly one after another.}
 \begin{example}
   A processor that takes \SI{10}{\second} for each of two programs run one
   after the other has latency \SI{10}{\second} per program and throughput
-  \SI{0.1}{programs/s}.  A second processor that takes \SI{15}{\second} per
+  \SI{0.1}{programs/s}.\margin{A DDR4-3200 module returns data
+  \SI{14}{\nano\second} after a read command (CL22) yet sustains
+  25.6~GB/s, because accesses overlap; Lesson 15.}  A second processor that takes \SI{15}{\second} per
   program but runs two at once has a worse latency yet a throughput of
   $2/15 \approx \SI{0.13}{programs/s}$.
 \end{example}
@@ -54,10 +56,11 @@ use the \term{speedup}[高速化率]:\source{Lesson 2, videos 4--7.}
   \label{eq:speedup}
 \end{equation}
 Note that latency appears \emph{inverted}: a shorter time means a higher
-speed.  A speedup greater than 1 means $X$ is better; a speedup below 1
-means it is worse (a \enquote{speedup of 0.8} is a slowdown).  Speedups
-compose multiplicatively: if $X$ is $2\times$ faster than $Y$ and $Y$ is
-$3\times$ faster than $Z$, then $X$ is $6\times$ faster than $Z$.
+speed.\caution{A percentage is not a speedup: \SI{30}{\percent} less time is
+$N \approx 1.43$, not $1.3$.}  A speedup greater than 1 means $X$ is
+better; a speedup below 1 means it is worse (a \enquote{speedup of 0.8} is
+a slowdown).  Speedups compose multiplicatively: if $X$ is $2\times$ faster
+than $Y$ and $Y$ is $3\times$ faster than $Z$, then $X$ is $6\times$ faster than $Z$.
 
 \tip{Always keep the ratio in the form
 $\text{old time}/\text{new time}$; most sign errors in this course come
@@ -80,11 +83,18 @@ From most to least representative:
     representative, but hardest to set up, and impossible on a simulator or
     an incomplete prototype.
   \item[Kernels] the most time-consuming part of a real application (e.g.\ a
-    matrix multiply), extracted so that it can be run on its own.  Easier to
-    run; still reflects the real work.
+    matrix multiply), extracted so that it can be run on its own.\margin{A
+    cycle-level simulator such as gem5 runs three to four orders of magnitude
+    slower than the hardware it models.}  Easier to run; still reflects the
+    real work.
   \item[Synthetic benchmarks] programs written to \emph{behave like} real
     applications (similar mix of instructions and memory accesses) while
-    being simpler to run.  Useful early in a design.
+    being simpler to run.  Useful early in a
+    design.\sidenote{The classic examples are Whetstone (1972, floating
+    point) and Dhrystone (Weicker, 1984, integer).  Both lost their
+    credibility once optimizing compilers began to delete the code whose
+    results are never used, which is why a synthetic program is no longer
+    accepted as a final measurement.}
   \item[Peak performance] the theoretical maximum rate the hardware can
     sustain (e.g.\ instructions per second if every unit were busy).  A
     marketing number that no real program reaches.
@@ -102,7 +112,9 @@ independent organizations define standard suites.\source{Lesson 2, video
 12; \cite{spec}.}  SPEC (Standard Performance Evaluation Corporation)
 publishes CPU, graphics and server suites; TPC does the same for
 transaction-processing workloads; EEMBC for embedded systems.  Members of
-these organizations agree on the programs, inputs and reporting rules.
+these organizations agree on the programs, inputs and reporting
+rules.\margin{SPEC CPU2017 contains 43 programs in four suites: integer and
+floating point, each in a speed and a rate version.  \texttt{spec.org}.}
 
 \section{Summarizing performance}
 
@@ -121,6 +133,8 @@ machine.\source{Lesson 2, videos 13--14; H\&P §1.8.}
       \overline{S} = \Bigl(\prod_{i=1}^{n} S_i\Bigr)^{1/n} .
       \label{eq:geomean}
     \end{equation}
+    \tip{Compute it as $\exp\bigl(\frac{1}{n}\sum_i \ln S_i\bigr)$: a product
+    of many ratios overflows, a sum of logarithms does not.}
 \end{itemize}
 
 \begin{example}
@@ -132,6 +146,9 @@ machine.\source{Lesson 2, videos 13--14; H\&P §1.8.}
   contradiction.  The geometric mean is $\sqrt{2\times 0.5} = 1$ either way,
   correctly reporting that the machines are equivalent on this suite.
 \end{example}
+
+\caution{The geometric mean is consistent, not predictive: it does not say
+how long the suite takes.  For that, add the times.}
 
 \begin{keypoint}
   Average \emph{times} arithmetically; average \emph{speedups}
@@ -159,8 +176,11 @@ videos 15--18; H\&P §1.9.}
     processor's microarchitecture (pipelining, out-of-order execution,
     caches, \ldots).  Most of this course is about lowering CPI.
   \item[Clock cycle time ($T_{\mathrm{clk}}$)] determined by the
-    microarchitecture (how much logic sits between two latches), the circuit
-    design and the fabrication technology.
+    microarchitecture (how much logic sits between two
+    latches),\margin{Pentium~4 (Prescott): 31 stages,
+    \SI{3.8}{\giga\hertz}; the Core of 2006: 14 stages, under
+    \SI{3}{\giga\hertz}, and faster.} the circuit design and the fabrication
+    technology.
 \end{description}
 
 The value of the law is that it exposes trade-offs: a change that reduces
@@ -173,7 +193,9 @@ are unchanged.}
 \subsection{Unequal instruction times}
 
 When different instruction classes take different numbers of cycles, the
-CPI is a weighted average.  With $n$ classes,
+CPI is a weighted average.\caution{Vendors quote IPC $= 1/\text{CPI}$.
+Averaging IPCs over a suite has the same defect as averaging speedups.}
+With $n$ classes,
 \begin{equation}
   \text{CPU time} \;=\; \Bigl(\sum_{i=1}^{n} \text{IC}_i \times \text{CPI}_i\Bigr)
   \times T_{\mathrm{clk}} ,
@@ -186,9 +208,11 @@ instruction of class $i$.
   A program executes $10^{9}$ instructions on a \SI{2}{\giga\hertz}
   processor: \SI{60}{\percent} are ALU operations (1 cycle),
   \SI{30}{\percent} loads/stores (2 cycles) and \SI{10}{\percent} branches
-  (3 cycles).  The average CPI is $0.6\cdot 1 + 0.3\cdot 2 + 0.1\cdot 3 =
-  1.5$, so the CPU time is $10^{9}\times 1.5 \times \SI{0.5}{\nano\second}
-  = \SI{0.75}{\second}$.
+  (3 cycles).\margin{Realistic order of magnitude: SPEC integer programs
+  execute about \SI{25}{\percent} loads, \SI{10}{\percent} stores and
+  \SI{15}{\percent} branches.  H\&P app.~A.}  The average CPI is
+  $0.6\cdot 1 + 0.3\cdot 2 + 0.1\cdot 3 = 1.5$, so the CPU time is
+  $10^{9}\times 1.5 \times \SI{0.5}{\nano\second} = \SI{0.75}{\second}$.
 \end{example}
 
 \section{Amdahl's law}
@@ -214,7 +238,10 @@ of the time after the change, and not a fraction of the instruction count.}
   Floating-point instructions account for \SI{40}{\percent} of the run
   time.  A new FP unit makes them $4\times$ faster.  The overall speedup is
   $1/(0.6 + 0.4/4) = 1/0.7 \approx 1.43$.  Making the FP unit infinitely
-  fast would only reach $1/0.6 \approx 1.67$.
+  fast would only reach $1/0.6 \approx 1.67$.\sidenote{Amdahl's three-page
+  paper (AFIPS 1967) used this bound against massively parallel machines: with
+  \SI{95}{\percent} of the time parallel, no core count exceeds $20\times$.
+  Lesson 18 applies it to cores.}
 \end{example}
 
 \subsection{Implications}
@@ -229,7 +256,9 @@ principles follow.\source{Lesson 2, videos 21--24.}
 \end{keypoint}
 
 The lecture also states the converse, jokingly called \enquote{Lhadma's
-law}: \emph{do not sacrifice the uncommon case too much} when speeding up the
+law}:\caution{\enquote{Lhadma} is \enquote{Amdahl} spelled backwards.  It is
+the lecture's own name for the principle, not standard terminology.}
+\emph{do not sacrifice the uncommon case too much} when speeding up the
 common one.  If the \SI{10}{\percent} that is left untouched by an
 optimization is made $10\times$ slower as a side effect, it now takes as
 long as the whole original program, and the overall speedup becomes a
@@ -245,7 +274,9 @@ the common case is \emph{now}.
 
 \begin{example}
   Starting from the previous example (FP $=\SI{40}{\percent}$ of time),
-  the first $2\times$ FP speedup gives $S = 1/(0.6+0.2) = 1.25$.  A second
+  the first $2\times$ FP speedup gives $S = 1/(0.6+0.2) =
+  1.25$.\margin{Amdahl's law assumes a fixed problem; if it grows with the
+  machine, the serial part shrinks (Gustafson 1988).}  A second
   $2\times$ FP speedup on the new machine, where FP is now only
   $0.2/0.8 = \SI{25}{\percent}$ of the time, gives just
   $1/(0.75+0.125) \approx 1.14$.
@@ -257,5 +288,12 @@ the common case is \emph{now}.
   (\cref{eq:iron-law}) attributes time to IC, CPI and clock period; Amdahl's
   law (\cref{eq:amdahl}) bounds what any partial improvement can achieve.
 \end{keypoint}
+
+\begin{marginfigure}
+  \resizebox{\linewidth}{!}{\input{figures/l02-amdahl}}
+  \caption{Overall speedup $S$ for $f_{\mathrm{enh}} = 0.4$ as the enhanced
+    part gets faster.  Each further improvement of the same part buys less.}
+  \label{fig:l02-amdahl}
+\end{marginfigure}
 
 \end{document}

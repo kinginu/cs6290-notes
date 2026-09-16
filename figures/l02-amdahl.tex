@@ -1,0 +1,27 @@
+% Overall speedup under Amdahl's law for f_enh = 0.4, as a function of the
+% speedup of the enhanced part.  The curve saturates at 1/(1-f) = 1.67.
+% Plotted as S-1 so that the origin of the picture is S = 1.
+\begin{tikzpicture}[x=2.2mm, y=30mm, font=\scriptsize\sffamily,
+                    >={Stealth[length=1.4mm]}]
+  % asymptote
+  \draw[ln-muted, densely dashed] (0,0.667) -- (17,0.667)
+    node[pos=0.52, above, font=\tiny\sffamily, text=ln-muted, inner sep=1pt]
+    {$1/(1-f_{\mathrm{enh}})$};
+  % axes
+  \draw[->] (0,0) -- (17.6,0) node[above left, font=\tiny\sffamily, inner sep=1pt]
+    {$s_{\mathrm{enh}}$};
+  \draw[->] (0,0) -- (0,0.80) node[right, font=\tiny\sffamily, xshift=-1pt] {$S$};
+  \foreach \xv in {4,8,12,16} {
+    \draw (\xv,0) -- (\xv,-0.015) node[below, font=\tiny\sffamily] {\xv};
+  }
+  \foreach \yv/\yl in {0/1.0, 0.25/1.25, 0.5/1.5} {
+    \draw (0,\yv) -- (-0.25,\yv) node[left, font=\tiny\sffamily, inner sep=1.5pt] {\yl};
+  }
+  % S = 1/(0.6 + 0.4/s), plotted as S-1
+  \draw[very thick, ln-accent]
+    (1,0) -- (1.5,0.154) -- (2,0.25) -- (3,0.364) -- (4,0.429) -- (5,0.471)
+    -- (6,0.5) -- (8,0.538) -- (10,0.563) -- (12,0.579) -- (16,0.6);
+  \foreach \xv/\yv in {1/0, 2/0.25, 4/0.429, 8/0.538, 16/0.6} {
+    \fill[ln-accent] (\xv,\yv) circle (1.1pt);
+  }
+\end{tikzpicture}
