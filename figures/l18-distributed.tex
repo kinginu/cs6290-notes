@@ -1,0 +1,36 @@
+% Distributed shared memory (NUMA): every node has its own memory and a
+% network interface; memory of other nodes is reached through the network.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  core/.style={draw, fill=ln-accent!15, minimum width=2.1cm, minimum height=0.55cm, inner sep=1pt},
+  part/.style={draw, fill=ln-box, minimum width=2.1cm, minimum height=0.5cm, inner sep=1pt},
+  small/.style={draw, fill=ln-box, minimum width=0.95cm, minimum height=0.5cm, inner sep=1pt, font=\scriptsize\sffamily}]
+  \foreach \i in {0,...,3} {
+    \begin{scope}[xshift=\i*2.75cm]
+      \draw[ln-rule, rounded corners=2pt] (-1.25,0.5) rectangle (1.25,-2.75);
+      \node[core] (c\i) at (0,0) {\iflangja{コア}{core}~\i};
+      \node[part] (k\i) at (0,-0.8) {\iflangja{キャッシュ}{cache}};
+      \node[small] (m\i) at (-0.575,-2.2) {\iflangja{メモリ}{memory}};
+      \node[small] (n\i) at (0.575,-2.2) {NIC};
+      \draw (c\i.south) -- (k\i.north);
+      \draw (k\i.south) -- (0,-1.45);
+      \draw (-0.575,-1.45) -- (0.575,-1.45);
+      \draw (m\i.north) -- (-0.575,-1.45);
+      \draw (n\i.north) -- (0.575,-1.45);
+      \draw (n\i.south) -- (0.575,-3.3);
+    \end{scope}
+  }
+  \draw[line width=1.4pt] (-1.25,-3.3) -- (9.5,-3.3);
+  \node[font=\footnotesize, anchor=north west] at (-1.25,-3.35) {\iflangja{ネットワーク}{network}};
+  % local access of core 0 to its own memory
+  \draw[->, thick, ln-tip] (-0.12,-1.05) -- (-0.12,-1.33) -- (-0.42,-1.33) -- (-0.42,-1.95);
+  \node[font=\scriptsize, text=ln-tip, anchor=east, inner sep=1pt] at (-0.64,-1.7)
+    {\iflangja{高速}{fast}};
+  % remote access from core 0 to the memory of node 2, through both NICs
+  \begin{scope}[dashed, thick, ln-caution]
+    \draw (0.12,-1.05) -- (0.12,-1.33) -- (0.8,-1.33) -- (0.8,-1.95);
+    \draw (0.8,-2.45) -- (0.8,-3.05) -- (6.3,-3.05) -- (6.3,-2.45);
+    \draw[->] (6.3,-1.95) -- (6.3,-1.33) -- (5.2,-1.33) -- (5.2,-1.95);
+  \end{scope}
+  \node[font=\scriptsize, text=ln-caution, anchor=north] at (3.4,-3.35)
+    {\iflangja{他ノードのメモリ：ネットワーク経由（低速）}{memory of another node: via the network (slow)}};
+\end{tikzpicture}

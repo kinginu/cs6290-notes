@@ -344,8 +344,11 @@ message passing	メッセージパッシング	めっせーじぱっしんぐ	18
 shared memory	共有メモリ	きょうゆうめもり	18	programming model
 chip multiprocessor	チップマルチプロセッサ	ちっぷまるちぷろせっさ	18	
 CMP	CMP	CMP	18	see: chip multiprocessor
+coarse-grained multithreading	粗粒度マルチスレッディング	そりゅうどまるちすれっでぃんぐ	18	
+fine-grained multithreading	細粒度マルチスレッディング	さいりゅうどまるちすれっでぃんぐ	18	
 simultaneous multithreading	同時マルチスレッディング	どうじまるちすれっでぃんぐ	18	
 SMT	SMT	SMT	18	see: simultaneous multithreading
+working set	ワーキングセット	わーきんぐせっと	18	
 cache coherence	キャッシュコヒーレンス	きゃっしゅこひーれんす	19	not: memory consistency
 bus snooping	バススヌーピング	ばすすぬーぴんぐ	19	
 write-update coherence	書き込み時更新方式	かきこみじこうしんほうしき	19	

@@ -1,0 +1,21 @@
+% Speedup versus number of cores: ideal linear scaling, and the levelling
+% off predicted by Amdahl's law for parallel fractions 0.97 and 0.9.
+\begin{tikzpicture}[x=0.118cm,y=0.118cm, font=\scriptsize\sffamily]
+  \draw[ln-rule] (0,0) grid[xstep=8,ystep=8] (32,32);
+  \draw[->] (0,0) -- (34,0);
+  \draw[->] (0,0) -- (0,34);
+  \foreach \v in {0,8,16,24,32} {
+    \node[below, inner sep=1.5pt] at (\v,0) {\v};
+    \node[left, inner sep=1.5pt] at (0,\v) {\v};
+  }
+  \node[below] at (16,-3.2) {\iflangja{コア数 $N$}{cores $N$}};
+  \node[rotate=90, above] at (-4.6,16) {\iflangja{高速化率}{speedup}};
+  \draw[thick, ln-muted, dashed] (1,1) -- (32,32)
+    node[pos=0.78, above left, inner sep=1pt] {\iflangja{理想}{ideal}};
+  \draw[thick, ln-accent] plot[domain=1:32, samples=48, smooth]
+    (\x, {1/(0.03+0.97/\x)});
+  \node[ln-accent, above left, inner sep=1pt] at (32,16.6) {$f_{\mathrm{par}}=0.97$};
+  \draw[thick, ln-caution] plot[domain=1:32, samples=48, smooth]
+    (\x, {1/(0.1+0.9/\x)});
+  \node[ln-caution, above left, inner sep=1pt] at (32,7.8) {$f_{\mathrm{par}}=0.9$};
+\end{tikzpicture}

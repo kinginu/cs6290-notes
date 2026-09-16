@@ -1,0 +1,670 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Multi-Processing}
+\lessoninfo{
+  video={Lesson 18, videos 1--22},
+  textbook={H\&P \cite{hennessy2017} §1.1--1.2, §1.5, §5.1, ch.~3, App.~B},
+  keywords={Flynn's taxonomy, MIMD, multicore processor, centralized shared memory, UMA, SMP, distributed shared memory, NUMA, message passing, shared memory, chip multiprocessor, fine-grained multithreading, simultaneous multithreading, working set},
+}
+
+Up to this point the course has made a single processor run a single
+program as fast as possible---with pipelining, branch prediction,
+out-of-order execution and a memory hierarchy---and Lesson 17 made such a
+system dependable.  This lesson turns to machines that execute several
+programs, or several parts of one program, at the same time.  It classifies
+parallel machines, explains why the additional transistors of each
+technology generation now become additional cores rather than a faster
+single core, compares the two ways of connecting processors to memory and
+the two programming models that go with them, and ends with multithreading
+hardware, in particular simultaneous multithreading, which lets one core
+execute several threads at once.
+
+\section{Flynn's taxonomy}
+\label{sec:l18-flynn}
+
+A machine can do more than one thing at a time in different
+ways.\source{Lesson 18, videos 1--2; H\&P §1.2; \cite{flynn1966}.}  The
+classic classification of parallel machines,
+\term{Flynn's taxonomy}[Flynn の分類], looks at two numbers: how many \emph{instruction streams}---each a
+sequence of instructions with its own program counter---the machine executes
+at the same time, and how many \emph{data streams} these instructions
+operate on.  Distinguishing \enquote{one} from \enquote{more than one} for
+each number gives four classes (\cref{tab:l18-flynn}).
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Flynn's taxonomy of parallel machines.}
+  \label{tab:l18-flynn}
+  \begin{tabular}{@{}lccl@{}}
+    \toprule
+    Class & Instruction streams & Data streams & Example \\
+    \midrule
+    SISD & 1        & 1        & uniprocessor \\
+    SIMD & 1        & $>1$     & vector processor, SSE/AVX \\
+    MISD & $>1$     & 1        & stream processor (rare) \\
+    MIMD & $>1$     & $>1$     & multiprocessor, multicore \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{description}
+  \item[SISD] A \term{single instruction, single data}[SISD]%
+    \index{SISD|see{single instruction, single data}} machine executes one
+    instruction stream on one stream of data: the uniprocessor of the
+    previous lessons.  A superscalar out-of-order core is still SISD; the
+    instructions it executes in the same cycle all belong to one program.
+  \item[SIMD] A \term{single instruction, multiple data}[SIMD]%
+    \index{SIMD|see{single instruction, multiple data}} machine executes one
+    instruction stream, but each instruction operates on several data items.
+    Vector processors are of this kind, and so are the multimedia extensions
+    of current instruction sets (MMX, SSE and AVX in x86), whose
+    instructions apply one operation to every element of a short vector.
+  \item[MISD] A \term{multiple instruction, single data}[MISD]%
+    \index{MISD|see{multiple instruction, single data}} machine executes
+    several instruction streams on one data stream; a stream processor in
+    which several programs each process the same incoming data would be an
+    example.  Such machines are rare.
+  \item[MIMD] A \term{multiple instruction, multiple data}[MIMD]%
+    \index{MIMD|see{multiple instruction, multiple data}} machine executes
+    several instruction streams, each on its own data.
+\end{description}
+
+A machine that consists of several processors, each executing its own
+program (or its own part of a program) on its own data, is a
+\term{multiprocessor}[マルチプロセッサ]; multiprocessors are MIMD machines,
+and almost every parallel machine in use today belongs to this class.
+
+\section{Why multiprocessors}
+\label{sec:l18-why}
+
+A uniprocessor can be made faster in two ways: by completing more
+instructions per cycle or by making the cycles shorter.\source{Lesson 18,
+videos 3--4; H\&P §1.1, §1.5.}  Both have run out of room.
+\begin{itemize}
+  \item \textbf{Wider.}  Current cores already handle about four
+    instructions per cycle.  Programs seldom contain enough independent
+    instructions to fill even more slots, so additional width yields
+    diminishing returns (Lesson 6).
+  \item \textbf{Faster.}  A higher clock frequency requires a higher supply
+    voltage.  Since dynamic power is proportional to $V^{2}f$
+    (\cref{eq:active-power}), raising $f$ and $V$ together makes power grow
+    roughly with $f^{3}$, and processors already dissipate as much power as
+    can be removed at reasonable cost.
+\end{itemize}
+
+Moore's law, on the other hand, continues: the number of transistors that
+fit on a chip still doubles about every 18 months.  Instead of a more
+complex single core, the transistors can be used to replicate the core.  A
+\term{multicore processor}[マルチコアプロセッサ] is a single chip that
+contains two or more complete processors, called \emph{cores}.  Doubling
+the number of cores in every generation can double the performance in every
+generation---provided that the software uses all the cores.
+
+\begin{example}
+  \label{ex:l18-power}
+  A core runs at \SI{3}{\giga\hertz} and dissipates \SI{40}{\watt} of dynamic
+  power.  Running it at \SI{3.6}{\giga\hertz}, $1.2\times$ faster, requires
+  a proportionally higher voltage and raises the power by a factor of about
+  $1.2^{3}\approx 1.73$, to \SI{69}{\watt}.  Two copies of the original core
+  at \SI{3}{\giga\hertz} dissipate \SI{80}{\watt} and complete twice the
+  work of one core---if the program keeps both busy.  Two copies at
+  \SI{2.4}{\giga\hertz} ($0.8\times$) dissipate
+  $2\times\SI{40}{\watt}\times 0.8^{3}\approx\SI{41}{\watt}$, about as much
+  as the single original core, yet together complete $1.6\times$ its work.
+\end{example}
+
+\section{Multiprocessors need parallel programs}
+\label{sec:l18-parallel-programs}
+
+A faster uniprocessor speeds up every program, including programs written
+long ago.  A multiprocessor speeds up only programs that divide their work
+among several cores.\source{Lesson 18, video 5; H\&P §5.1.}  Compared with
+sequential (single-threaded) code, such parallel programs are harder in
+every respect:
+\begin{itemize}
+  \item \textbf{Development.}  Besides solving the problem, the programmer
+    must divide the work among threads and coordinate them.
+  \item \textbf{Debugging.}  The behavior of a parallel program depends on
+    the relative timing of its threads, which changes from run to run, so an
+    error may appear in one run and not in the next.
+  \item \textbf{Performance scaling.}  Ideally, performance grows linearly
+    with the number of cores.  In practice it grows up to some number of
+    cores and then levels off; improving the program raises the level, but
+    performance still stops growing at some point (\cref{fig:l18-scaling}).
+\end{itemize}
+
+\begin{marginfigure}
+  \resizebox{\linewidth}{!}{\input{figures/l18-scaling}}
+  \caption{Speedup on $N$ cores: ideal scaling and
+    \cref{eq:l18-amdahl-cores}.}
+  \label{fig:l18-scaling}
+\end{marginfigure}
+Amdahl's law (\cref{eq:amdahl}) shows why the levelling off is
+unavoidable.  If a fraction $f_{\mathrm{par}}$ of a program's execution
+time is divided evenly among $N$ cores and the rest remains sequential, the
+speedup is at most
+\begin{equation}
+  S(N) \;=\; \frac{1}{(1-f_{\mathrm{par}}) + \dfrac{f_{\mathrm{par}}}{N}}
+  \;<\; \frac{1}{1-f_{\mathrm{par}}} .
+  \label{eq:l18-amdahl-cores}
+\end{equation}
+Coordinating the threads costs additional time on top of this, so real
+programs stay below these curves.
+
+\begin{example}
+  In a program, \SI{95}{\percent} of the time is spent in a loop whose
+  iterations are independent, so $f_{\mathrm{par}}=0.95$.  On 8 cores the speedup is at
+  most $1/(0.05+0.95/8)\approx 5.9$, on 32 cores
+  $1/(0.05+0.95/32)\approx 12.5$, and no number of cores takes it beyond
+  $1/0.05 = 20$.
+\end{example}
+
+\needspace{5\baselineskip}
+\begin{keypoint}
+  Replicating cores turns transistors into throughput far more efficiently
+  than building a larger or faster single core, but only for programs that
+  are written to use many cores, and only to the extent that their
+  sequential part allows.
+\end{keypoint}
+
+\section{Centralized shared memory}
+\label{sec:l18-centralized}
+
+The simplest multiprocessor connects all processors to one main
+memory.\source{Lesson 18, videos 6--8; H\&P §5.1.}
+
+\begin{definition}[Centralized shared memory]
+  In a multiprocessor with \term{centralized shared memory}[集中共有メモリ]
+  all cores, each with its own caches, are connected by one bus to a single
+  main memory and to the I/O devices (\cref{fig:l18-centralized}).
+\end{definition}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l18-centralized}
+  \caption{Centralized shared memory: all cores reach the main memory and
+    the I/O devices through the same bus.}
+  \label{fig:l18-centralized}
+\end{figure}
+
+Any core can read and write any memory location and use any I/O device, so
+cores exchange data simply by writing it to memory where another core reads
+it.  Because the memory is equally far from all cores, every core needs the
+same time to access a given location: the machine has
+\term{uniform memory access}[UMA]\index{UMA|see{uniform memory access}}
+(UMA).  And because no core has a special role, the machine is also called
+a \term{symmetric multiprocessor}[対称型マルチプロセッサ]%
+\index{SMP|see{symmetric multiprocessor}} (SMP).  A multicore chip whose
+cores share the main memory attached to it is the most common example.
+
+Centralized shared memory does not scale to many cores, for two reasons.
+\begin{itemize}
+  \item \textbf{Memory size.}  One memory holds the data of all cores, so it
+    must grow with the number of cores, and a larger memory is a slower
+    memory (Lessons 12 and 15).
+  \item \textbf{Memory bandwidth.}  The cache misses of all cores and all
+    I/O transfers go over the same bus.  The more cores there are, the more
+    they wait for each other's memory accesses, until memory access is
+    effectively serialized and adding cores brings no further benefit.
+\end{itemize}
+Centralized shared memory therefore works well only for small machines,
+with about 2 to 16 cores.
+
+\section{Distributed shared memory}
+\label{sec:l18-distributed}
+
+Larger machines distribute the memory among the
+processors.\source{Lesson 18, videos 9--10; H\&P §5.1.}
+
+\begin{definition}[Distributed shared memory]
+  In a multiprocessor with \term{distributed shared memory}[分散共有メモリ]
+  each core has its own local memory and a network interface, and the cores
+  are connected by a network (\cref{fig:l18-distributed}).  A core accesses
+  only its local memory directly; data held by another core is obtained by
+  sending that core a request over the network.
+\end{definition}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l18-distributed}
+  \caption{Distributed shared memory: each node combines a core, its cache, local
+    memory and a network interface card (NIC).}
+  \label{fig:l18-distributed}
+\end{figure}
+
+A core with its memory and network interface is almost a computer of its
+own, a \emph{node}; such a machine is therefore also called a
+\emph{cluster} or a \emph{multicomputer}.  A core reaches its local memory
+as fast as a uniprocessor does, but data held by another node must travel
+over the network, which takes far longer.  The access time depends on where
+the data is, so the machine has
+\term{non-uniform memory access}[NUMA]%
+\index{NUMA|see{non-uniform memory access}} (NUMA).
+
+Distributed shared memory scales to very large numbers of cores; clusters and
+supercomputers are built this way.  The reason is not that the network is
+fast---it is much slower than a memory bus---but that no memory or bus is
+shared by all cores, and that the programmer, who has to request every
+remote access explicitly, is forced to think about communication and
+therefore keeps it to a minimum.
+
+Since a remote access costs far more than a local one, placement of data
+decides the performance of a NUMA machine.  The operating system should
+place each page in the memory of the node whose core accesses it most---the
+private data of a thread, such as its stack, on the node where the thread
+runs---and keep the thread on that node, so that most memory accesses stay
+local.  A page that several cores use, however, cannot be local to all of
+them.\tip{On a NUMA machine, keep each thread on the node that holds the
+data it uses most.}
+
+\begin{note}[Terminology]
+  Following the lecture, \enquote{distributed shared memory} is used here
+  for every multiprocessor whose memory is divided among its nodes, although
+  with explicit requests over a network no memory is actually shared.  H\&P
+  reserve the name for machines whose nodes do share one physical address
+  space---any core can issue any address, and the interconnect carries an
+  access to a remote address to the node that holds it---and call machines
+  that communicate only by explicit messages clusters.  The lecture calls
+  both kinds NUMA; in H\&P's terminology NUMA refers only to the machines
+  with a shared address space, in which the access time depends on where the
+  data is.
+\end{note}
+
+\section{Message passing and shared memory}
+\label{sec:l18-programs}
+
+A parallel program can be written in two fundamentally different
+ways.\source{Lesson 18, videos 11--14; H\&P §5.1.}
+
+\begin{definition}[Message passing]
+  In the \term{message passing}[メッセージパッシング] programming model
+  each process has its own memory, which no other process can access.
+  Processes exchange data only by explicitly sending and receiving messages.
+\end{definition}
+
+\begin{definition}[Shared memory]
+  In the \term{shared memory}[共有メモリ] programming model all threads
+  share one address space and exchange data simply by writing variables
+  that other threads read.
+\end{definition}
+
+The two models are compared here on the same task: adding up the $N$
+elements of an array with $P$ processes or threads.  In both programs every
+process or thread executes the same code and differs only in its
+identifier \texttt{myPID}, which ranges from 0 to $P-1$.
+
+\subsection{A message-passing program}
+
+Each process holds only the $N/P$ elements assigned to it.  Distributing
+the parts of the array is itself explicit work (not shown): the process
+that initially has the data must send each other process its part.  Each
+process then adds up its own part, and process 0 receives and combines the
+partial sums of all the others (\cref{ex:l18-mp}).
+
+\needspace{8\baselineskip}
+\begin{example}[Message passing]
+  \label{ex:l18-mp}
+  Every process executes the following code, with its own $N/P$ elements
+  already in \texttt{part}:
+  \begin{lstlisting}[language=C, numbers=none]
+#define N 4096            /* array size          */
+#define P 8               /* number of processes */
+double part[N/P];         /* this process's part */
+double mySum = 0;
+for (int i = 0; i < N/P; i++)
+  mySum += part[i];
+if (myPID == 0) {
+  for (int p = 1; p < P; p++) {
+    double pSum;
+    recv(p, &pSum);       /* wait for p's sum    */
+    mySum += pSum;
+  }
+  printf("sum: %f\n", mySum);
+} else
+  send(0, &mySum);        /* to process 0        */
+\end{lstlisting}
+\end{example}
+
+\subsection{A shared-memory program}
+
+With shared memory the whole array is visible to every thread, so nothing
+has to be distributed: each thread computes the range of indices it is
+responsible for and adds its partial sum to a shared total
+(\cref{ex:l18-sm}).  Variables declared \texttt{shared} exist once for all
+threads; all other variables are private to each thread.
+
+\begin{example}[Shared memory]
+  \label{ex:l18-sm}
+  Every thread executes the following code on the shared array:
+  \begin{lstlisting}[language=C, numbers=none, morekeywords={shared}]
+#define N 4096
+#define P 8
+shared double array[N];
+shared double allSum = 0;
+shared lock_t sumLock;
+double mySum = 0;         /* private to the thread */
+int lo = myPID * N / P;
+int hi = (myPID + 1) * N / P;
+for (int i = lo; i < hi; i++)
+  mySum += array[i];
+lock(&sumLock);
+allSum += mySum;
+unlock(&sumLock);
+if (myPID == 0)           /* see text              */
+  printf("sum: %f\n", allSum);
+\end{lstlisting}
+\end{example}
+
+The lock is essential.  The statement \texttt{allSum += mySum} reads
+\texttt{allSum}, adds, and writes the result back; if two threads both read
+the old value before either writes, one of the two partial sums is lost.
+The lock admits one thread at a time to the update.  The program is also
+still incomplete: thread 0 must wait until all other threads have added
+their sums before it prints the total.  Locks and this kind of waiting are
+the subject of Lesson 20.
+
+\subsection{Comparison}
+
+\Cref{tab:l18-mp-sm} summarizes how the two models differ.  In message
+passing, every transfer of data and the decision which process holds which
+data are written by the programmer, and the hardware only has to connect
+otherwise independent nodes by a network.  With shared memory,
+communication and data distribution happen implicitly through the shared
+variables, but the hardware must provide a shared address space, including
+consistent contents in the caches of all cores (Lesson 19), and support for
+synchronization (Lesson 20).  The two models also require explicit code in
+different places: message passing needs code to distribute the data, but a
+receive already waits until the data has arrived, whereas shared memory
+needs no distribution code but explicit synchronization wherever a thread
+must wait for the others.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Message passing and shared memory compared.}
+  \label{tab:l18-mp-sm}
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+                                   & Message passing   & Shared memory \\
+    \midrule
+    Communication                  & by the programmer & automatic \\
+    Data distribution              & manual            & automatic \\
+    Hardware support               & simple            & extensive \\
+    Programming for correctness    & difficult         & less difficult \\
+    Programming for performance    & difficult         & very difficult \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+For the programmer the two models distribute the difficulty differently.
+A shared-memory program is easier to get right: a sequential program can be
+parallelized one loop at a time, with locks around the updates of shared
+data.  Making it fast is much harder, because the costs of sharing do not
+appear in the source code---threads waiting for locks, data moving between
+the caches of different cores, remote accesses on a NUMA machine.  A
+message-passing program is harder to get right, since the data distribution
+and every send with its matching receive must be written by hand, but once
+it is correct all communication is visible in the code, and much of the
+work of making it fast has been done along the way.
+
+\begin{keypoint}
+  Message passing makes communication explicit: hard to program correctly,
+  but its costs are visible.  Shared memory makes communication implicit:
+  easier to program correctly, but much harder to make fast.
+\end{keypoint}
+
+\section{Shared-memory hardware}
+\label{sec:l18-mt-hardware}
+
+The threads of a shared-memory program can be run by the hardware in
+several ways.\source{Lesson 18, video 15; H\&P ch.~3, §5.1.}
+\begin{enumerate}
+  \item \textbf{Several cores sharing a physical address space.}  Every core
+    can issue any physical address.  The memory may be centralized (UMA) or
+    distributed among the nodes, which then share one physical address space
+    (NUMA; see the note in \cref{sec:l18-distributed}).  Each thread runs on a
+    core of its own, and the threads truly execute at the same time.
+  \item \textbf{One core, time-sharing.}  The operating system runs one
+    thread for a while, then saves its state (PC and registers) and restores
+    the state of another thread.  Such \emph{context switches} need no
+    special hardware, and the threads automatically use the same physical
+    memory, but only one thread executes at any moment: time-sharing gains
+    nothing in performance.
+  \item \textbf{One core, hardware multithreading.}  The core itself keeps
+    the state of several threads and switches among them without the
+    operating system.  By how often the core changes threads, three
+    variants are distinguished, each requiring more hardware support than
+    the one before:
+    \begin{itemize}
+      \item \term{coarse-grained multithreading}[粗粒度マルチスレッディング]
+        changes to another thread only after several cycles, typically when
+        the running thread has to wait for a slow event such as a miss in
+        the last-level cache;
+      \item \term{fine-grained multithreading}[細粒度マルチスレッディング]
+        can change to another thread in every cycle;
+      \item \term{simultaneous multithreading}[同時マルチスレッディング]%
+        \index{SMT|see{simultaneous multithreading}} (SMT) executes
+        instructions from several threads in the same cycle.  Intel's
+        Hyper-Threading is an implementation of SMT.
+    \end{itemize}
+\end{enumerate}
+
+\section{Multithreading performance}
+\label{sec:l18-mt-performance}
+
+Consider two threads and a superscalar core that can handle four
+instructions per cycle.\source{Lesson 18, videos 16--17; H\&P ch.~3;
+\cite{olukotun1996,tullsen1995}.}  A single thread rarely fills all four
+slots of a cycle: dependences among its instructions, mispredicted branches
+and cache misses leave many slots empty, and in some cycles the thread
+cannot proceed at all.  \Cref{fig:l18-mt-timing} shows schematically how
+four configurations use the slots.  In all four, an instruction for which
+no slot is free waits for the next cycle, and a thread that waits for an
+event, such as a cache miss, waits the same number of cycles whether or
+not it holds the core.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l18-mt-timing}
+  \caption{Schematic use of the four slots per cycle of a core by two
+    threads over ten cycles.  Each column is a cycle and each row a slot.
+    Alone, each thread executes 16 instructions in these ten cycles (b);
+    (a) switches threads after five cycles, (c) alternates between the
+    threads that are not waiting.}
+  \label{fig:l18-mt-timing}
+\end{figure}
+
+\begin{description}
+  \item[Time-sharing] One core runs one thread at a time.  Together the
+    threads complete no more work than a single thread, in practice
+    slightly less, because every context switch costs time (not drawn in
+    the figure).  The cost is that of one core.
+  \item[Chip multiprocessor] Each thread runs on a core of its own.  A
+    multicore processor used in this way is a
+    \term{chip multiprocessor}[チップマルチプロセッサ]%
+    \index{CMP|see{chip multiprocessor}} (CMP).  Both threads run at full
+    speed, so the throughput doubles, but so do chip area and power, and
+    each core still leaves as many slots empty as a single thread does.
+  \item[Fine-grained multithreading] One core with a separate set of
+    registers for each thread changes threads from cycle to cycle, so a
+    cycle in which one thread must wait is used by the other.  The core is
+    busier, and the only additional hardware is the small per-thread state,
+    about \SI{5}{\percent} of the cost of a core.  The empty slots within a
+    cycle, however, stay empty.
+  \item[SMT] One core mixes instructions of both threads in the same cycle
+    and fills many of the slots that a single thread would leave empty.  The
+    throughput rises above that of fine-grained multithreading, though it
+    stays below that of two cores, because the threads share a single set of
+    resources.  SMT needs more additional hardware than fine-grained
+    multithreading, about \SI{10}{\percent} of the cost of a core
+    (\cref{sec:l18-smt-hw}).
+\end{description}
+
+How much SMT gains depends on the threads.  When their instructions compete
+for the same execution units, the instructions of one thread find few slots
+left free by the other and the gain is small; SMT approaches the throughput
+of a CMP only when the resource demands of the two threads complement each
+other.
+
+\begin{example}
+  \label{ex:l18-smt-cmp}
+  Let SMT add \SI{10}{\percent} to the cost of a core and raise its
+  throughput on two threads by \SI{35}{\percent}.  A CMP of two cores
+  without SMT doubles both throughput and cost.  Relative to one core that
+  time-shares the threads, the SMT core delivers $1.35/1.10\approx 1.23$
+  times the throughput per unit of cost and the CMP $2/2=1$, although the
+  absolute throughput of the CMP is higher.  If the two threads competed for
+  the same execution units and SMT raised the throughput by only
+  \SI{5}{\percent}, the SMT core would deliver $1.05/1.10\approx 0.95$, and
+  two cores would be the better use of the hardware.
+\end{example}
+
+\begin{keypoint}
+  A CMP gives the highest throughput, at twice the cost.  SMT gives a
+  smaller gain for about \SI{10}{\percent} more cost.  When the resource
+  demands of the threads complement each other, SMT is the more efficient
+  use of the hardware; when the threads compete for the same resources, two
+  cores can be the better choice.
+\end{keypoint}
+
+\section{Hardware changes for SMT}
+\label{sec:l18-smt-hw}
+
+SMT can be added to the out-of-order core of Lessons 7 and 8 with few
+changes (\cref{fig:l18-smt-hw}).\source{Lesson 18, video 18; H\&P ch.~3;
+\cite{tullsen1995}.}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l18-smt-hw}
+  \caption{An out-of-order core with SMT for two threads and separate ROBs.
+    With a shared ROB, only the program counter, the RAT and the
+    architectural registers are kept per thread.}
+  \label{fig:l18-smt-hw}
+\end{figure}
+
+\begin{description}
+  \item[Fetch] Each thread needs its own PC.  The fetch stage takes
+    instructions from both PCs and marks each fetched instruction with the
+    thread it belongs to.
+  \item[Decode] Decoding does not depend on the thread and is unchanged.
+  \item[Rename] The renaming logic is unchanged, but each thread needs its
+    own RAT: register R1 of thread 1 and register R1 of thread 2 are
+    different architectural registers.
+  \item[Dispatch and execution] Unchanged.  The reservation stations, the
+    execution units and the CDB are shared; after renaming, operands are
+    identified by tags that are unique across both threads, so instructions
+    of different threads cannot be confused.
+  \item[ROB] Each thread can have a separate ROB with its own commit point.
+    The ROB is a large structure, however, so duplicating it is expensive.
+    More often in practice, the instructions of both threads are interleaved
+    in a single shared ROB, each entry recording the thread of its
+    instruction.  The small price is that a completed instruction of one
+    thread may have to wait for older instructions of the other thread to
+    commit.
+  \item[Commit] Each thread needs its own architectural register file (ARF),
+    into which its instructions commit.
+\end{description}
+
+With a shared ROB, the duplicated structures---PC, RAT and ARF---are small;
+the expensive parts of the core---ROB, reservation stations, execution
+units, caches and branch predictors---are shared.  This is why SMT adds
+only about \SI{10}{\percent} to the cost of a core.
+
+\section{SMT, the data cache and the TLB}
+\label{sec:l18-smt-tlb}
+
+The threads that share an SMT core may belong to different processes, each
+with its own virtual address space.\source{Lesson 18, video 19; H\&P
+App.~B.}  The same virtual address then refers to different data in each
+thread, and the caches and the TLB of Lessons 13 and 14 must not confuse the
+two.
+\begin{itemize}
+  \item A \term*{virtually accessed cache} is indexed and tagged with the
+    virtual address alone.  A block cached for one thread produces a hit for
+    the other thread's access to the same virtual address and returns the
+    wrong data.  Such a cache can be used with SMT only if each entry also
+    records its thread and a hit requires the thread to match as well.
+  \item A \term*{VIPT cache} and a physically accessed
+    cache compare physical tags.  Two threads hit the same block only when
+    they access the same physical address, and then they really do access
+    the same data.  These caches work correctly with SMT as long as the TLB
+    delivers the right translation for each thread.
+  \item The \term*{TLB} must therefore be thread-aware: each entry records the
+    thread it belongs to, the thread identifier of the access is passed into
+    the lookup, and a hit requires both the thread and the virtual page
+    number to match (\cref{fig:l18-smt-tlb}).
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l18-smt-tlb}
+  \caption{A thread-aware TLB.  The same virtual page number is translated
+    to different frames for the two threads.}
+  \label{fig:l18-smt-tlb}
+\end{figure}
+
+\section{SMT and cache performance}
+\label{sec:l18-smt-cache}
+
+The caches of a core are shared by all its SMT threads, which has one
+advantage and one serious drawback.\source{Lesson 18, videos 20--22; H\&P
+ch.~3.}
+\begin{itemize}
+  \item \textbf{Fast data sharing.}  When one thread stores a value that
+    the other thread then loads, the load finds the data already in the
+    cache.
+  \item \textbf{Shared capacity.}  The threads also share the capacity and
+    the associativity of the cache, and so they compete for it.
+\end{itemize}
+
+The competition is described in terms of the
+\term{working set}[ワーキングセット] of a thread: the set of blocks it is actively using
+at a given time.  Let $\mathit{WS}_0$ and $\mathit{WS}_1$ be the sizes of
+the working sets of two SMT threads and $\mathit{WS}_{01}$ the size of the
+part both use.  As long as
+\begin{equation}
+  \mathit{WS}_0 + \mathit{WS}_1 - \mathit{WS}_{01} \;\le\; \text{cache size},
+  \label{eq:l18-ws}
+\end{equation}
+both threads find their blocks in the cache almost as often as when running
+alone.  When the combined working set exceeds the cache, the threads keep
+evicting each other's blocks and the cache \emph{thrashes}.  If each working
+set would fit on its own, SMT can then be slower than running the threads
+one at a time: a time-shared thread has the whole cache to itself for
+millions of cycles and refills it only after each context switch, whereas
+SMT threads evict each other's blocks all the time.\caution{SMT raises
+throughput only if the cache holds the working sets of all threads at the
+same time.}  A scheduler should therefore run together threads whose
+combined working set fits the cache, and run a thread whose working set
+alone exceeds the cache without SMT partners: it would evict their blocks
+without gaining anything itself.
+
+\begin{example}
+  A core has a \SI{64}{KB} L1 data cache.  Threads A, B and C have working
+  sets of \SI{40}{KB}, \SI{36}{KB} and \SI{28}{KB}; each fits into the cache
+  alone.  A and B work on common data, \SI{20}{KB} of which appears in both
+  working sets, so running them together with SMT needs
+  $40+36-20=\SI{56}{KB}$, which fits.  A and C share no data and together
+  need \SI{68}{KB}; with SMT they thrash, and time-sharing them may well be
+  faster.
+\end{example}
+
+\begin{keypoint}[Lesson summary]
+  Multiprocessors are MIMD machines.  They have replaced ever-faster
+  uniprocessors because wider pipelines give diminishing returns and higher
+  frequencies cost power roughly as $f^{3}$, whereas replicated cores turn
+  Moore's-law transistors into throughput---but only for parallel programs,
+  whose speedup levels off (\cref{eq:l18-amdahl-cores}).  Centralized shared
+  memory (UMA, SMP) is simple but limited to a few cores by memory size and
+  bandwidth; distributed shared memory (NUMA) scales to large machines at the price
+  of slow remote accesses.  Message passing is hard to program correctly,
+  shared memory hard to make fast.  A core can run several threads by
+  time-sharing, by coarse- or fine-grained multithreading, or by SMT, which
+  duplicates little more than the PC, the RAT and the ARF, needs a
+  thread-aware TLB, and pays off only if the shared cache holds the combined
+  working set (\cref{eq:l18-ws}).  Cores that share memory must also keep
+  their caches consistent, the topic of Lesson 19.
+\end{keypoint}
+
+\end{document}

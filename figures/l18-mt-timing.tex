@@ -1,0 +1,60 @@
+% Schematic use of the four slots per cycle of a core by two threads over
+% ten cycles: (a) time-sharing, (b) chip multiprocessor, (c) fine-grained
+% multithreading, (d) simultaneous multithreading.
+% Alone, thread 1 executes 3,2,3,-,-,1,1,-,4,2 and thread 2
+% 3,1,2,-,2,-,-,4,1,3 instructions in the ten cycles (16 each; "-" is a
+% cycle spent waiting for an event such as a cache miss).  One model for all
+% panels: instructions for which no slot is free wait for the next cycle
+% (with SMT, 4 slots are split 2+2 when both threads have more ready), and
+% a wait elapses whether or not the thread holds the core.  (a) switches
+% threads after five cycles; (c) alternates between the threads that are
+% not waiting.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\scriptsize\sffamily]
+  \def\lncw{0.24}
+  % \lnslots{x0}{y0}{cycle/slots of thread 1/slots of thread 2, ...}
+  \def\lnslots#1#2#3{%
+    \foreach \c/\a/\b in {#3} {
+      \foreach \s in {1,...,4} {
+        \pgfmathtruncatemacro\lnk{\s<=\a ? 1 : (\s<=\a+\b ? 2 : 0)}
+        \ifcase\lnk \def\lnf{white}\or \def\lnf{ln-accent!60}\or \def\lnf{ln-tip!45}\fi
+        \draw[ln-rule, fill=\lnf] ({#1+(\c-1)*\lncw},{#2-(\s-1)*\lncw})
+          rectangle ++(\lncw,-\lncw);
+      }
+    }
+    \draw ({#1},{#2}) rectangle ++({10*\lncw},{-4*\lncw});
+  }
+  % (a) time-sharing: thread 1 for five cycles, then thread 2
+  \node[anchor=south west, inner sep=1pt] at (0,0.05)
+    {\iflangja{(a) 時分割}{(a) time-sharing}};
+  \lnslots{0}{0}{1/3/0,2/2/0,3/3/0,4/0/0,5/0/0,6/0/3,7/0/1,8/0/2,9/0/0,10/0/2}
+  \node[anchor=north, text=ln-muted] at (1.2,-0.98) {\iflangja{コア：16 命令}{core: 16 instr.}};
+  % (b) CMP: one core per thread
+  \node[anchor=south west, inner sep=1pt] at (3.0,0.05) {(b) CMP};
+  \lnslots{3.0}{0}{1/3/0,2/2/0,3/3/0,4/0/0,5/0/0,6/1/0,7/1/0,8/0/0,9/4/0,10/2/0}
+  \node[anchor=north, text=ln-muted] at (4.2,-0.98) {\iflangja{コア 1：16 命令}{core 1: 16 instr.}};
+  \lnslots{3.0}{-1.44}{1/0/3,2/0/1,3/0/2,4/0/0,5/0/2,6/0/0,7/0/0,8/0/4,9/0/1,10/0/3}
+  \node[anchor=north, text=ln-muted] at (4.2,-2.42) {\iflangja{コア 2：16 命令}{core 2: 16 instr.}};
+  % (c) fine-grained multithreading: one thread per cycle
+  \node[anchor=south west, inner sep=1pt] at (6.0,0.05)
+    {\iflangja{(c) 細粒度 MT}{(c) fine-grained MT}};
+  \lnslots{6.0}{0}{1/3/0,2/0/3,3/2/0,4/0/1,5/3/0,6/0/2,7/0/0,8/1/0,9/0/2,10/1/0}
+  \node[anchor=north, text=ln-muted] at (7.2,-0.98) {\iflangja{コア：18 命令}{core: 18 instr.}};
+  % (d) SMT: both threads in the same cycle
+  \node[anchor=south west, inner sep=1pt] at (9.0,0.05) {(d) SMT};
+  \lnslots{9.0}{0}{1/2/2,2/1/1,3/2/1,4/2/2,5/1/0,6/0/2,7/0/0,8/1/0,9/1/3,10/0/1}
+  \node[anchor=north, text=ln-muted] at (10.2,-0.98) {\iflangja{コア：22 命令}{core: 22 instr.}};
+  % axis hints
+  \draw[->, ln-muted] (6.0,-1.7) -- (8.4,-1.7)
+    node[midway, below, inner sep=1.5pt] {\iflangja{サイクル}{cycles}};
+  \draw[->, ln-muted] (-0.12,0) -- (-0.12,-0.96)
+    node[midway, rotate=90, above, inner sep=1.5pt] {\iflangja{スロット}{slots}};
+  % legend
+  \begin{scope}[xshift=9.0cm, yshift=-1.6cm]
+    \draw[ln-rule, fill=ln-accent!60] (0,0) rectangle ++(0.24,-0.24);
+    \node[anchor=west] at (0.3,-0.125) {\iflangja{スレッド 1}{thread 1}};
+    \draw[ln-rule, fill=ln-tip!45] (0,-0.4) rectangle ++(0.24,-0.24);
+    \node[anchor=west] at (0.3,-0.525) {\iflangja{スレッド 2}{thread 2}};
+    \draw[ln-rule, fill=white] (0,-0.8) rectangle ++(0.24,-0.24);
+    \node[anchor=west] at (0.3,-0.925) {\iflangja{空きスロット}{empty slot}};
+  \end{scope}
+\end{tikzpicture}

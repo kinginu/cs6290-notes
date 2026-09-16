@@ -1,0 +1,19 @@
+% Centralized shared memory (UMA, SMP): cores with private caches share one
+% main memory and the I/O devices through a common bus.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily,
+  core/.style={draw, fill=ln-accent!15, minimum width=1.7cm, minimum height=0.6cm, inner sep=2pt},
+  cache/.style={draw, fill=ln-box, minimum width=1.7cm, minimum height=0.5cm, inner sep=2pt},
+  big/.style={draw, fill=ln-box, minimum height=0.7cm, inner sep=2pt}]
+  \foreach \i in {0,...,3} {
+    \node[core] (c\i) at (\i*2.3,0) {\iflangja{コア}{core}~\i};
+    \node[cache] (k\i) at (\i*2.3,-0.85) {\iflangja{キャッシュ}{cache}};
+    \draw (c\i.south) -- (k\i.north);
+    \draw (k\i.south) -- (\i*2.3,-1.7);
+  }
+  \draw[line width=1.4pt] (-1.0,-1.7) -- (7.9,-1.7)
+    node[right, font=\footnotesize] {\iflangja{バス}{bus}};
+  \node[big, minimum width=4.4cm] (mem) at (1.15,-2.75) {\iflangja{主記憶}{main memory}};
+  \node[big, minimum width=2.8cm] (io) at (5.75,-2.75) {\iflangja{I/O 装置}{I/O devices}};
+  \draw (mem.north) -- (1.15,-1.7);
+  \draw (io.north) -- (5.75,-1.7);
+\end{tikzpicture}
