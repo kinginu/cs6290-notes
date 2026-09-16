@@ -40,8 +40,10 @@ and large once in a while.
 Predication has no misprediction penalty, since nothing is predicted, but it
 always wastes the work of the direction that is not needed: if both
 directions contain equally many instructions, half of the work is thrown
-away.  Per execution of the branch, predication wastes the instructions of
-the unneeded direction, while prediction wastes the misprediction penalty
+away.\caution{Nothing is guessed and nothing is undone: both directions run
+on purpose, and the code itself discards the unneeded results.}  Per
+execution of the branch, predication wastes the instructions of the unneeded
+direction, while prediction wastes the misprediction penalty
 multiplied by the probability of a misprediction.  Which is smaller depends
 on the kind of branch (\cref{tab:l05-which}); predication can be the better
 choice only for a small if-then-else, whose directions contain far fewer
@@ -77,8 +79,11 @@ instructions than a misprediction flushes.
 For a small if-then-else the choice depends on how well the branch is
 predicted.  If a misprediction flushes 40 instructions and the unneeded
 direction contains 4, predication wastes less than prediction as soon as more
-than one execution in ten is mispredicted.  \Cref{sec:l05-performance} makes
-this comparison precise for the code that a compiler actually produces.
+than one execution in ten is mispredicted.\margin{Real penalties are
+larger: about 17 cycles on a Skylake-class core (Lesson 4), some 70
+instruction slots at four instructions per cycle.}
+\Cref{sec:l05-performance} makes this comparison precise for the code that a
+compiler actually produces.
 
 \begin{keypoint}
   Prediction costs nothing when it is right and tens of instructions when it
@@ -135,7 +140,9 @@ value.  The converted code contains no branch.
 \end{figure}
 
 The transformation gains something only if the selections can be carried out
-without a branch.  Translated into ordinary branch instructions, each
+without a branch.\margin{Removing the branch also leaves one straight-line
+stretch of code, which the compiler can then schedule as a whole (Lesson
+10).}  Translated into ordinary branch instructions, each
 selection is itself an if-then-else on~\texttt{c}, as hard to predict as the
 branch that was removed, so the converted code would still mispredict and in
 addition execute the work of both directions.  Ordinary arithmetic can select
@@ -177,7 +184,10 @@ MOVN R4, R1, R3     ; if c != 0: x <- x1
 MOVZ R4, R2, R3     ; if c == 0: x <- x2
 \end{lstlisting}
 The condition register is typically set by a comparison such as
-\texttt{SLT}, which writes 1 if the condition holds and 0 otherwise.
+\texttt{SLT}, which writes 1 if the condition holds and 0
+otherwise.\tip{After \texttt{SLT} the condition register is nonzero exactly
+when the condition holds: the \texttt{MOVN} carries the then part and the
+\texttt{MOVZ} the else part.}
 
 \begin{example}
   \label{ex:l05-movzn}
@@ -241,8 +251,10 @@ count pipeline slots, as in Lesson 3: every executed instruction occupies one
 slot, and every misprediction wastes as many slots as it flushes instructions.
 Let the branch version execute $n_b$ instructions per execution on average
 and mispredict $m$ times per execution with a penalty of $P$ instructions, and
-let the converted version execute $n_c$ instructions.  If-conversion pays off
-when
+let the converted version execute $n_c$ instructions.\caution{$m$ is the
+rate of this one branch, per execution of the fragment, not the
+per-instruction rate of Lesson 4; $P$ counts instructions, not cycles.}
+If-conversion pays off when
 \begin{equation}
   n_c \;<\; n_b + mP
   \qquad\Longleftrightarrow\qquad
@@ -251,9 +263,11 @@ when
 \end{equation}
 The right-hand side is the \emph{break-even misprediction rate}: the extra
 instructions of the converted code, measured in units of the misprediction
-penalty.  Compared with the rough comparison of \cref{sec:l05-predication},
-the extra instructions include the conditional moves, less the branch and
-jump instructions that the conversion removes.
+penalty.\tip{Each extra instruction of the converted code raises the
+break-even rate by $1/P$: with $P = 20$, five percentage points of predictor
+accuracy apiece.}  Compared with the rough comparison of
+\cref{sec:l05-predication}, the extra instructions include the conditional
+moves, less the branch and jump instructions that the conversion removes.
 
 \begin{example}
   \label{ex:l05-performance}
@@ -348,7 +362,9 @@ result and raises no exception.  Predicate register~0 always holds~1, so an
 instruction whose qualifying predicate is~0 is unconditional.
 The predicate registers are set by compare instructions, which write a pair
 of predicates with complementary values, one for the condition and one for
-its negation.
+its negation.\margin{A 128-bit bundle holds three 41-bit instructions and a
+5-bit template; IA-64 also has 128 integer and 128 floating-point registers
+(Lesson 11).}
 
 \begin{figure}[htbp]
   \centering
@@ -399,7 +415,11 @@ its negation.
 \end{table}
 
 The fully predicated version executes the compare and the instructions of
-both directions, and nothing else.  Compared with the branch version it
+both directions, and nothing else.\sidenote{IA-64 was developed jointly by HP
+and Intel from 1994, and full predication was part of its plan to expose
+parallelism at compile time instead of in hardware.  The first Itanium shipped
+in 2001; it never displaced x86-64, and Intel shipped the last one in July
+2021 (Lesson 11).}  Compared with the branch version it
 executes the unneeded direction but no branch and no jump; here the two
 balance, and its $n_c = 4$ equals the average $n_b$ of the branch version.
 Its break-even rate by \cref{eq:l05-break-even} is $m = (4-4)/20 = 0$: the
@@ -411,7 +431,9 @@ by $M/P$; if the conditional moves test a register that already holds the
 condition, they need no compare while full predication still needs one, and
 the difference is $(M-1)/P$.  By lowering the break-even rate, full
 predication makes if-conversion pay off also for branches that are predicted
-too well to justify conditional moves.
+too well to justify conditional moves.\margin{ARM's 32-bit A32 instructions
+carry a 4-bit condition field, so nearly all of them are predicated; AArch64
+(2011) dropped it, keeping conditional select (CSEL).}
 
 \begin{keypoint}[Lesson summary]
   Branch prediction costs nothing when right and tens of instructions when
