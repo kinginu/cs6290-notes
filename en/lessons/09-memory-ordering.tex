@@ -30,15 +30,20 @@ dependences between writes to the same register; the scheduling of Tomasulo's
 algorithm (Lesson 7) makes each instruction wait until the register values it
 reads have been computed; and the ROB makes exceptions precise.
 
-Loads and stores remain.  They depend on one another through memory locations
-in the same way as instructions depend on one another through registers
+Loads and stores remain.\margin{About 38\% of the instructions a typical
+x86 program executes are loads or stores, roughly two loads per store
+(Intel, \emph{Smart Memory Access} white paper, 2006).}  They depend on one
+another through memory locations in the same way as instructions depend on one
+another through registers
 (\cref{sec:l07-load-store}):
 \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
 SW  R1, 0(R2)      ; MEM[R2] <- R1
 ADD R4, R5, R6     ; R4 <- R5 + R6
 LW  R3, 0(R4)      ; R3 <- MEM[R4]
 \end{lstlisting}
-The load has a RAW dependence on the store exactly when R4 equals R2.  Two
+The load has a RAW dependence on the store exactly when R4 equals
+R2.\caution{Memory has WAR and WAW dependences too, but stores write memory in
+program order (\cref{sec:l09-write}), so only RAW needs machinery.}  Two
 properties distinguish such a dependence from a dependence through a register.
 \begin{itemize}
   \item It is not visible in the instructions themselves.  The register names
@@ -64,17 +69,21 @@ executed, an exception raised afterwards by an earlier instruction would let
 the handler see a location that, in program order, has not yet been written,
 and a store on a mispredicted path would change memory that the program never
 changes.  At commit, in contrast, the store is known to belong to the
-execution of the program, and stores commit in program order.
+execution of the program, and stores commit in program order.\sidenote{Commit
+is when the write becomes irrevocable, not when it reaches the cache: real
+cores move the value into a store buffer that drains into the L1 cache
+afterwards.  Other cores may see it late, which is what the consistency
+models of Lesson 21 constrain.}
 
 Deferring the write creates a problem for loads.  A load could read memory as
 soon as it has computed its address, but a store that precedes it in program
 order may have executed and still be waiting to commit, or may not even have
 computed its address yet.  If that store writes the location the load reads,
 memory still holds the old value, and the load must instead obtain the value of
-the store.\margin{In the pipeline of Lesson 3, the MEM stage performs loads and
-stores in program order.}  The processor must therefore keep, in program order,
+the store.  The processor must therefore keep, in program order,
 the address and value of every store that has not yet committed, and every load
-must consult them.
+must consult them.\margin{In the pipeline of Lesson 3, the MEM stage performs
+loads and stores in program order.}
 
 \begin{keypoint}
   Stores execute out of order but write memory at commit, in program order.
@@ -140,7 +149,9 @@ or at the commit pointer.
   \item If it reaches the commit pointer without finding a matching store or a
     store with an unknown address, no uncommitted store writes the location
     before the load, so memory already holds the correct value, and the load
-    reads memory.
+    reads memory.\caution{Not the forwarding of Lesson 3: there a result is
+    bypassed between pipeline stages, here a value is copied from one
+    instruction's LSQ entry into another's.}
 \end{enumerate}
 If, before it ends, the search passes a store whose address has not been
 computed yet, that store may or may not write the location the load reads, and
@@ -158,7 +169,8 @@ three options.\source{Lesson 9, videos 5--8; H\&P §3.6.}
   \item The load waits until every earlier store has computed its address, so
     that its search never meets an unknown address.
   \item The load executes anyway, and a wrong value is detected and corrected
-    later.
+    later.\margin{The pattern of branch prediction (Lesson 4): proceed on a
+    guess, check it later, squash what followed if the guess was wrong.}
 \end{enumerate}
 The first two options make loads wait; the third does not, but needs a check.
 A store's address is unknown until its base register is available, which can
@@ -203,9 +215,11 @@ writes its result in cycle~6, so the load I5 could execute in cycle~7
 
 In the example I5 executes in cycle~7 and I6, which uses its value, in
 cycle~9.  In return, every store must check its own address against the loads
-that have overtaken it.  When I3 computes its address in cycle~9, it searches
-the later LSQ entries for loads with the same address whose C bit is set, that
-is, loads that have already obtained a value.
+that have overtaken it.\tip{A load looks back for stores, a store looks
+forward for loads: each search skips its own kind.}  When I3 computes its
+address in cycle~9, it searches the later LSQ entries for loads with the same
+address whose C bit is set, that is, loads that have already obtained a
+value.
 \begin{itemize}
   \item If the address of I5 differs, nothing happens: I5 has obtained the
     correct value, and I6 writes its result in cycle~10.
@@ -215,8 +229,10 @@ is, loads that have already obtained a value.
     I5 and all instructions after it and executes them again, starting by
     fetching I5.  None of them has committed, since I3 precedes them, so the
     ROB discards them like the instructions of a mispredicted path
-    (\cref{sec:l08-recovery}).  When I5 executes again, its search finds I3,
-    and it receives the value by forwarding.
+    (\cref{sec:l08-recovery}).\margin{Cancelling costs a pipeline restart ---
+    on Skylake-class cores 15--20 cycles, the order of a branch misprediction
+    (Agner Fog, microarchitecture manual).}  When I5 executes again, its
+    search finds I3, and it receives the value by forwarding.
 \end{itemize}
 
 \subsection{In-order load-store execution}
@@ -246,7 +262,13 @@ instructions after it costs more than waiting would have.  Options 1 and 2
 delay every load that follows a store with an unknown address, whether the two
 conflict or not.  In real programs few loads actually read what such a store
 writes, so out-of-order load-store execution performs better, and it is the
-policy that high-performance processors use.
+policy that high-performance processors use.\sidenote{Cores decide per load
+rather than once for all: a predictor says whether this load is likely to
+conflict.  The Alpha 21264 makes only those loads wait whose PC appears in
+its table of past squashes, cleared periodically so that a load can become
+speculative again; store sets \cite{chrysos1998} pair each load with the
+stores it has conflicted with.  Intel calls its version memory
+disambiguation and has shipped it since 2006.}
 
 \begin{keypoint}
   In-order load-store execution never re-executes a load but makes loads wait
@@ -271,7 +293,9 @@ from both ends.\source{Lesson 9, video 9; H\&P ch.~3.}
     matching store.}
   \item[For a store] the value goes to every later load with the same address,
     up to the next store with that address.  The loads after that store receive
-    the value of that store instead.
+    the value of that store instead.\margin{Hardware forwards only a load that
+    lies entirely inside one store; on a partial overlap the load waits for
+    the store to reach L1 instead, some 12 cycles (Agner Fog).}
 \end{description}
 A load applies the first rule in its search (\cref{sec:l09-lsq}), and a store
 applies the second in its check of the completed later loads
@@ -313,7 +337,9 @@ L7:  LW  R9, 0(R2)     ; R9 <- MEM[0x40]
   $\text{R7}=\texttt{0x40}$ are computed by slow instructions that precede S3
   and S5, so these two stores learn their addresses late, in the order of
   \cref{tab:l09-trace}.  Memory initially holds 20 at \texttt{0x40} and 30 at
-  \texttt{0x48}.
+  \texttt{0x48}.\tip{To check a trace, write down the values of a sequential
+  execution first: a load that ends with any other value marks a missing
+  re-execution.}
 \end{example}
 
 \begin{table}[htbp]
@@ -358,8 +384,11 @@ Loads and stores pass through the same steps as other instructions, and the LSQ
 adds work to each step (\cref{tab:l09-steps}).\source{Lesson 9, videos 11--14;
 H\&P §3.6.}  A load or store is issued only when a ROB entry and an LSQ entry
 are both available; the LSQ entry takes the place of the reservation station
-that other instructions need with their ROB entry.  A load broadcasts its value on the CDB under the name of its ROB entry, exactly
-like an arithmetic result.  A store produces no register value, so nothing is
+that other instructions need with their ROB entry.\margin{Real sizes:
+Skylake keeps 72 loads and 56 stores in flight against a 224-entry ROB, Ice
+Lake 128 and 72 against 352 (Intel optimization manual).}  A load broadcasts
+its value on the CDB under the name of its ROB entry, exactly like an
+arithmetic result.  A store produces no register value, so nothing is
 broadcast, and its ROB entry is done as soon as the store has recorded both its
 address and its value.
 
@@ -399,7 +428,8 @@ the ROB is also the oldest entry of the LSQ, and the two entries are freed
 together.\index{commit}  A store leaves the LSQ exactly when its value is
 written to memory, so a later load always finds that value in one of the two
 places it looks: in the store's LSQ entry before the commit, in memory after
-it.
+it.\margin{A multicore adds a rule: a load that has already read must also be
+squashed if another core writes its address before it commits (Lesson 21).}
 
 \begin{keypoint}[Lesson summary]
   Loads and stores depend on one another through memory addresses that are
