@@ -84,14 +84,19 @@ core does the work.  Suppose core 0 reads Y as 0.  Then its read of Y took
 effect before core 1's store to Y, and therefore also before core 1's read of
 X, which follows that store.  Core 0's store to X precedes its own read of Y,
 so it precedes core 1's read of X as well, and that read returns 1.  (If both
-stores take effect before both reads, neither core does the work.)
+stores take effect before both reads, neither core does the
+work.)\margin{The two-flag program is the core of Dekker's and Peterson's
+mutual-exclusion algorithms (Lesson 20), which use ordinary loads and
+stores.}
 
 An out-of-order processor does not perform the accesses in program order.  A
 store writes memory only when it commits, whereas a load reads memory as soon
 as it has computed its address and found no earlier store to the same address
 in the load-store queue (\cref{sec:l09-lsq}).  The store and the load of
 \cref{ex:l21-flags} access different addresses, so the load can read memory
-long before the store commits.  If this happens on both cores
+long before the store commits.\margin{The distance is bounded by the reorder
+buffer: 224 entries on a Skylake core (Lesson 8).  Agner Fog,
+microarchitecture manual.}  If this happens on both cores
 (\cref{fig:l21-reorder}), both loads read 0 and both cores do the work.
 
 \begin{figure}[htbp]
@@ -104,7 +109,9 @@ long before the store commits.  If this happens on both cores
 \end{figure}
 
 Every read in this execution is coherent: when each load reads its flag, the
-flag really holds 0, and the stores take effect at commit, in program order.
+flag really holds 0, and the stores take effect at commit, in program
+order.\caution{No cache holds a stale value here, so no coherence protocol
+can prevent this outcome: the cause is reordering, not stale data.}
 The result is nevertheless impossible in any execution in program order.  What
 the out-of-order cores have changed is the order of accesses to different
 locations: each core's read of the other flag took effect before its own
@@ -163,7 +170,9 @@ thread has exited, and then uses the results it produced.  The wait ends when
 a load of the thread's status, which the operating system writes when the
 thread exits, finds the thread finished; the load of the results, which
 follows in program order, can execute earlier, before the other thread has
-written them.
+written them.\margin{Thread libraries hide this: POSIX requires
+\texttt{pthread\_join} to order the writes of the exiting thread before the
+accesses of the joining one.}
 
 In both patterns all caches are coherent, and the program is correct whenever
 its accesses take effect in program order.  To be able to write such programs
@@ -203,7 +212,9 @@ such an order, as long as no program can tell the difference.
   \label{ex:l21-interleavings}
   In \cref{ex:l21-flags} core 0 stores X ($w_0$) and then reads Y ($r_0$);
   core 1 stores Y ($w_1$) and then reads X ($r_1$).  Keeping the order of each
-  core leaves six interleavings (\cref{tab:l21-interleavings}).  In every one
+  core leaves six interleavings (\cref{tab:l21-interleavings}).%
+  \tip{Interleavings that keep both program orders: $\binom{m+n}{m}$ for $m$
+  and $n$ accesses, here $\binom{4}{2}=6$.}  In every one
   of them at least one read returns 1, so a sequentially consistent system
   never lets both cores do the work: the execution of \cref{fig:l21-reorder}
   is not sequentially consistent.
@@ -260,7 +271,9 @@ every earlier store has committed, and every instruction that uses the loaded
 value waits with it.  Memory accesses are, however, exactly the slow
 operations that out-of-order execution most needs to overlap.  A cache miss
 takes many cycles, and in a multiprocessor an access may in addition have to
-wait for the bus and the coherence protocol (Lesson 19).  Limited to one
+wait for the bus and the coherence protocol (Lesson 19).\margin{Serialized,
+each latency is paid in full: L1 4 cycles, L2 12, L3 44, memory 60--100~ns
+on a Skylake-class core (Lesson 14).}  Limited to one
 memory access at a time, a core loses most of the benefit of out-of-order
 execution.
 
@@ -287,7 +300,10 @@ invalidation of the block that contains the location
 (\cref{sec:l19-write-invalidate}).  If such a write is observed, the load may
 have read a stale value: the load and all instructions after it are cancelled
 and executed again, exactly as after a branch misprediction
-(\cref{sec:l08-recovery}).  This is always possible because the load has not
+(\cref{sec:l08-recovery}).\margin{Intel's counters call these
+memory-ordering machine clears (\texttt{MACHINE\_CLEARS}); each costs a
+pipeline refill, about 17 cycles on Skylake (Lesson 4).}  This is always
+possible because the load has not
 committed.  Once the load commits, it has taken effect in program order, and
 its location no longer needs to be watched.
 
@@ -314,7 +330,9 @@ execution and the commit of a load that reads it.  This is uncommon in most
 code, but frequent in loops that poll a location another core writes, such as
 the reader of the data-ready flag.  Because invalidations refer to whole
 blocks, a write to another location in the same block also causes a replay;
-this costs time but never produces a wrong result.
+this costs time but never produces a wrong result.\margin{Blocks are 64
+bytes on x86 and on most Arm cores, so unrelated variables share one: false
+sharing (Lesson 19) causes replays as well as coherence misses.}
 
 \begin{keypoint}
   Sequential consistency does not forbid reordering memory accesses; it
@@ -333,7 +351,8 @@ first to location A and the second to location B, there are four kinds of
 ordering: WR A $\to$ WR B, WR A $\to$ RD B, RD A $\to$ WR B and RD A $\to$ RD
 B.  Each requires the first access to take effect before the second, as
 observed by all cores (\cref{tab:l21-orderings}).  Sequential consistency
-obeys all four, always.
+obeys all four, always.\margin{x86 relaxes only WR $\to$ RD; Arm, POWER and
+RISC-V relax all four.  Intel SDM vol.~3A, \enquote{Memory Ordering}.}
 
 \begin{table}[htbp]
   \centering\small
@@ -384,7 +403,9 @@ instruction \texttt{MSYNC}\index{MSYNC}: every memory access that precedes an
 (\cref{fig:l21-msync}).\margin{x86 has such an instruction,
 \texttt{MFENCE}\index{MFENCE}: the accesses before it become globally visible
 before any that follow.}  Between two \texttt{MSYNC} instructions, accesses
-may still be reordered.
+may still be reordered.\caution{\texttt{MSYNC} is a \emph{full} fence.  Real
+ISAs also have partial ones---x86 \texttt{SFENCE}, Arm \texttt{DMB
+ISHST}---that order only some of the four pairs.}
 
 \begin{figure}[htbp]
   \centering
@@ -423,13 +444,18 @@ relaxed as well.
 The flag is a simple form of synchronization, and the placement of the two
 \texttt{MSYNC}s follows a general rule: place \texttt{MSYNC} \emph{after} an
 operation that acquires the right to proceed and \emph{before} an operation
-that releases it.  A thread that uses a lock (Lesson 20) executes
+that releases it.\tip{Remember the placement as two fences facing
+\emph{into} the critical section: nothing may leave it at either end.}  A
+thread that uses a lock (Lesson 20) executes
 \texttt{MSYNC} right after \texttt{lock}, so that the accesses of its critical
 section take effect after the acquisition and see all writes of earlier lock
 holders, and right before \texttt{unlock}, so that all writes of its critical
 section have taken effect when the next thread acquires the lock.  Such
 instructions normally belong inside the lock and barrier routines of a
-synchronization library rather than in every program.
+synchronization library rather than in every program.\margin{Arm folds the
+fence into the access itself: \texttt{LDAR} (acquire) and \texttt{STLR}
+(release) order one direction only; RISC-V has \texttt{.aq}/\texttt{.rl}
+bits.}
 
 \section{Data races and consistency}
 \label{sec:l21-races}
@@ -463,7 +489,9 @@ after its load, and core 1 reaches the same barrier before its store.  No
 thread leaves a barrier before all threads have arrived, so the load always
 takes effect before the store, and there is no data race.  Accesses protected
 by the same lock are ordered as well: one critical section ends with
-\texttt{unlock} before the other begins with \texttt{lock}.
+\texttt{unlock} before the other begins with \texttt{lock}.\margin{Race
+detectors (ThreadSanitizer, Helgrind) search for exactly this: two
+conflicting accesses that no lock, barrier or fence orders.}
 
 The importance of data races lies in the following property
 \cite{adve1990}.
@@ -485,7 +513,13 @@ The importance of data races lies in the following property
 A program can therefore be developed and debugged under sequential
 consistency, where even a program with data races produces results that some
 interleaving explains, and then run under relaxed consistency for speed once
-synchronization has removed the races.
+synchronization has removed the races.\sidenote{Programming languages turned
+this into a contract.  C++11 and Java guarantee that a data-race-free
+program behaves as under sequential consistency, and in C++ a data race
+makes the whole program undefined.  The synchronization these models
+recognize is \texttt{std::atomic}---its default is
+\texttt{memory\_order\_seq\_cst}, with release/acquire as the cheaper
+option---and the locks built on it \cite{boehm2008}.}
 
 The examples of this lesson all contain data races.  In
 \cref{ex:l21-flags} each core reads a flag that the other core writes without
@@ -552,12 +586,19 @@ sequential consistency:
     \texttt{unlock}.  An acquire keeps later accesses from taking effect before
     it, and a release waits until all earlier accesses have taken effect, so
     ordinary accesses are never reordered across the boundaries of a critical
-    section---the placement of \texttt{MSYNC} in \cref{sec:l21-relaxed}.
+    section---the placement of \texttt{MSYNC} in
+    \cref{sec:l21-relaxed}.\margin{Release consistency was defined in 1990
+    for the Stanford DASH multiprocessor, the machine that made the
+    acquire/release split a hardware notion.}
   \item[Lazy release consistency]\index{lazy release consistency} Release
     consistency implemented lazily, originally for distributed shared memory
     built in software: the updates made in a critical section are transferred
     to another node only when that node accesses the data after acquiring the
-    lock, not at every release.
+    lock, not at every release.\sidenote{Lazy release consistency
+    \cite{keleher1992} was designed for software distributed shared memory
+    on a network of workstations, where propagating an update means sending
+    a message: the TreadMarks system transfers a page only when a node that
+    has acquired the lock touches it.}
   \item[Scope consistency]\index{scope consistency} Each lock defines a scope:
     a thread that enters a critical section sees the updates made in earlier
     critical sections of the same lock, but not necessarily those made under
