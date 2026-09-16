@@ -1,0 +1,295 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{VLIW}
+\lessoninfo{
+  video={Lesson 11, videos 1--9},
+  textbook={H\&P \cite{hennessy2017} §3.7, Appendix H},
+  keywords={very long instruction word, VLIW, out-of-order superscalar, in-order superscalar, NOP, backward compatibility, irregular code, code bloat, full predication, branch hint, stop bit, Itanium, EPIC, digital signal processor},
+}
+
+Lesson 10 showed that the compiler can raise the number of instructions a
+processor completes per cycle by rewriting the program: it shortens chains of
+dependences, places independent instructions next to each other, and removes
+branches and calls.  In a very long instruction word (VLIW) processor this
+idea is taken to its end point: the compiler alone decides which operations
+execute in parallel and encodes the decision in the instructions, so that the
+hardware needs none of the dependence-tracking machinery of the out-of-order
+processors of Lessons 7--9.  This lesson compares VLIW with superscalar
+designs, weighs its advantages against its disadvantages, and shows where the
+approach has failed and where it has succeeded.
+
+\section{Superscalar and VLIW processors}
+\label{sec:l11-superscalar-vs-vliw}
+
+A superscalar\index{superscalar} processor (Lesson 8) executes up to $N$
+instructions per cycle.\source{Lesson 11, videos 1--3; H\&P §3.7;
+\cite{fisher1983}.}  Designs differ in how many instructions they examine to
+find $N$ that can execute together, and in how much of that search they leave
+to the compiler (\cref{fig:l11-windows,tab:l11-compare}).  An out-of-order
+design finds the parallelism of any program by itself, at the price of complex
+hardware for renaming, window scheduling and the reorder buffer (Lessons
+6--8).  An in-order design stops at the first instruction that must wait for
+another, so it needs the compiler to place independent instructions next to
+each other (Lesson 10).  A VLIW processor executes, without any checking, one
+instruction of up to $N$ operations that the compiler has made independent.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l11-windows}
+  \caption{What each design examines to fill one cycle with up to $N=4$
+    operations.  Shaded boxes are executed in this cycle; the in-order design
+    stops at the first instruction that depends on an earlier one in its
+    group.}
+  \label{fig:l11-windows}
+\end{figure}
+
+\begin{definition}[Very long instruction word]
+  \label{def:l11-vliw}
+  A \term{very long instruction word}[VLIW]%
+  \index{VLIW|see{very long instruction word}} (VLIW) architecture is an
+  instruction set architecture in which each instruction consists of up to $N$
+  operations, each equivalent to one instruction of an ordinary ISA, that are
+  executed in parallel in the same cycle.  Choosing the operations that form
+  an instruction, and ensuring that they are independent, is the task of the
+  compiler; the processor performs no dependence checking.
+\end{definition}
+
+An instruction that carries $N$ operations is about $N$ times as long as an
+ordinary one, which gives the architecture its name.  Since it does the work
+of up to $N$ ordinary instructions, a VLIW processor that completes one
+instruction per cycle is comparable to a superscalar processor with an IPC of
+up to~$N$ (Lesson 6).\caution{Instruction counts and CPI of a VLIW program
+are not comparable with those of an ordinary ISA; compare operations per
+cycle.}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Superscalar and VLIW processors that execute up to $N$ operations
+    per cycle.}
+  \label{tab:l11-compare}
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+                       & Out-of-order          & In-order              & VLIW \\
+    \midrule
+    Executes per cycle & $\le N$ instructions  & $\le N$ instructions  & 1 instr.\ ($\le N$ ops) \\
+    Examines           & $\gg N$ instructions  & next $N$ instructions & 1 instruction \\
+    Hardware           & complex               & simpler               & simplest \\
+    Compiler           & can help              & must help             & does all the work \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{example}[Packing operations into instructions]
+  \label{ex:l11-packing}
+  The fragment below adds four array elements and stores the sum.  The
+  comments list its RAW dependences (Lesson 3); the four loads only read R8
+  and are independent of each other.
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+I1: LW  R1, 0(R8)
+I2: LW  R2, 4(R8)
+I3: LW  R3, 8(R8)
+I4: LW  R4, 12(R8)
+I5: ADD R5, R1, R2    ; RAW with I1, I2
+I6: ADD R6, R3, R4    ; RAW with I3, I4
+I7: ADD R7, R5, R6    ; RAW with I5, I6
+I8: SW  R7, 16(R8)    ; RAW with I7
+\end{lstlisting}
+  A VLIW compiler takes the operations in program order and places each one
+  in the earliest instruction that follows all the operations it depends on
+  and still has a free slot; slots left over are filled with NOPs
+  (\cref{tab:l11-packing}).  With four slots the eight operations occupy
+  four instructions, hence four cycles, where an ordinary ISA needs eight
+  instructions; with two slots they occupy five.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{The fragment of \cref{ex:l11-packing} compiled for VLIW ISAs with
+    four and with two operation slots.  Each row is one instruction; sizes
+    assume 32-bit slots.}
+  \label{tab:l11-packing}
+  \begin{tabular}{@{}cll@{}}
+    \toprule
+    Instruction & 4 slots            & 2 slots \\
+    \midrule
+    1           & I1, I2, I3, I4     & I1, I2 \\
+    2           & I5, I6, NOP, NOP   & I3, I4 \\
+    3           & I7, NOP, NOP, NOP  & I5, I6 \\
+    4           & I8, NOP, NOP, NOP  & I7, NOP \\
+    5           & ---                & I8, NOP \\
+    \midrule
+    NOP slots   & 8 of 16            & 2 of 10 \\
+    Code size   & 512~bits           & 320~bits \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Advantages and disadvantages}
+\label{sec:l11-good-bad}
+
+Leaving the search for parallelism to the compiler has three
+advantages.\source{Lesson 11, videos 4--5; H\&P §3.7, Appendix H.}
+\begin{itemize}
+  \item \textbf{The compiler has plenty of time.}  An out-of-order processor
+    must find independent instructions within a fraction of every clock cycle
+    and only in its window; the compiler runs once and can analyze the whole
+    program.
+  \item \textbf{The hardware is simpler.}  Without renaming, window scheduling
+    and a reorder buffer, a VLIW processor needs less area and power for the
+    same operations per cycle, so it can be more energy efficient.
+  \item \textbf{Loops and regular code work well.}  When arrays are processed
+    in loops, the dependences are few and visible at compile time, and loop
+    unrolling\index{loop unrolling} (Lesson 10) removes the branches between
+    iterations, so that their independent operations fill the slots.
+\end{itemize}
+It also has four disadvantages.
+\begin{itemize}
+  \item \textbf{Latencies are not known at compile time.}  The compiler
+    groups operations as if each completes within its cycle.  If one takes
+    longer, e.g.\ a load with a cache miss (Lesson 12), all later operations
+    wait for it, even independent ones, whereas an out-of-order processor
+    keeps executing instructions that do not depend on it.
+  \item \textbf{Irregular code is hard.}  The compiler sees the program, not
+    its execution.  When it cannot prove two operations independent---a store
+    and a load through pointers that may address the same location, or
+    operations on either side of a data-dependent branch---it must place them
+    in different instructions, whereas an out-of-order processor knows the
+    actual addresses and predicts the branches at run time (Lessons 4 and~9).
+  \item \textbf{Code bloat.}  Whenever fewer than $N$ independent operations
+    are available, NOPs fill the slots and the program grows: the four-slot
+    version in \cref{tab:l11-packing} is half NOPs and occupies 512~bits,
+    against 256~bits for eight ordinary 32-bit instructions.  Compaction
+    (\cref{sec:l11-instructions}) reduces this overhead.
+  \item \textbf{A new processor needs recompiled programs.}  The grouping of
+    operations and the number of slots are fixed at compile time, which
+    undermines backward compatibility (below).
+\end{itemize}
+
+\begin{definition}[Backward compatibility]
+  A processor offers \term{backward compatibility}[後方互換性] when it runs,
+  unmodified, the programs compiled for earlier processors of its family.
+\end{definition}
+
+For superscalar processors backward compatibility comes with a performance
+gain: a wider out-of-order processor finds more parallelism in an \emph{old}
+binary without recompilation.  A new VLIW processor with more slots either
+cannot run an old VLIW binary at all, because the instruction format has
+changed, or runs it with no more operations per cycle than the processor it
+was compiled for.
+
+\begin{example}[An old binary on a wider VLIW processor]
+  \label{ex:l11-compat}
+  A four-slot processor that still accepts the two-slot format executes the
+  two-slot version of \cref{ex:l11-packing} in five cycles, as the old
+  processor does; only the recompiled four-slot version takes four.  The eight
+  ordinary instructions, counted the same way, take five cycles on a two-wide
+  and four on a four-wide out-of-order processor, without recompilation.
+\end{example}
+
+\begin{keypoint}
+  VLIW trades hardware complexity for dependence on the compiler.  It pays off
+  when the code is regular and compiled for the exact processor; it loses when
+  parallelism or operation latencies become known only at run time, or when
+  old binaries must run faster on new processors.
+\end{keypoint}
+
+\section{VLIW instructions}
+\label{sec:l11-instructions}
+
+A VLIW instruction is a sequence of $N$ operation slots
+(\cref{fig:l11-format}).\source{Lesson 11, video 6; H\&P Appendix H.}  Each
+slot is encoded like an instruction of an ordinary ISA, with its own opcode
+from the full set of ordinary opcodes and its own operands.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l11-format}
+  \caption{A VLIW instruction with four operation slots.  Each slot is decoded
+    and executed independently of the others; no hardware checks for
+    dependences between slots.}
+  \label{fig:l11-format}
+\end{figure}
+
+The operations of one instruction must be independent: none may use the
+result of another, and no two may write the same location.  The hardware does
+not check this, so correct grouping is the responsibility of the compiler.
+Operations in \emph{consecutive} instructions may depend on each other, as I5
+depends on I1 in \cref{tab:l11-packing}.\caution{Independence is required
+only within an instruction, not between instructions.}
+
+The compiler exposes the parallelism with instruction scheduling, as in
+\cref{ex:l11-packing}, helped by the other techniques of Lesson 10: tree
+height reduction\index{tree height reduction} shortens dependence chains so
+that more operations can share an instruction, and loop unrolling and function
+call inlining\index{function call inlining} remove the branches, calls and
+returns that would separate operations.  A VLIW processor has no renaming
+hardware, so the compiler itself removes false dependences (Lesson 3) by
+writing results into otherwise unused registers, of which the instruction set
+provides many.
+
+Branches limit the grouping, since the operations after a branch execute only
+on one of its paths.  A VLIW instruction set therefore provides good support
+for predication (Lesson 5), ideally full predication\index{full predication},
+so that the compiler can if-convert\index{if-conversion} branches and group
+the operations of both paths.  A branch that remains can carry a
+\term{branch hint}[分岐ヒント], with which the compiler tells the processor
+which way it expects the branch to go.
+
+Fixed slots waste space whenever fewer than $N$ independent operations are
+available.  Compacted instructions store the operations one after another
+without NOPs, and a \term{stop bit}[ストップビット] marks the last operation
+of each group that executes together.  In the four-slot program of
+\cref{tab:l11-packing}, I4, I6, I7 and I8 carry a stop bit; at 33~bits per
+operation the code occupies 264~bits instead of 512.
+
+\section{VLIW processors in practice}
+\label{sec:l11-examples}
+
+Two kinds of processors show where the VLIW approach fails and where it
+succeeds.\source{Lesson 11, videos 7--9; H\&P §3.7, Appendix H.}
+
+\subsection{Itanium}
+\label{sec:l11-itanium}
+
+The most prominent attempt to bring VLIW-style instructions to general-purpose
+computing was \term{Itanium}[Itanium], the processor family Intel built for
+the IA-64 instruction set; its designers called the approach EPIC, explicitly
+parallel instruction computing \cite{schlansker2000}.\margin{IA-64 uses stops
+in the same way to end groups of independent instructions
+(\cref{sec:l11-instructions}).}  The instruction set, however, accumulated
+many additional features whose hardware became very complex, removing the main
+advantage of VLIW.  The compiler still found little parallelism in irregular
+code, and Itanium did not displace out-of-order processors.
+
+\subsection{Digital signal processors}
+\label{sec:l11-dsp}
+
+A \term{digital signal processor}[DSP]%
+\index{DSP|see{digital signal processor}} (DSP) is a processor specialized
+for digital signals such as audio, video and radio.  This market plays to the
+strengths of VLIW (\cref{sec:l11-good-bad}).\margin{H\&P lists the TI C6x
+DSPs as an example of the VLIW approach.}
+\begin{itemize}
+  \item Loops that apply the same computation to many samples dominate the
+    code: regular code in which the compiler finds plenty of parallelism.
+  \item Programs are usually compiled for the particular DSP of the device
+    they run in, so backward compatibility of binaries matters little.
+  \item DSPs sit in power-limited devices, where energy-efficient hardware
+    pays off.
+\end{itemize}
+
+\begin{keypoint}[Lesson summary]
+  An out-of-order superscalar processor examines many more than $N$
+  instructions and needs no help from the compiler; an in-order one examines
+  $N$ and needs that help; a VLIW processor examines one
+  instruction of up to $N$ independent operations and relies on the compiler
+  entirely.  VLIW hardware is simple and energy efficient and performs well on
+  regular loop code, but binaries must be recompiled for each new processor,
+  irregular code yields little parallelism, a cache miss on one load delays
+  all later operations, and NOPs bloat the code unless it is compacted with
+  stop bits.  Itanium failed in general-purpose computing; DSPs are where
+  VLIW fits.  Lesson 12 turns from instructions per cycle to memory.
+\end{keypoint}
+
+\end{document}

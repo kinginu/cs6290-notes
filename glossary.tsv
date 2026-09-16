@@ -156,6 +156,8 @@ function call inlining	インライン展開	いんらいんてんかい	10
 very long instruction word	VLIW	VLIW	11	
 VLIW	VLIW	VLIW	11	see: very long instruction word
 backward compatibility	後方互換性	こうほうごかんせい	11	
+branch hint	分岐ヒント	ぶんきひんと	11	direction the compiler expects, encoded in the branch
+stop bit	ストップビット	すとっぷびっと	11	marks the last operation of a group executed together
 Itanium	Itanium	Itanium	11	Intel IA-64 processor with VLIW-style instructions
 digital signal processor	DSP	DSP	11	
 DSP	DSP	DSP	11	see: digital signal processor
