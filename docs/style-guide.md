@@ -90,6 +90,38 @@ and how it connects to the previous lesson.>
 - Margin density: at most ~3 margin items within a short paragraph run; the
   checker reports "margin notes moved down" — keep it at 0–2.
 
+### 3.1 What goes in the margin column
+
+The margin is a quarter of the page: it must carry real content, not only
+`\source` notes.  **Aim for 3–4 margin items per page** counting `\source`
+and `\term` glosses — i.e. roughly 10–20 items in a 5-page chapter, 30–50 in
+a long one — while respecting the density limit above.  The body keeps the
+single line of argument; everything that supports it goes to the margin.
+
+| Put in the margin | Macro | Example |
+|---|---|---|
+| Where the material comes from | `\source` | one per section (required) |
+| Term in the other language | `\term` | automatic |
+| **Real-world numbers** | `\margin` | "L1: 32 KB, 4 cycles; L2: 256 KB, 12 cycles on Intel Skylake" |
+| **Notation and assumptions** | `\margin` | what a symbol means, units, "a write takes one cycle here" |
+| **Link to another lesson** | `\margin` | "same idea as the reservation stations of Lesson 7" |
+| **Lecture vs textbook terminology** | `\caution` | a term the lecture uses with a different meaning than the textbook |
+| **Common misconception, sign error** | `\caution` | "a speedup below 1 is a slowdown" |
+| **Rule of thumb, shortcut, mnemonic** | `\tip` | "tag width = address − index − offset" |
+| **Longer aside (> 3 lines)** | `\sidenote` | why a design exists, a named implementation (Pentium M's hierarchical predictor), a historical note |
+| Small illustration | `marginfigure` | state diagram, small plot |
+
+- `\sidenote` is numbered and anchored to one spot in the text: use it when
+  the aside is longer than about three lines or when it must be tied to a
+  precise sentence.  Shorter remarks stay `\margin`.
+- **Real-world numbers are welcome even when the lecture does not give them**
+  — they are what makes the notes usable later.  Name where the number comes
+  from in the same note or an adjacent `\source` (vendor optimization
+  manual, H\&P figure, a paper), so that lecture content and added context
+  stay distinguishable.  Keep them few, current and uncontroversial.
+- Do not park body-level reasoning in the margin: if a reader needs it to
+  follow the argument, it belongs in the body.
+
 ## 4. Labels, figures, bibliography
 
 - Labels are unique across the whole book and carry the lesson number:
