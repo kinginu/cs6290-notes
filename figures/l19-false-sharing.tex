@@ -1,0 +1,17 @@
+% False sharing: two counters used by different cores lie in one cache block.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  core/.style={draw, fill=ln-accent!15, minimum width=1.5cm, minimum height=0.55cm, inner sep=2pt},
+  cell/.style={draw, minimum width=0.5cm, minimum height=0.5cm, inner sep=0pt}]
+  \fill[ln-box] (-0.25,-0.25) rectangle (0.75,0.25);
+  \foreach \j in {0,...,7} {
+    \node[cell] (b\j) at (\j*0.5,0) {};
+  }
+  \node[font=\scriptsize] at (b0) {c0};
+  \node[font=\scriptsize] at (b1) {c1};
+  \node[core] (k0) at (0,1.2)   {\iflangja{コア}{core}~0};
+  \node[core] (k1) at (0.5,-1.2) {\iflangja{コア}{core}~1};
+  \draw[->] (k0.south) -- (b0.north);
+  \draw[->] (k1.north) -- (b1.south);
+  \node[font=\scriptsize, text=ln-muted, anchor=north east] at (b7.south east)
+    {\iflangja{1つのキャッシュブロック}{one cache block}};
+\end{tikzpicture}

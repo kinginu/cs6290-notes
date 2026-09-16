@@ -380,3 +380,8 @@ network on chip	ネットワークオンチップ	ねっとわーくおんちっ
 mesh	メッシュ	めっしゅ	22	network topology
 distributed last-level cache	分散最終レベルキャッシュ	ぶんさんさいしゅうれべるきゃっしゅ	22	
 on-chip directory	オンチップディレクトリ	おんちっぷでぃれくとり	22	coherence directory
+tile	タイル	たいる	22	core, private caches, LLC slice, directory part, router
+torus	トーラス	とーらす	22	network topology
+partial directory	部分ディレクトリ	ぶぶんでぃれくとり	22	
+turbo mode	ターボモード	たーぼもーど	22	
+logical processor	論理プロセッサ	ろんりぷろせっさ	22	hardware thread as seen by the OS

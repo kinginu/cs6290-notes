@@ -1,0 +1,24 @@
+% MSI state machine of one block in one cache.  Solid edges: access by this
+% core; dashed edges: access by another core, observed on the bus.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  st/.style={circle, draw, minimum size=0.9cm, inner sep=1pt, fill=ln-box},
+  dirty/.style={st, fill=ln-accent!15},
+  lab/.style={font=\scriptsize, inner sep=2pt},
+  other/.style={dashed, ln-accent}]
+  \node[st]    (I) at (0,0)     {I};
+  \node[st]    (S) at (3.4,-1.8) {S};
+  \node[dirty] (M) at (6.8,0)   {M};
+  % this core
+  \draw[->] (I) to[bend right=22] node[lab, below left]
+    {\iflangja{R / バス読み出し}{R / bus read}} (S);
+  \draw[->] (I) -- node[lab, above]
+    {\iflangja{W / バス読み出し＋無効化}{W / bus read + invalidate}} (M);
+  \draw[->] (S) to[bend left=22] node[lab, above left, pos=0.3]
+    {\iflangja{W / 無効化}{W / invalidate}} (M);
+  % other cores
+  \draw[->, other] (S) to[bend right=22] node[lab, above right, pos=0.45] {W$'$} (I);
+  \draw[->, other] (M) to[bend left=22] node[lab, below right]
+    {\iflangja{R$'$ / 書き戻し}{R$'$ / write back}} (S);
+  \draw[->, other] (M) to[bend right=30] node[lab, above]
+    {\iflangja{W$'$ / 書き戻し}{W$'$ / write back}} (I);
+\end{tikzpicture}
