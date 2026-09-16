@@ -61,7 +61,10 @@ so the time saved on hits is easily lost again on misses.  The techniques of
 this and the next four sections reduce the hit time, or its cost, without
 giving up the miss rate.
 
-Lesson 12 noted that an L1 hit takes one to three clock cycles.  If a lookup
+Lesson 12 noted that an L1 hit takes one to three clock
+cycles.\caution{The L1 latencies vendors publish are load-to-use, not the
+array access alone: Skylake quotes 4 cycles, and 5 with an indexed address.
+Intel optimization manual.}  If a lookup
 that needs several cycles occupied the cache until it completed, each memory
 access would have to wait for the previous one: the hit time seen by an
 access would be its own lookup time plus this wait, and consecutive loads and
@@ -87,7 +90,10 @@ each of which can become a stage (\cref{fig:l14-pipelined}):
     and the block offset picks the requested bytes out of the block, which are
     delivered.
 \end{enumerate}
-A miss is known at the end of the second stage.  Pipelining does not reduce
+A miss is known at the end of the second stage.\margin{Reading every way's
+data beside the tags is what makes step~2 fast.  Large L2 and L3 caches read
+the tags first and then only the matching way: slower, much less energy.}
+Pipelining does not reduce
 the number of cycles one lookup takes.  It prevents that number from limiting
 the rate of accesses: while one access compares its tags, the next one already
 reads its set, exactly as instructions overlap in the pipeline of Lesson 3,
@@ -113,7 +119,10 @@ the whole lookup.
   every third cycle.  Split into three stages of about
   \SI{0.25}{\nano\second} each, which leaves room for the latch overhead, the
   lookup fits the \SI{0.3}{\nano\second} clock: the data arrives three cycles
-  after the access starts, and an access can start in every cycle.
+  after the access starts, and an access can start in every
+  cycle.\margin{Pipelining gives one access per cycle; ports and banks give
+  more.  Skylake's L1 data cache serves two loads and one store per cycle.
+  Intel optimization manual.}
 \end{example}
 
 \section{Address translation and the hit time}
@@ -147,7 +156,10 @@ therefore includes the translation:
   \label{eq:l14-pa-hit}
 \end{equation}
 The TLB is small and fast, but its delay is paid on every access, hits
-included, and it adds to exactly the quantity we are trying to reduce.
+included, and it adds to exactly the quantity we are trying to
+reduce.\margin{The TLB has to be tiny to keep up: Skylake has 64 first-level
+data TLB entries for 4~KB pages, and 1536 second-level entries behind them.
+Intel optimization manual.}
 
 \subsection{Virtually accessed caches}
 
@@ -269,7 +281,10 @@ alias, and nothing connects the copies.
 To be correct, every write would have to find all other cached copies of the
 same physical block and update or invalidate them, and the cache has no
 efficient way of locating them.  Aliasing is thus a further problem of
-virtually accessed caches.
+virtually accessed caches.\sidenote{The operating system can prevent the
+second copy instead: page coloring maps aliases only at virtual addresses
+that agree in the index bits, so they select the same set.  The price is less
+freedom in choosing which frame backs a page (H\&P §B.3).}
 
 \subsection{Aliasing in VIPT caches}
 
@@ -308,7 +323,8 @@ sides by the associativity~$N$ gives a bound on the cache size:
   \label{eq:l14-vipt-size}
 \end{equation}
 The block size has cancelled out: only the associativity and the page size
-limit a VIPT cache.
+limit a VIPT cache.\tip{Count bits, not bytes: with 4~KB pages only bits
+0--11 survive translation, so offset bits $+$ index bits $\le 12$.}
 
 \begin{example}
   \label{ex:l14-vipt-size}
@@ -327,7 +343,10 @@ typically 4~KB.  By \cref{eq:l14-vipt-size}, an L1 cache that is to be both
 VIPT and free of aliasing can therefore grow only by becoming more
 associative: a direct-mapped cache is limited to 4~KB, a 32~KB cache needs 8
 ways.  The Intel Core~2, Nehalem, Sandy Bridge and Haswell processors all
-have 8-way L1 data caches of 32~KB, exactly at this bound.  Real L1 caches
+have 8-way L1 data caches of 32~KB, exactly at this bound.\margin{A larger
+page raises the bound: Apple's M-series uses 16~KB pages, and the M1
+performance core has a 128~KB L1 data cache.  Apple silicon CPU optimization
+guide.}  Real L1 caches
 are consequently more associative than their hit time alone would justify,
 which makes the techniques of the next two sections important.
 
@@ -443,7 +462,9 @@ that was used only a little less recently than the most recent one.
 \end{definition}
 
 The bit of a line tells whether the line has been accessed since the last
-reset.  The bit of the most recently used line is always set, so the
+reset.\caution{Elsewhere \enquote{pseudo-LRU} usually names the tree variant:
+$N-1$ bits per set steer a binary tree to the victim.  The bit per line here
+is a different approximation.}  The bit of the most recently used line is always set, so the
 candidates of PLRU are always among those of NMRU, and PLRU is at least as
 good as NMRU.  How closely it approximates LRU depends on how many bits are
 set.  Right after a reset only the most recently used line is excluded, as
@@ -528,7 +549,9 @@ actual cache adds the conflict misses.
 
 The classification points to the remedies.  A larger cache reduces capacity
 misses, and a higher associativity or a better replacement policy reduces
-conflict misses, but all of these lengthen the hit time.  The following
+conflict misses, but all of these lengthen the hit time.\margin{A fourth C
+is added in multiprocessors: coherence misses, caused by another core's write
+invalidating the block (Lesson 19).}  The following
 sections present techniques that reduce the miss rate without lengthening
 hits.
 
@@ -757,7 +780,10 @@ misses in the cache first compares its block address with the MSHRs.
 When the data arrives, it is placed in the cache, all instructions recorded in
 the MSHR are woken up, and the MSHR is released.  Already two MSHRs give a
 large improvement over a blocking cache, four are better still, and because
-memory accesses take so long, even 16 to 32 MSHRs continue to help.
+memory accesses take so long, even 16 to 32 MSHRs continue to
+help.\margin{Real machines track fewer: Intel cores from Nehalem to Skylake
+have ten line-fill buffers, so at most ten L1 data misses are outstanding per
+core.  Intel optimization manual.}
 
 \begin{figure}[htbp]
   \centering
@@ -823,7 +849,9 @@ In \cref{eq:l14-amat-hierarchy} the hit time $h_1$ of L1 is paid by every
 access, whereas the hit time $h_2$ of L2 is paid only by the fraction $m_1$
 of accesses that miss in L1.  L1 is therefore designed for a short hit time,
 with the techniques of the previous sections, while L2 can trade a longer
-hit time for a lower miss rate.
+hit time for a lower miss rate.\margin{Skylake, per Intel's optimization
+manual: L1 data 32~KB, 4 cycles; L2 256~KB, 12 cycles; L3 about 2~MB per
+core, 44 cycles; main memory 60--100~ns, i.e.\ hundreds of cycles.}
 
 \begin{example}
   \label{ex:l14-hierarchy}
@@ -896,7 +924,9 @@ the instructions instead of the memory accesses:
   \label{eq:l14-mpki}
 \end{equation}
 It thus states directly how often per instruction a program pays the miss
-penalty of that level.
+penalty of that level.\tip{About a third of instructions access memory in
+typical code, so MPKI $\approx 330 \times$ global miss rate (H\&P instruction
+mixes).}
 
 \begin{example}
   \label{ex:l14-local-global}
@@ -974,7 +1004,12 @@ there, while it remains in L1.
 
 Inclusion therefore has to be enforced if it is wanted.  One way is an
 \emph{inclusion bit} in every line of L2, set while the block is also in L1;
-L2 never chooses a line with this bit set as its victim.
+L2 never chooses a line with this bit set as its victim.\sidenote{Both
+choices are in use.  Intel's client L3 up to Skylake is inclusive and doubles
+as a filter: a block that is not in L3 is in no core's cache, so the other
+cores need not be asked (Lesson 19).  The L3 of Skylake-SP and of AMD's Zen
+is non-inclusive and holds mainly the blocks evicted from the private caches,
+so its capacity is not spent on copies.}
 
 This lesson completes the discussion of caches in a single processor
 (Lesson 19 returns to caches in multiprocessors).  Lesson 15 turns to the
