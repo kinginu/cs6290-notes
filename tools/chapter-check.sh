@@ -20,7 +20,7 @@ mkdir -p "$HOME/.cache/texmf-var-docker" "$root/.png"
 rm -f "$root/$lang/lessons/build/$slug".{aux,bbl,bcf,idx,ind,ilg,log,pdf,toc,fdb_latexmk,fls,run.xml,out}
 
 run() {
-  timeout 1800 docker run --rm --memory=1500m --memory-swap=1500m -v "$root":/work -w /work -u "$(id -u):$(id -g)" \
+  timeout 1800 docker run --rm --memory=1500m -v "$root":/work -w /work -u "$(id -u):$(id -g)" \
     -e HOME=/home/texlive -e TEXMFVAR=/texmf-var \
     -v "$HOME/.cache/texmf-var-docker":/texmf-var \
     latex-lecture-notes:tl2025 "$@"
