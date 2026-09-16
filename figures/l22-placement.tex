@@ -1,0 +1,38 @@
+% Two chips with two cores each and two SMT threads per core give eight
+% logical processors (0-7).  Three threads A, B, C placed (a) on logical
+% processors 0-2 without regard to the topology, (b) on separate chips and
+% cores.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\scriptsize\sffamily,
+  chip/.style={draw, fill=ln-box, rounded corners=2pt},
+  core/.style={draw=ln-muted, fill=white},
+  lp/.style={draw, minimum size=0.42cm, inner sep=0pt, font=\footnotesize\sffamily\bfseries},
+  busy/.style={fill=ln-accent!25},
+  num/.style={font=\tiny\sffamily, text=ln-muted, inner sep=1.5pt},
+  paneltitle/.style={font=\footnotesize\sffamily, anchor=north}]
+  \foreach \panel/\px/\captext in {0/0/{\iflangja{(a) トポロジを考慮しない配置}{(a) topology-unaware}},
+                           1/5.95/{\iflangja{(b) トポロジを考慮した配置}{(b) topology-aware}}} {
+    \begin{scope}[xshift=\px cm]
+      \foreach \chipi in {0,1} {
+        \pgfmathsetmacro{\chx}{\chipi*2.8}
+        \draw[chip] (\chx,0) rectangle (\chx+2.55,1.7);
+        \node[anchor=north west, inner sep=2pt] at (\chx,1.7) {\iflangja{チップ}{chip}~\chipi};
+        \foreach \corei in {0,1} {
+          \pgfmathsetmacro{\cox}{\chx+0.15+\corei*1.2}
+          \pgfmathtruncatemacro{\coid}{2*\chipi+\corei}
+          \draw[core] (\cox,0.1) rectangle (\cox+1.05,1.33);
+          \node[anchor=north west, inner sep=1.5pt, text=ln-muted] at (\cox,1.33) {\iflangja{コア}{core}~\coid};
+          \foreach \smt in {0,1} {
+            \pgfmathtruncatemacro{\lpid}{4*\chipi+2*\corei+\smt}
+            \node[lp] (lp-\panel-\lpid) at (\cox+0.3+\smt*0.45,0.7) {};
+            \node[num, below] at (lp-\panel-\lpid.south) {\lpid};
+          }
+        }
+      }
+      \node[paneltitle] at (2.675,-0.05) {\captext};
+    \end{scope}
+  }
+  % thread placements
+  \foreach \panel/\lpid/\thr in {0/0/A, 0/1/B, 0/2/C, 1/0/A, 1/4/B, 1/2/C} {
+    \node[lp, busy] at (lp-\panel-\lpid) {\thr};
+  }
+\end{tikzpicture}

@@ -1,0 +1,57 @@
+% Interconnect topologies for many cores: (a) a shared bus, (b) a 4x4 mesh
+% carrying two transfers at the same time on different links, (c) a 4x4
+% torus, i.e. a mesh with wraparound links in every row and column (only the
+% link of the left column and the one of the bottom row are drawn).
+% Links are drawn between node centres on the background layer, so the
+% filled nodes hide the parts of the lines inside them.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily,
+  nd/.style={draw, fill=ln-accent!15, minimum size=0.36cm, inner sep=0pt},
+  lk/.style={ln-muted, line width=0.5pt},
+  wrap/.style={ln-accent, line width=0.5pt, rounded corners=2pt},
+  route/.style={line width=1.6pt, line cap=round, line join=round},
+  paneltitle/.style={font=\footnotesize\sffamily, anchor=north}]
+  % ---------------------------------------------------------------- (a) bus
+  \begin{scope}
+    \foreach \i in {0,...,3} {
+      \node[nd] at (0.3+\i*0.8,2.3) {};
+      \node[nd] at (0.3+\i*0.8,0.4) {};
+    }
+    \begin{scope}[on background layer]
+      \foreach \i in {0,...,3}
+        \draw[lk] (0.3+\i*0.8,2.3) -- (0.3+\i*0.8,0.4);
+    \end{scope}
+    \draw[line width=1.4pt] (-0.1,1.35) -- (3.1,1.35);
+    \node[paneltitle] at (1.5,-0.8) {\iflangja{(a) バス}{(a) bus}};
+  \end{scope}
+  % --------------------------------------------------------------- (b) mesh
+  \begin{scope}[xshift=4.0cm]
+    \foreach \x in {0,...,3} \foreach \y in {0,...,3}
+      \node[nd] at (\x*0.9,\y*0.9) {};
+    \begin{scope}[on background layer]
+      \foreach \k in {0,...,3} {
+        \draw[lk] (\k*0.9,0) -- (\k*0.9,2.7);
+        \draw[lk] (0,\k*0.9) -- (2.7,\k*0.9);
+      }
+      % two transfers in progress on disjoint links
+      \draw[route, ln-caution] (0,2.7) -- (1.8,2.7) -- (1.8,1.8);
+      \draw[route, ln-tip] (2.7,0) -- (2.7,0.9) -- (0.9,0.9);
+    \end{scope}
+    \node[paneltitle] at (1.35,-0.8) {\iflangja{(b) メッシュ}{(b) mesh}};
+  \end{scope}
+  % -------------------------------------------------------------- (c) torus
+  \begin{scope}[xshift=8.1cm]
+    \foreach \x in {0,...,3} \foreach \y in {0,...,3}
+      \node[nd] at (\x*0.9,\y*0.9) {};
+    \begin{scope}[on background layer]
+      \foreach \k in {0,...,3} {
+        \draw[lk] (\k*0.9,0) -- (\k*0.9,2.7);
+        \draw[lk] (0,\k*0.9) -- (2.7,\k*0.9);
+      }
+      % two wraparound links drawn in full, outside the grid: the one of the
+      % left column and the one of the bottom row
+      \draw[wrap] (0,2.7) -- (-0.55,2.7) -- (-0.55,0) -- (0,0);
+      \draw[wrap] (0,0) -- (0,-0.45) -- (2.7,-0.45) -- (2.7,0);
+    \end{scope}
+    \node[paneltitle] at (1.35,-0.8) {\iflangja{(c) トーラス}{(c) torus}};
+  \end{scope}
+\end{tikzpicture}

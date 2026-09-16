@@ -1,0 +1,490 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Many Cores}
+\lessoninfo{
+  video={Lesson 22, videos 1--19},
+  textbook={H\&P \cite{hennessy2017} §1.5, §5.4, App.~F},
+  keywords={many-core processor, coherence traffic, network on chip, mesh, torus, tile, off-chip traffic, distributed last-level cache, on-chip directory, partial directory, power budget, turbo mode, logical processor},
+}
+
+Lessons 18--21 developed multiprocessors whose cores typically share a bus
+and a last-level cache, keep their caches coherent by snooping on the bus
+(or, in a machine without a common bus, through a directory), coordinate
+with locks, and rely on a consistency model for shared data.  Every
+technology generation fits more cores on a chip, however, and mechanisms
+that serve four or eight cores well break down when a chip has dozens or
+hundreds of them.  This lesson examines the challenges
+that such chips face---coherence traffic, off-chip traffic, the size of the
+coherence directory, the shared power budget and the placement of threads
+by the operating system---and the solution the lecture gives for each.
+
+\section{Coherence traffic}
+\label{sec:l22-coherence}
+
+A \term{many-core processor}[メニーコアプロセッサ] is a multicore processor
+with many cores on one chip: dozens to hundreds rather than two to
+eight.\source{Lesson 22, videos 1--2; H\&P ch.~5.}  The first challenge of
+such a chip concerns cache coherence (Lesson 19).  Every write to a shared
+location that other cores have cached causes \emph{coherence traffic}:
+invalidations sent to the other caches, and coherence misses when those
+cores access the block again.  With more cores the chip performs more writes
+per second in total, so the rate of coherence messages grows with the
+number of cores.  On a shared bus this traffic soon becomes the bottleneck:
+\begin{itemize}
+  \item a bus carries one transfer at a time, so the cores wait for each
+    other's coherence messages and cache misses;
+  \item a bus that connects more cores is longer and has more devices
+    attached, so each transfer is slower as well.
+\end{itemize}
+
+A many-core chip therefore needs two things: an on-chip interconnect whose
+capacity grows with the number of cores, and a coherence mechanism that
+does not rely on every cache observing every operation on a single bus.
+The second is directory-based coherence (\cref{sec:l19-directory}), which
+delivers each message only to the caches that hold the block, instead of
+broadcasting it to all cores.
+
+\section{Network on chip}
+\label{sec:l22-noc}
+
+The shared bus is replaced by a network.\source{Lesson 22, videos 3--4;
+H\&P App.~F; \cite{dally2001}.}
+
+\begin{definition}[Network on chip]
+  A \term{network on chip}[ネットワークオンチップ] connects the cores of a
+  chip by point-to-point links between routers, one router per core.  A
+  message travels from router to router until it reaches its destination,
+  and messages on different links travel at the same time.
+\end{definition}
+
+In the \term{mesh}[メッシュ] topology the routers form a two-dimensional
+grid, and each router is linked to its neighbours to the north, south, east
+and west (\cref{fig:l22-topologies}b).  Any core reaches any other core over
+a path of several links, or \emph{hops}, and transfers that use different
+links proceed at the same time, so the network as a whole carries many
+times the traffic of a single link.  Two further properties suit the mesh to
+a chip.
+\begin{description}
+  \item[Scaling] Adding cores enlarges the grid, and every added core adds
+    links, so the capacity of the network grows with the number of cores,
+    unlike that of a bus.  Every link connects two neighbouring cores and
+    stays short however large the chip, whereas a bus must span all cores.
+  \item[Planar layout] The links connect only neighbours and do not cross,
+    so the mesh is easily laid out on the flat surface of a chip.
+\end{description}
+Such a chip is built by replicating a \term{tile}[タイル]: a core with its
+private caches and its router, to which later sections add a part of the
+structures that all cores share.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l22-topologies}
+  \caption{Interconnects for many cores.  A bus carries one transfer at a
+    time; the mesh carries the two highlighted transfers at the same time on
+    different links; the torus adds a wraparound link between the first and
+    the last router of every row and every column---only the link of the
+    left column and the one of the bottom row are drawn.}
+  \label{fig:l22-topologies}
+\end{figure}
+
+Other topologies shorten the paths at the cost of a more difficult layout.
+A \term{torus}[トーラス] is a mesh with additional wraparound links between
+the first and the last router of every row and every column
+(\cref{fig:l22-topologies}c), which roughly halves the longest path; the
+wraparound links, however, are long or cross other links.  The
+\emph{flattened butterfly} and the \emph{hypercube} link each router to more
+routers---to all routers of its own row and column in a flattened butterfly,
+to $\log_{2}N$ routers in a hypercube---which shortens the paths further but
+requires long, crossing links that are hard to build on a chip.
+
+If the traffic were spread evenly over the links, a network of $L$ links,
+each carrying up to $C$ messages per second, would carry
+\begin{equation}
+  \text{throughput} \;\approx\; \frac{L\cdot C}{h}
+  \label{eq:l22-throughput}
+\end{equation}
+messages per second, where $h$ is the average number of hops per message,
+because a message occupies a link on every hop.  A $k\times k$ mesh has
+$L=2k(k-1)$ links, and for a destination drawn at random among the other
+tiles the average distance is $h=2k/3$ hops, which grows only with the
+square root of the number of cores $N=k^{2}$.
+
+\Cref{eq:l22-throughput} is an average-load estimate that no real routing
+reaches.  The load on a link is the sum of the rates of all messages routed
+over it, and the network carries the offered traffic only while every link
+stays below $C$, so the busiest link, not the average, sets the
+limit.\caution{A mesh raises throughput but does not shorten latency: a
+message to a distant tile passes many routers, each adding delay.}  When
+messages are addressed all over the chip and the routers send each message
+along one dimension and then the other, the links that cross the middle of
+the mesh are the busiest, and they saturate at about $2kC$ messages per
+second.  The capacity of a mesh therefore grows with $\sqrt{N}$ for such
+traffic, and in proportion to $N$ only while messages stay among
+neighbouring tiles; a bus, by contrast, never carries more than one link's
+worth of traffic however many cores it connects.  Since the capacity per
+core falls as $1/\sqrt{N}$ once traffic crosses the chip, keeping a core's
+data in its own tile matters (\cref{sec:l22-llc}).
+
+\begin{example}
+  \label{ex:l22-throughput}
+  Let each link, and the bus, carry $C$ messages per second.  With 16 cores
+  the bus carries $C$; a $4\times4$ mesh has 24 links and an average
+  distance of $8/3\approx 2.67$ hops, for which \cref{eq:l22-throughput}
+  estimates $24C/2.67\approx 9C$, while its middle links limit it to about
+  $8C$.  With 64 cores the bus still carries at most $C$ (in practice less,
+  since it is longer), while an $8\times8$ mesh has 112 links and an average
+  distance of $16/3\approx 5.33$ hops, which the estimate turns into $21C$
+  and the middle links into about $16C$: four times the cores, twice the
+  capacity.  If all traffic went to neighbouring tiles ($h=1$), the two
+  meshes would carry $24C$ and $112C$.
+\end{example}
+
+\section{Off-chip traffic and the distributed LLC}
+\label{sec:l22-llc}
+
+The second challenge is the traffic that leaves the chip.\source{Lesson 22,
+videos 5--7.}  Each core has its own caches, and the miss rate per core does
+not change with the number of cores, so a chip with more cores sends
+proportionally more requests to main memory.  These requests pass through
+the pins of the chip; the number of pins also grows from generation to
+generation, but far more slowly than the number of cores, so the memory
+interface becomes a bottleneck.  The number of memory requests \emph{per
+core} must therefore go down: more accesses must be served on the chip, by
+a last-level cache that all cores share and whose size grows roughly in
+proportion to the number of cores.  A single large LLC, however, is slow,
+since a larger cache has a longer hit time (Lesson 12), and it has a single
+entry point through which the L2 misses of all cores must pass, which is a
+bottleneck of its own.
+
+\begin{definition}[Distributed last-level cache]
+  A \term{distributed last-level cache}[分散最終レベルキャッシュ] is
+  logically a single cache shared by all cores---each block is stored in it
+  at most once, not once per core---but is physically divided into
+  \emph{slices}, one slice in each tile (\cref{fig:l22-llc}).
+\end{definition}
+
+The size of the LLC is the number of cores times the size of a slice, so it
+grows automatically with the number of cores, while each slice remains
+small and fast and the requests of the cores are spread over many slices.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l22-distributed-llc}
+  \caption{Eight tiles connected by a mesh.  Each tile holds a core, its L1
+    and L2 caches, one slice of the distributed LLC, a part of the on-chip
+    directory (\cref{sec:l22-directory}) and a router (R).  An L2 miss of
+    core~1 on a block whose set number ends in binary 110 is sent to LLC
+    slice~6.}
+  \label{fig:l22-llc}
+\end{figure}
+
+On an L2 miss the core must send its request to the one slice that may hold
+the block, and it must be able to compute that slice from the address alone.
+The lecture distributes the blocks among the tiles in round-robin fashion,
+in one of two ways.
+\begin{description}
+  \item[By cache index] The lowest bits of the set number select the tile, so
+    consecutive sets go to consecutive tiles.  The blocks are spread evenly,
+    but without regard to which core uses them: the blocks of a thread are
+    scattered over all tiles, and most of its LLC accesses travel to a
+    distant tile.
+  \item[By page number] Bits of the physical page number select the tile, so
+    all blocks of a page are in the same slice.  The operating system
+    decides which physical frame each page receives; it can give a thread
+    frames whose slices lie in or near the thread's own tile, and most LLC
+    accesses stay local---the same idea as keeping a thread's memory on its
+    own node in a NUMA machine (\cref{sec:l18-distributed}).
+\end{description}
+
+\begin{example}
+  \label{ex:l22-llc}
+  A chip has 32 tiles with a \SI{1}{MB} LLC slice each, so its LLC holds
+  \SI{32}{MB}.  With \SI{64}{B} blocks and 8-way set associativity, the LLC
+  has $2^{25}/(2^{6}\cdot 2^{3})=2^{16}$ sets, of which each slice holds
+  $2^{11}=2048$.  If the tile is selected by cache index, the 16-bit set
+  number consists of address bits 6--21: its lowest 5 bits (address bits
+  6--10) select one of the 32 tiles, the remaining 11 bits (address bits
+  11--21) select the set within that slice, and the tag consists of the
+  address bits from bit 22 up, as in any cache with $2^{16}$ sets.
+\end{example}
+
+\section{The on-chip directory}
+\label{sec:l22-directory}
+
+Directory-based coherence brings a challenge of its own.\source{Lesson 22,
+videos 8--11; H\&P §5.4; \cite{agarwal1988}.}  The directory of
+\cref{sec:l19-directory} has an entry for every memory block, and each entry
+has one presence bit per core plus an exclusive bit.  Main memory of many
+gigabytes consists of hundreds of millions of blocks, and a directory with
+an entry for each of them does not fit on a chip.
+
+\begin{example}
+  \label{ex:l22-directory-size}
+  A 64-core system has \SI{32}{GB} of memory divided into \SI{64}{B} blocks,
+  that is, $2^{35}/2^{6}=2^{29}\approx 537$ million blocks.  At 65 bits per
+  entry the full directory needs about $3.5\times10^{10}$ bits, or
+  \SI{4.1}{GB}---about \SI{13}{\percent} of main memory itself.
+\end{example}
+
+Two decisions adapt the directory to the chip.  The first is where an entry
+is kept.  The directory is divided among the tiles, and the entry of a block
+resides in the tile that holds the block's LLC slice, its \emph{home} tile.
+A core whose private caches miss must contact that tile anyway to search the
+LLC, so it reaches the directory entry without an additional message; no
+tile becomes a central bottleneck either.  The second decision, the one that
+makes the directory small enough, is which blocks have an entry at all.
+
+\begin{definition}[On-chip directory]
+  An \term{on-chip directory}[オンチップディレクトリ] is a coherence
+  directory kept on the chip: it is distributed over the tiles, the entry of
+  each block residing in the tile of the block's LLC slice, and it is a
+  \term{partial directory}[部分ディレクトリ], which has a fixed number of
+  entries in each tile and holds entries only for some of the blocks.
+\end{definition}
+
+An entry is needed only for a block that is held by at least one private
+cache (L1 or L2), that is, whose entry would have at least one presence bit
+set.  A block that is only in the LLC or in main memory would have an entry
+of zeros, and a missing entry says the same thing.  The directory therefore
+allocates an entry when a private cache obtains a block that has none, and
+the entry is no longer needed once no private cache holds the block.  When a
+new entry is needed but all entries of the tile are in use, the directory
+replaces one:
+\begin{enumerate}
+  \item it selects a victim entry, for example the least recently used one;
+  \item it sends an invalidation to every tile whose presence bit is set in
+    the victim entry; these caches discard their copies of the block (a
+    modified copy is first written back);
+  \item it uses the entry for the new block.
+\end{enumerate}
+The invalidated caches miss the next time they access the block, although
+no other core has written to it.  Directory replacement thus causes a new
+kind of cache miss, in addition to the misses of the 3C model (Lesson 14)
+and the coherence misses of Lesson 19.  The more entries the directory
+has, the rarer such misses become.\margin{The partial directory behaves like a
+cache of directory entries, with its own replacement policy.}
+
+\begin{example}
+  \label{ex:l22-directory-trace}
+  \Cref{tab:l22-directory-trace} traces the directory part of one tile with
+  room for two entries in a chip with four cores, C0--C3.  Blocks A, B and C
+  all have this tile as their home tile, and initially no private cache holds
+  them.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{A partial directory with two entries.  Each entry shows the
+    block, the exclusive bit and the presence bits of C0--C3.}
+  \label{tab:l22-directory-trace}
+  \begin{tabular}{@{}clccl@{}}
+    \toprule
+    Step & Event & Entry 1 & Entry 2 & Directory action \\
+    \midrule
+    1 & C0 reads A  & \texttt{A 1 1000} & ---               & allocate entry 1 \\
+    2 & C2 reads A  & \texttt{A 0 1010} & ---               & forward read to C0 \\
+    3 & C1 writes B & \texttt{A 0 1010} & \texttt{B 1 0100} & allocate entry 2 \\
+    4 & C3 reads C  & \texttt{C 1 0001} & \texttt{B 1 0100} & replace A: invalidate C0, C2 \\
+    5 & C0 reads A  & \texttt{C 1 0001} & \texttt{A 1 1000} & replace B: invalidate C1 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+In step~4 the directory is full, and A, last used in step~2, is the least
+recently used entry; C0 and C2 lose their copies of A.  The read of A by C0
+in step~5 is a miss caused only by that replacement, and it in turn evicts B
+from the directory and from C1, whose modified copy is written back to the
+LLC.
+
+\begin{keypoint}
+  The distributed LLC and the on-chip directory both divide a shared
+  structure among the tiles, so that it grows with the number of cores
+  without a central bottleneck.  A block's LLC slice and its directory entry
+  reside in the same tile, and the directory keeps entries only for blocks
+  in private caches, at the price of occasional misses caused by directory
+  replacement.
+\end{keypoint}
+
+\section{Sharing the power budget}
+\label{sec:l22-power}
+
+The third challenge is power.\source{Lesson 22, videos 12--14; H\&P §1.5.}
+A chip can dissipate only as much power as its package and cooling remove,
+and this power budget is shared by all its cores.  The more cores a chip
+has, the less power each core receives, and the lower its supply voltage
+and clock frequency must be.  The dynamic power of a core is proportional to
+$V^{2}f$ (\cref{eq:active-power}), and the frequency a core reaches is
+roughly proportional to its voltage, so the power grows roughly with $f^{3}$
+(\cref{ex:l18-power}).  If $N$ cores share the budget of a single core, each
+receives $1/N$ of it and runs at
+\begin{equation}
+  f_{N} \;=\; \frac{f_{1}}{\sqrt[3]{N}} ,
+  \label{eq:l22-freq}
+\end{equation}
+where $f_{1}$ is the frequency of the single core.  This relation assumes
+that the voltage can be lowered in proportion to the frequency; near its
+lower limit, power falls only linearly with $f$, and dividing the budget
+costs even more frequency.
+
+\begin{marginfigure}
+  \resizebox{\linewidth}{!}{\input{figures/l22-power-perf}}
+  \caption{Performance of $N$ cores sharing the power budget of one core,
+    by \cref{eq:l22-perf}.}
+  \label{fig:l22-power-perf}
+\end{marginfigure}
+Since the CPI does not change, a single-threaded program runs
+$\sqrt[3]{N}$ times slower on a chip with $N$ cores than on a single core
+with the same budget: more cores make a sequential program slower.  A
+program whose parallel fraction is $f_{\mathrm{par}}$ gains from the
+additional cores, as Amdahl's law (\cref{eq:l18-amdahl-cores}) describes,
+but loses from the lower frequency:
+\begin{equation}
+  \text{performance}(N) \;=\; \frac{1}{\sqrt[3]{N}}\cdot
+  \frac{1}{(1-f_{\mathrm{par}}) + \dfrac{f_{\mathrm{par}}}{N}} ,
+  \label{eq:l22-perf}
+\end{equation}
+relative to the single core.  More generally, if a fraction $t_{p}$ of the
+single-core execution time can use $p$ threads, the program needs
+$\sqrt[3]{N}\,\sum_{p} t_{p}/\min(p,N)$ of that time on $N$ cores.
+Beyond some number of cores the loss in frequency outweighs the gain in
+parallelism (\cref{fig:l22-power-perf}).
+
+\begin{example}
+  \label{ex:l22-power}
+  A chip has a \SI{120}{W} budget; a single core using all of it runs at
+  \SI{4.2}{GHz}.  Eight cores receive \SI{15}{W} each and run at
+  $\SI{4.2}{GHz}/\sqrt[3]{8}=\SI{2.1}{GHz}$, so a single-threaded program
+  runs at half its speed on the single core.  A program with
+  $f_{\mathrm{par}}=0.9$ performs $0.5/(0.1+0.9/8)\approx 2.35$ times as well
+  as on the single core.  With 27 cores at \SI{1.4}{GHz} it reaches
+  $(1/3)/(0.1+0.9/27)=2.5$, but with 64 cores at \SI{1.05}{GHz} only
+  $0.25/(0.1+0.9/64)\approx 2.19$.
+\end{example}
+
+\section{Turbo mode}
+\label{sec:l22-turbo}
+
+When a program has no parallelism, the power budget of the idle cores can
+be given to the core that runs it.\source{Lesson 22, video 15; H\&P §1.5.}
+In \term{turbo mode}[ターボモード] the chip keeps only one core (or a few)
+active, turns the others off, and raises the voltage and the clock frequency
+of the active core above their normal values.  With the entire budget of $N$
+cores, the frequency could rise by a factor of $\sqrt[3]{N}$---1.59 for four
+cores---which would recover exactly the frequency lost by dividing the
+budget (\cref{eq:l22-freq}).  \Cref{tab:l22-turbo} shows the two
+processors of 2013 that the lecture uses as examples; their design power is
+that of the whole package, which also contains the integrated graphics and
+the uncore, and is therefore not a budget for the cores alone.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Normal and turbo clock frequencies of two quad-core Intel Core
+    processors.  The power factor is the cube of the ratio of the turbo
+    frequency to the normal one.}
+  \label{tab:l22-turbo}
+  \begin{tabular}{@{}lccccc@{}}
+    \toprule
+    Processor & Design power & Normal & Turbo & Frequency & Power \\
+    \midrule
+    i7-4702MQ (laptop) & \SI{37}{W} & \SI{2.2}{GHz} & \SI{3.2}{GHz} & $1.45\times$ & $3.1\times$ \\
+    i7-4771 (desktop)  & \SI{84}{W} & \SI{3.5}{GHz} & \SI{3.9}{GHz} & $1.11\times$ & $1.38\times$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Neither processor uses the whole budget of four cores for one core.  What
+limits a chip is its temperature, not only its total power: in turbo mode
+the power is concentrated in the area of one core, only part of its heat
+spreads into the idle cores around it, and the active core reaches its
+maximum temperature before it consumes four times its normal power.  The
+laptop processor normally runs its cores at low power, so one core can
+still raise its power about threefold.  The desktop processor, designed for
+better cooling, runs its cores at high power already in normal operation,
+close to what the area of one core can dissipate, and gains little from
+turbo mode.
+
+\section{SMT, cores and chips}
+\label{sec:l22-os}
+
+The last challenge concerns the operating system.\source{Lesson 22, videos
+16--17.}  A many-core system uses all the kinds of parallelism of Lesson 18
+at once: a board carries several chips, each chip several cores, and each
+core runs several threads with SMT.  The operating system sees every
+hardware thread as a \term{logical processor}[論理プロセッサ] on which it
+can run one software thread; two chips with eight cores each and two SMT
+threads per core, for example, appear as 32 logical processors.
+
+The logical processors are not equivalent, however.  Two threads on the same
+core share its pipeline and caches, and each runs much slower than on a core
+of its own (\cref{sec:l18-mt-performance}).  Threads on the same chip share
+its last-level cache, its power budget and its memory interface.  Threads on
+different chips share none of these, but communicate over the slower links
+between the chips.  An operating system that treats all logical processors
+as identical may start three threads on logical processors 0, 1 and 2,
+which places two of the threads on one core and leaves the other chip idle
+(\cref{fig:l22-placement}a).  A topology-aware operating system spreads the
+threads first over the chips, then over the cores of each chip, and uses the
+second SMT thread of a core only when every core is busy
+(\cref{fig:l22-placement}b).
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l22-placement}
+  \caption{Three threads A, B and C on two chips with two cores and two SMT
+    threads per core; small numbers are logical processors.  (a) Threads A
+    and B share core~0.  (b) Every thread has a core of its own.}
+  \label{fig:l22-placement}
+\end{figure}
+
+\begin{note}
+  Spreading is best for independent threads; threads that share much data
+  communicate faster on one chip, where the data stays in one LLC.  Either
+  choice requires that the operating system know the topology.
+\end{note}
+
+\section{Challenges and solutions}
+\label{sec:l22-summary}
+
+\Cref{tab:l22-challenges} collects the challenges of this lesson and their
+solutions.\source{Lesson 22, videos 18--19.}  Each arises because a
+mechanism that serves a few cores does not grow with the number of cores.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Many-core challenges and their solutions.}
+  \label{tab:l22-challenges}
+  \begin{tabular}{@{}l>{\raggedright\arraybackslash}p{0.36\linewidth}>{\raggedright\arraybackslash}p{0.33\linewidth}@{}}
+    \toprule
+    Challenge & Cause & Solution \\
+    \midrule
+    Coherence traffic & more writes to shared data; a bus carries one
+      transfer at a time & network on chip (mesh), directory-based coherence \\
+    Off-chip traffic & more cache misses; pins grow more slowly than cores
+      & distributed LLC \\
+    Directory size & an entry for every memory block & on-chip partial
+      directory \\
+    Power budget & one budget shared by more cores & turbo mode when few
+      cores are active \\
+    Thread placement & SMT threads, cores and chips differ &
+      topology-aware operating system \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{keypoint}[Lesson summary]
+  A many-core processor cannot simply scale up the designs of Lessons
+  18--21.  Coherence traffic outgrows a bus, so the cores are connected by a
+  network on chip, usually a mesh of tiles whose capacity, unlike that of a
+  bus, grows with the number of cores---with $\sqrt{N}$ for traffic across
+  the chip and with $N$ for traffic between neighbours---and use
+  directory-based coherence.  A distributed LLC gives each tile a slice,
+  selected by cache index or, for locality, by page number; the coherence
+  directory becomes an on-chip partial directory in the tile of each block's
+  LLC slice.  A shared power budget lowers the frequency of every core by a
+  factor of $\sqrt[3]{N}$ (\cref{eq:l22-freq}), which turbo mode partly
+  recovers for sequential programs, and the operating system must know which
+  logical processors share a core or a chip.
+\end{keypoint}
+
+\end{document}
