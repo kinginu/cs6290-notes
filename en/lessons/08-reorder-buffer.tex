@@ -27,7 +27,10 @@ An exception is an event, such as a division by zero or an access to an
 invalid memory address, that an instruction raises when it
 executes.\source{Lesson 8, videos 1--2; H\&P §C.4, §3.6.}  The processor
 saves the address of the excepting instruction and transfers control to an
-exception handler, usually part of the operating system.  When the handler
+exception handler, usually part of the operating system.\caution{H\&P reserves
+\emph{interrupt} for an event that no instruction causes, such as a timer tick
+or an I/O completion; the mechanism of this chapter serves both.}  When the
+handler
 has dealt with the cause, it may return to the saved address, so that the
 excepting instruction is executed again and the program continues after it.
 For the handler to work, and for the program to continue correctly after the
@@ -109,7 +112,9 @@ address, and the load I4 may raise an exception long before I2 executes.
 \end{definition}
 
 A phantom exception must not reach the handler: in program order, the
-instruction that raised it does not exist.
+instruction that raised it does not exist.\caution{\emph{Phantom
+exception} is this course's term; H\&P speaks of an exception raised by a
+speculated instruction, buffered and discarded with it.}
 
 \section{Correct out-of-order execution}
 \label{sec:l08-correct}
@@ -132,7 +137,9 @@ Holding the results until they may be written requires a structure that
 remembers the program order of the instructions after they have been issued.
 The reservation stations cannot do this: an instruction leaves its
 reservation station as soon as its result is broadcast, and the stations are
-allocated in no particular order.
+allocated in no particular order.\margin{Smith and Pleszkun
+\cite{smith1988} give three more ways to the same end: a result shift register,
+a history buffer and a future file.}
 
 \begin{keypoint}
   Execute out of order, broadcast out of order, but write the registers in
@@ -174,7 +181,9 @@ would describe both an empty and a full buffer, an occupancy count or a full
 bit distinguishes the two.  In normal operation both pointers only advance,
 wrapping around from the last entry to the first; recovery moves the issue
 pointer back (\cref{sec:l08-recovery}).  When every entry is in use, no
-instruction can be issued until the oldest one leaves the ROB.  Every issued
+instruction can be issued until the oldest one leaves the ROB.\margin{ROBs have
+grown from 40 entries on the Pentium Pro to 224 on Skylake (Lesson~7), 256 on
+AMD Zen~3 and 512 on Intel Golden Cove.}  Every issued
 instruction receives an entry, including a branch, which writes no register:
 its entry keeps its place in the program order and, as shown below, records
 whether it was mispredicted.
@@ -247,13 +256,21 @@ later entries are: results enter the register file only in program order.  The
 RAT entry is reset only when it still names the committing entry; otherwise a
 later instruction writes the same register, and the RAT must keep naming that
 instruction's entry (\cref{sec:l08-rat}).  Commit is also called
-\emph{retirement}.
+\emph{retirement}.\margin{\emph{Retire} is the word of the vendor
+manuals: Intel's counter \texttt{INST\_RETIRED.ANY} counts commits, and measured
+IPC (Lesson~2) is derived from it.}
 
 \subsection{Hardware organization}
 
 \Cref{fig:l08-organization} shows the organization of Lesson 7 with a ROB
 added.  The CDB now delivers results to the RSs and to the ROB, the RAT names
-ROB entries, and the register file is written only by commit.  An instruction
+ROB entries, and the register file is written only by commit.\sidenote{Keeping
+results in the ROB, as here, is the design of Intel's P6 cores (Pentium Pro,
+1995).  Since Sandy Bridge (2011) every result is written straight into the
+physical register file of Lesson~6, and the ROB entry records only which
+physical register the instruction was given; commit then changes a mapping
+instead of copying a value, and recovery frees the registers allocated after
+the branch.}  An instruction
 passes through six steps: fetch, decode, issue, execute (from dispatch until
 the operation completes), write result and commit.
 
@@ -287,7 +304,9 @@ I6 are issued while I2 waits for R1, and all of them except I6, which is
 still executing, write their results into their ROB entries.  When I2 finally executes and
 the processor finds that the branch was mispredicted, the misprediction is
 recorded in the ROB entry of I2, and nothing else happens yet.  Instructions
-before the branch are unaffected and continue to execute and commit.
+before the branch are unaffected and continue to execute and commit.\margin{The
+branch can be held up for a long time: a 32-bit integer division alone takes 26
+cycles on Skylake (Agner Fog, \emph{Instruction tables}).}
 
 When the branch reaches the commit pointer, every instruction before it has
 committed, so the register file holds exactly the values that a sequential
@@ -345,7 +364,9 @@ This removes both problems of
     has written the register file.  Stores likewise write memory only when
     they commit (Lesson~9), so memory is also unchanged by later instructions.
     The handler sees exactly the state of \cref{def:l08-precise}; after the
-    return, the later instructions are executed from that state.
+    return, the later instructions are executed from that state.\margin{Demand
+    paging rests on this: the handler fetches the missing page, and the
+    faulting load is then executed again (Lesson~13).}
   \item[No phantom exceptions] An exception on a mispredicted path is recorded
     in an entry that follows the mispredicted branch.  The branch commits
     first, and its recovery discards the entry together with the exception,
@@ -385,7 +406,9 @@ of R4 names ROB5, because that instruction was issued later.
     not the older value that has just entered the register file.
 \end{itemize}
 When ROB5 commits, the RAT entry of R4 still names ROB5 unless an even later
-writer has been issued in the meantime, and only then is it reset.  The
+writer has been issued in the meantime, and only then is it reset.\tip{Only the
+youngest writer of a register ever resets its RAT entry; an older one writes
+the register file and leaves the RAT alone.}  The
 opposite mistake, leaving a RAT entry that names a committed entry, is equally
 wrong: the entry is freed at commit and may soon be given to an unrelated
 instruction.
@@ -411,7 +434,9 @@ instruction waits for one.  The steps follow these conventions:
     $D+k$; there is one CDB, and in this example no two results are written
     in the same cycle;
   \item an instruction commits no earlier than the cycle after its write
-    result, and at most one instruction commits per cycle.
+    result, and at most one instruction commits per cycle.\margin{One commit
+    per cycle is an assumption of this example: Skylake retires up to four
+    micro-operations per cycle and AMD Zen~3 up to eight.}
 \end{itemize}
 
 \needspace{12\baselineskip}
@@ -432,7 +457,9 @@ I6:  ADD R6, R2, R4     ; R6 <- R2 + R4
 \end{example}
 
 \paragraph{Cycles 1--6: issue.}
-One instruction is issued per cycle, I$k$ into ROB$k$.  I1 copies 48 and 4
+One instruction is issued per cycle, I$k$ into ROB$k$.\tip{Follow one register
+at a time: its RAT entry changes when a writer issues, and a reader takes
+whatever the RAT names in its own issue cycle.}  I1 copies 48 and 4
 from the register file into MD1 and sets the RAT entry of R1 to ROB1.  In
 cycle~2 I1 is dispatched and frees MD1, and I2 is issued into AD1 with the
 values 7 and~3.  I3, issued in cycle~3, finds ROB2 in the RAT entry of R4; ROB2
@@ -448,7 +475,9 @@ cycle~6 I6 is issued into AD3, because AD2, freed by the dispatch of I5 in the
 same cycle, can be used only from cycle~7; I6 waits for ROB3 and ROB5.
 \Cref{tab:l08-rob-state,tab:l08-rat-state} show the state at the end of
 cycle~6: AD1 holds I4 and AD3 holds I6, all other RSs are free, and the
-register file is unchanged.
+register file is unchanged.\tip{Entries in use $=$ (issue $-$
+commit) $\bmod\ 8$: at the end of cycle~6 that is $(7-1) \bmod 8 = 6$, namely
+ROB1 to ROB6.}
 
 \begin{table}[htbp]
   \centering\small
@@ -586,7 +615,10 @@ cycle: every later instruction commits exactly one cycle after its
 predecessor.  This waiting delays no computation: I3 and I5 obtained the
 result of I2, and I6 those of I3 and I5, without waiting for any commit.  The
 ROB delays only the moment at which results become part of the architectural
-state.
+state.\margin{A ROB is sized to cover the
+longest stall it should hide: at four instructions per cycle, 224 entries hold
+some 56 cycles---an L3 hit on Skylake takes 42 cycles, a DRAM access about 200
+(7-cpu.com).}
 
 \needspace{4\baselineskip}
 The ROB can nevertheless limit execution when it is too small.  With only four
@@ -614,7 +646,10 @@ use the free multiplier RSs.
 \end{definition}
 
 Issue then waits only when all RSs are occupied, so the same number of RSs is
-used more effectively.  The cost lies in dispatch: instead of choosing among
+used more effectively.\margin{Intel's schedulers are
+unified (97 entries on Skylake, Lesson~7); AMD's Zen cores keep separate
+integer and floating-point schedulers.}  The cost lies in dispatch: instead of
+choosing among
 the RSs of one group for one execution unit, the dispatch logic must find, for
 each free execution unit, the ready instructions in the whole pool whose
 operation that unit performs, and select among them.
@@ -692,7 +727,9 @@ videos 38--40; H\&P §3.6.}
     These are the only steps in which a later instruction overtakes an
     earlier one.
   \item[Commit] is in program order again; the ROB restores the order that
-    execution relaxed.
+    execution relaxed.\caution{The ROB reorders nothing: entries enter and
+    leave it in program order.  The name refers to its effect on execution,
+    not to the queue itself.}
 \end{description}
 
 \begin{figure}[htbp]
