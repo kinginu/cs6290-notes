@@ -1,0 +1,45 @@
+% LL/SC on two cores.  Both cores load-link the lock variable at address A;
+% core 0's store-conditional succeeds, and its store clears every link
+% register that holds A, so core 1's store-conditional fails.
+% Register contents are shown after step (5).
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  core/.style={draw, fill=ln-accent!15, minimum width=3.6cm, minimum height=0.55cm, inner sep=2pt},
+  reg/.style={draw, fill=white, minimum width=1.8cm, minimum height=0.5cm, inner sep=1pt, font=\footnotesize\ttfamily},
+  hd/.style={inner sep=1pt, font=\scriptsize\sffamily, text=ln-muted},
+  big/.style={draw, fill=ln-box, minimum height=0.65cm, inner sep=3pt},
+  op/.style={font=\scriptsize, align=left, anchor=south west, inner sep=1pt}]
+  % ---- core 0
+  \node[core] (c0) at (1.8,0) {\iflangja{コア}{core}~0};
+  \node[reg, anchor=north west] (r0) at (c0.south west) {1};
+  \node[reg, anchor=north east] (l0) at (c0.south east) {--};
+  \node[hd, anchor=north] (r0l) at (r0.south) {R1};
+  \node[hd, anchor=north] (l0l) at (l0.south) {\iflangja{リンクレジスタ}{link register}};
+  % ---- core 1
+  \node[core] (c1) at (8.4,0) {\iflangja{コア}{core}~1};
+  \node[reg, anchor=north west] (r1) at (c1.south west) {0};
+  \node[reg, anchor=north east, fill=ln-caution!15] (l1) at (c1.south east) {--};
+  \node[hd, anchor=north] (r1l) at (r1.south) {R1};
+  \node[hd, anchor=north] (l1l) at (l1.south) {\iflangja{リンクレジスタ}{link register}};
+  % ---- operations, numbered in the order they happen
+  \node[op] at ([yshift=2pt]c0.north west) {%
+    \iflangja{(1) LL: R1 $=$ 0，リンクレジスタ $\leftarrow$ A}%
+             {(1) LL: R1 $=$ 0, link register $\leftarrow$ A}\\
+    \iflangja{(3) SC: リンク有効 $\to$ 1 をストア，R1 $=$ 1}%
+             {(3) SC: link valid $\to$ store 1, R1 $=$ 1}};
+  \node[op] at ([yshift=2pt]c1.north west) {%
+    \iflangja{(2) LL: R1 $=$ 0，リンクレジスタ $\leftarrow$ A}%
+             {(2) LL: R1 $=$ 0, link register $\leftarrow$ A}\\
+    \textcolor{ln-caution}{\iflangja{(5) SC: リンク無効 $\to$ ストアせず，R1 $=$ 0}%
+             {(5) SC: link cleared $\to$ no store, R1 $=$ 0}}};
+  % ---- memory
+  \node[big, minimum width=4.4cm] (mem) at (5.1,-2.55)
+    {\iflangja{ロック変数（アドレス A）$=$ 1}{lock variable (address A) $=$ 1}};
+  % store of core 0
+  \draw[->] (r0l.south) |- (mem.west)
+    node[pos=0.75, above, font=\scriptsize] {\iflangja{(3) 1 をストア}{(3) store 1}};
+  % clearing of the link registers
+  \draw[->, ln-caution] (mem.east) -- (11.0,-2.55) |- (l1.east)
+    node[pos=0, above left, font=\scriptsize, align=right, inner sep=2pt]
+    {\iflangja{(4) A への書き込みで，\\A を保持する\\リンクレジスタを消去}%
+              {(4) the write to A clears\\every link register holding A}};
+\end{tikzpicture}

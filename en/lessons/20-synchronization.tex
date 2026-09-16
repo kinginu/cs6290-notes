@@ -1,0 +1,627 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Synchronization}
+\lessoninfo{
+  video={Lesson 20, videos 1--23},
+  textbook={H\&P \cite{hennessy2017} §5.5, §I.4},
+  keywords={lock, mutual exclusion, critical section, spin lock, Lamport's bakery algorithm, atomic instruction, atomic exchange, test-and-set, load-linked/store-conditional, link register, cache coherence, barrier synchronization},
+}
+
+Lesson 19 made the caches of all cores present one coherent view of the
+shared memory.  Coherent memory alone does not make a shared-memory program
+correct: when several threads read and update the same variable, the result
+depends on how their instructions interleave.  This lesson introduces locks,
+which admit only one thread at a time to such an update, shows why the
+obvious lock built from ordinary loads and stores is incorrect and which
+atomic instructions processors provide instead, examines how the lock
+variable interacts with cache coherence, and ends with barriers, which make
+a group of threads wait for each other.
+
+\section{The need for synchronization}
+\label{sec:l20-need}
+
+Threads that share memory must coordinate their updates of shared
+data.\source{Lesson 20, videos 1--2; H\&P §5.5.}  As an example, consider a
+program that counts how often each letter occurs in a long document.  Two
+threads each process one half of the document and increment a shared array
+of 26 counters (\cref{ex:l20-count}).
+
+\begin{example}[Counting letters]
+  \label{ex:l20-count}
+  Each thread executes the following loop over its half of the document,
+  which contains only lowercase letters:
+  \begin{lstlisting}[language=C, numbers=none, morekeywords={shared}]
+shared char doc[N];
+shared int  count[26];
+for (int i = lo; i < hi; i++) {  /* my half */
+  int c = doc[i] - 'a';
+  count[c]++;
+}
+\end{lstlisting}
+\end{example}
+
+The statement \texttt{count[c]++} is one line of source code but three
+instructions for the processor: a load of the counter, an addition and a
+store.
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+LW   R1, 0(R2)      ; R2 = address of count[c]
+ADDI R1, R1, 1
+SW   R1, 0(R2)
+\end{lstlisting}
+Each thread has its own registers, but when both threads encounter the same
+letter, their R2 hold the same address.  If both threads load the counter
+before either stores the incremented value, both compute the same new value
+and one increment is lost (\cref{tab:l20-race}).
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Both threads increment the counter of the letter \texttt{e},
+    which holds 41.  After two increments it holds 42 instead of 43.}
+  \label{tab:l20-race}
+  \begin{tabular}{@{}cllrrr@{}}
+    \toprule
+    Step & Thread A & Thread B & R1 of A & R1 of B & Counter \\
+    \midrule
+    1 & \texttt{LW R1, 0(R2)}   &                             & 41 & --  & 41 \\
+    2 &                         & \texttt{LW R1, 0(R2)}       & 41 & 41  & 41 \\
+    3 & \texttt{ADDI R1, R1, 1} &                             & 42 & 41  & 41 \\
+    4 &                         & \texttt{ADDI R1, R1, 1}     & 42 & 42  & 41 \\
+    5 & \texttt{SW R1, 0(R2)}   &                             & 42 & 42  & 42 \\
+    6 &                         & \texttt{SW R1, 0(R2)}       & 42 & 42  & 42 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Whether an increment is lost depends on the relative timing of the threads.
+Most of the time the two threads process different letters, or one thread
+finishes its three instructions before the other starts, and the counts are
+correct; occasionally a count comes out too low, and the error need not
+reappear when the program is run again.\margin{The same loss occurs on a
+single time-shared core if a context switch falls between the load and the
+store.}  The load, the addition and the store must therefore execute as one
+indivisible unit with respect to every other thread that updates the same
+counter.  Providing this is the task of \emph{synchronization}.
+
+\section{Locks}
+\label{sec:l20-locks}
+
+The basic synchronization mechanism is the lock.\source{Lesson 20, videos
+3--4; H\&P §5.5.}
+
+\begin{definition}[Lock]
+  A \term{lock}[ロック] is a shared object with two operations.
+  \texttt{lock} waits until the lock is free and then marks it as held by the
+  calling thread; \texttt{unlock} marks it free again.  At any time at most
+  one thread holds a given lock.
+\end{definition}
+
+With one lock per counter, the loop of \cref{ex:l20-count} becomes
+\begin{lstlisting}[language=C, numbers=none, morekeywords={shared}]
+shared lock_t countLock[26];
+  ...
+  lock(&countLock[c]);
+  count[c]++;
+  unlock(&countLock[c]);
+\end{lstlisting}
+If thread B calls \texttt{lock} while thread A holds the lock, B waits until
+A calls \texttt{unlock}, and only then loads the counter
+(\cref{fig:l20-lock-timing}).  Thread B therefore sees the value that
+thread~A has stored, and no increment is lost.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l20-lock-timing}
+  \caption{Two threads using the same lock: thread B waits in
+    \texttt{lock} until thread A leaves its critical section.}
+  \label{fig:l20-lock-timing}
+\end{figure}
+
+\begin{definition}[Mutual exclusion]
+  The guarantee that at most one thread at a time executes code protected
+  by a given lock is called \term{mutual exclusion}[相互排除].
+\end{definition}
+
+For this reason a lock is also called a \emph{mutex}\index{mutex|see{lock}}.
+
+\begin{definition}[Critical section]
+  A \term{critical section}[クリティカルセクション] is a sequence of
+  instructions that must execute under mutual exclusion; it begins with
+  \texttt{lock} and ends with \texttt{unlock}.
+\end{definition}
+
+A lock protects \emph{data}, not code.  Mutual exclusion holds only among
+threads that use the same lock, so every access to a given shared variable
+must be made under one and the same lock; threads that update the same
+variable while holding different locks do not exclude each other at all.
+How many variables one lock protects is a choice with performance
+consequences.\tip{Use the same lock for every access to a given shared
+variable and different locks for independent variables.}  A single lock for
+all 26 counters is correct, but every increment then excludes every other
+one, even of a different letter, and the threads spend much of their time
+waiting for each other.  With one lock per counter, threads that increment
+different counters proceed in parallel, and a thread waits only while
+another thread updates the same counter.
+
+\section{Implementing a lock}
+\label{sec:l20-implementing}
+
+A lock can be represented by a shared \emph{lock variable} that holds 0 when
+the lock is free and 1 when it is held.\source{Lesson 20, videos 5--7; H\&P
+§5.5; \cite{lamport1974}.}  The obvious implementation waits until the
+variable is 0 and then sets it to~1:
+\begin{lstlisting}[language=C, numbers=none]
+void lock(lock_t *l) {
+  while (*l == 1)
+    ;              /* wait until the lock is free */
+  *l = 1;          /* take it                     */
+}
+void unlock(lock_t *l) {
+  *l = 0;
+}
+\end{lstlisting}
+A waiting thread keeps executing the loop, reading the lock variable over
+and over; a lock that waits in this way is a \term{spin lock}[スピンロック].
+
+\needspace{7\baselineskip}
+This implementation does not work.  In machine code, testing the lock
+variable and setting it are separate instructions:
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none, deletekeywords={lock}]
+lock:  LW   R1, 0(R2)    ; R2 = address of lock variable
+       BNEZ R1, lock     ; held: read it again
+       ADDI R1, R0, 1
+       SW   R1, 0(R2)    ; lock variable <- 1
+\end{lstlisting}
+If two threads both execute the \texttt{LW} while the lock is free, both read
+0, both leave the loop, both store 1, and both enter the critical section.
+This is the lost update of \cref{sec:l20-need} once more: the test and the
+set are a read and an update of a shared variable, so \texttt{lock} would
+itself need a critical section---the very thing it is supposed to provide.
+
+There are two ways out.
+\begin{itemize}
+  \item \textbf{Software.}  A software solution is
+    \term{Lamport's bakery algorithm}[Lamport のパン屋のアルゴリズム]
+    \cite{lamport1974}, which achieves mutual exclusion with ordinary loads
+    and stores.  It is complicated, and every acquisition executes many
+    instructions, which makes the lock slow---too slow for locks that are
+    acquired very frequently.
+  \item \textbf{Hardware.}  The processor provides an instruction that reads
+    and writes the lock variable in one indivisible step.
+\end{itemize}
+
+\begin{definition}[Atomic instruction]
+  An \term{atomic instruction}[アトミック命令] performs several steps---here,
+  reading a memory location and writing it---as one indivisible operation:
+  no other instruction, on this or any other core, can access the location
+  between the steps.
+\end{definition}
+
+To implement a lock, the atomic step must contain both the read and the
+write of the lock variable.  The test of the value that was read can follow
+in ordinary instructions, because once the variable has been written, no
+other thread can still read the old value.
+
+\section{Atomic read/write instructions}
+\label{sec:l20-atomic}
+
+Instruction sets provide more than one instruction that reads and writes a
+memory location as one atomic step.\source{Lesson 20, videos 8--10; H\&P
+§5.5.}  The simplest of them swaps a register with memory.
+
+\begin{definition}[Atomic exchange]
+  An \term{atomic exchange}[アトミック交換] \texttt{EXCH R1, 0(R2)}
+  atomically writes the content of R1 into the memory location at the
+  address in R2 and leaves the previous content of that location in R1.
+\end{definition}
+
+\needspace{6\baselineskip}
+A thread acquires the lock by exchanging a 1 into the lock variable until it
+gets a 0 back:
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none, deletekeywords={lock}]
+        ADDI R1, R0, 1
+lock:   EXCH R1, 0(R2)   ; swap R1 and the lock variable
+        BNEZ R1, lock    ; was held: try again
+        ...              ; critical section
+unlock: SW   R0, 0(R2)   ; lock variable <- 0
+\end{lstlisting}
+If the lock is held, the exchange writes 1 over 1 and returns 1, so R1 is
+again 1 for the next attempt.  If the lock is free, the first exchange to
+execute returns 0 and leaves 1 behind, and every later one returns 1.
+Because nothing can intervene between the read and the write, two threads
+can never both read~0.
+
+The exchange writes the lock variable on every attempt, also while another
+thread holds the lock, where the write changes nothing;
+\cref{sec:l20-performance} shows what this costs.  The second instruction
+writes only when the value it reads passes a test.
+
+\begin{definition}[Test-and-set]
+  A \term{test-and-set}[テストアンドセット] instruction tests a memory
+  location and writes it only if the value passes the test.  Here the test
+  is a comparison with 0: \texttt{TSTSW R1, 0(R2)} sets
+  $\text{Mem}[\text{R2}] \leftarrow \text{R1}$ and
+  $\text{R1} \leftarrow 1$ if $\text{Mem}[\text{R2}] = 0$, and otherwise
+  leaves memory unchanged and sets $\text{R1} \leftarrow 0$.
+\end{definition}
+
+\needspace{7\baselineskip}
+The instruction reports in R1 whether it has written, so the lock is taken
+when R1 comes back as~1.  A thread whose attempt failed must put the value
+to be stored back into R1 before it retries:
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none, deletekeywords={lock}]
+lock:   ADDI R1, R0, 1   ; value to store into the lock var.
+        TSTSW R1, 0(R2)  ; store it if the lock variable is 0
+        BEQZ R1, lock    ; did not store: try again
+        ...              ; critical section
+unlock: SW   R0, 0(R2)   ; lock variable <- 0
+\end{lstlisting}
+While another thread holds the lock, the test fails and the instruction
+writes nothing.
+
+Both instructions are awkward for a load/store instruction set.  Every other
+instruction accesses data memory at most once: a load reads and a store
+writes, both in the single MEM stage of the pipeline (Lesson 3).  An
+exchange or a test-and-set reads \emph{and} writes the same location within
+one instruction, so the pipeline needs a datapath with two memory
+accesses---in effect a second memory stage---and the processor must ensure
+that nothing, neither an access by another core nor an exception, comes
+between them.
+
+\section{Load-linked/store-conditional}
+\label{sec:l20-llsc}
+
+The alternative splits the atomic read and write into two instructions,
+each of which accesses memory only once, like an ordinary load or
+store.\source{Lesson 20, videos 11--13; H\&P §5.5.}
+
+\begin{definition}[Load-linked/store-conditional]
+  The instruction pair \term{load-linked/store-conditional}[LL/SC]%
+  \index{LL/SC|see{load-linked/store-conditional}} (LL/SC) consists of two
+  instructions:
+  \begin{description}
+    \item[\texttt{LL R1, 0(R2)}] loads like \texttt{LW},
+      $\text{R1} \leftarrow \text{Mem}[\text{R2}]$, and records the address
+      in the \term{link register}[リンクレジスタ] of the core;
+    \item[\texttt{SC R1, 0(R2)}] stores like \texttt{SW},
+      $\text{Mem}[\text{R2}] \leftarrow \text{R1}$, but only if the link
+      register still holds this address; it then sets R1 to 1 to report
+      success.  Otherwise it stores nothing and sets R1 to~0.
+  \end{description}
+\end{definition}
+
+What makes the pair atomic is the rule for clearing the link register: every
+write to a memory location---an \texttt{SC} or an ordinary store, by this
+core or by any other---clears every link register that holds the address of
+that location (\cref{fig:l20-llsc}).\margin{Per H\&P, an interrupt or
+exception between \texttt{LL} and \texttt{SC} also clears the link
+register.}  A core learns of the writes of other cores through the coherence
+protocol of Lesson 19: the invalidation of the block that holds the linked
+address clears the link register.  Detection therefore works per block, so a
+write to another address in the same block clears the link as well; this
+costs a retry, but never correctness.
+
+An \texttt{SC} succeeds only if nobody has written the location since the
+matching \texttt{LL}; in particular, the value that \texttt{LL} read is then
+still in memory.  The converse does not hold: writing the same value again
+also makes the \texttt{SC} fail, because LL/SC detects writes, not changes
+of value.  Other instructions may run between \texttt{LL} and \texttt{SC},
+including instructions of other threads that access the same location; if
+they interfere, the \texttt{SC} detects it and fails, and the program simply
+tries again.  The effect is that of an atomic read and write, although
+neither instruction by itself does more than a normal load or store.
+
+\needspace{9\baselineskip}
+A lock built with LL/SC loads the lock variable, tests it, and tries to
+store 1 only if it was~0:\tip{Only register-to-register instructions belong
+between \texttt{LL} and \texttt{SC}; another memory access can clear the
+link.}
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none, deletekeywords={lock}]
+lock:   LL   R1, 0(R2)   ; R1 <- lock variable, link
+        BNEZ R1, lock    ; held: try again
+        ADDI R1, R0, 1   ; R1 <- 1
+        SC   R1, 0(R2)   ; store 1 if still linked
+        BEQZ R1, lock    ; SC failed: start over
+        ...              ; critical section
+unlock: SW   R0, 0(R2)   ; lock variable <- 0
+\end{lstlisting}
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l20-llsc}
+  \caption{LL/SC on two cores.  The successful store of core 0 clears the
+    link register of core 1, whose store-conditional then fails.}
+  \label{fig:l20-llsc}
+\end{figure}
+
+
+\needspace{6\baselineskip}
+\begin{example}[Two cores competing for a lock]
+  \label{ex:l20-llsc}
+  Cores 0 and 1 execute the \texttt{lock} code above at the same time; the
+  lock variable, at address A, is 0.  \Cref{tab:l20-llsc} traces the
+  instructions in the order in which they execute.  Both cores find the lock
+  free, but only one \texttt{SC} can succeed: its store clears the other
+  core's link register.  Core 1 goes back to \texttt{LL}, now reads 1, and
+  waits.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Trace of \cref{ex:l20-llsc}.  A dash in a link-register column
+    means that the register holds no address.}
+  \label{tab:l20-llsc}
+  \begin{tabular}{@{}ccllccc@{}}
+    \toprule
+    & & & & \multicolumn{2}{c}{Link register} & Lock \\
+    \cmidrule(lr){5-6}
+    Step & Core & Instruction & Effect & Core 0 & Core 1 & variable \\
+    \midrule
+    1  & 0 & \texttt{LL R1, 0(R2)}  & R1 $=$ 0                & A  & -- & 0 \\
+    2  & 1 & \texttt{LL R1, 0(R2)}  & R1 $=$ 0                & A  & A  & 0 \\
+    3  & 0 & \texttt{BNEZ}, \texttt{ADDI} & R1 $=$ 1          & A  & A  & 0 \\
+    4  & 1 & \texttt{BNEZ}, \texttt{ADDI} & R1 $=$ 1          & A  & A  & 0 \\
+    5  & 0 & \texttt{SC R1, 0(R2)}  & stores 1, R1 $=$ 1      & -- & -- & 1 \\
+    6  & 1 & \texttt{SC R1, 0(R2)}  & no store, R1 $=$ 0      & -- & -- & 1 \\
+    7  & 0 & \texttt{BEQZ R1, lock} & not taken: holds lock   & -- & -- & 1 \\
+    8  & 1 & \texttt{BEQZ R1, lock} & taken: start over       & -- & -- & 1 \\
+    9  & 1 & \texttt{LL R1, 0(R2)}  & R1 $=$ 1                & -- & A  & 1 \\
+    10 & 1 & \texttt{BNEZ R1, lock} & taken: lock is held     & -- & A  & 1 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\needspace{9\baselineskip}
+A critical section that consists of a single read-modify-write needs no lock
+at all when LL/SC is available: the pair is applied to the shared variable
+itself.  For the counter of \cref{ex:l20-count},
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+retry:  LL   R1, 0(R2)   ; R2 = address of count[c]
+        ADDI R1, R1, 1
+        SC   R1, 0(R2)   ; store if nobody wrote the counter
+        BEQZ R1, retry   ; someone did: read and add again
+\end{lstlisting}
+increments the counter atomically.  If another thread writes the counter
+between the \texttt{LL} and the \texttt{SC}, the \texttt{SC} fails and the
+increment is repeated with the new value, so no update is lost.
+
+\begin{keypoint}
+  A lock needs the read and the write of the lock variable to form one
+  atomic step.  Atomic exchange and test-and-set do both in one unusual
+  instruction; LL/SC uses two ordinary memory accesses and lets the store
+  fail if anyone wrote the location in between, which also makes a short
+  read-modify-write atomic without any lock.
+\end{keypoint}
+
+\section{Locks and performance}
+\label{sec:l20-performance}
+
+The lock variable is a shared variable like any other: every core that uses
+the lock has the block containing it in its cache, and the cache coherence
+protocol of Lesson 19 keeps these copies coherent.\source{Lesson 20, videos
+14--17; H\&P §5.5.}  A spin lock built on atomic exchange interacts badly
+with coherence.
+
+\texttt{EXCH} writes the lock variable even when the lock is held; writing 1
+over 1 changes no value, but for the coherence protocol it is a write like
+any other.  Under the MSI protocol the writing core must have the block in
+the modified state, and all other copies are invalidated.  While one core
+holds the lock, each waiting core that executes \texttt{EXCH} takes the
+block away from the core that tried before it.  Almost every attempt thus
+causes a coherence miss, because another waiting core has written the block
+since this core's last attempt, and the block is carried over the bus once
+more (\cref{tab:l20-coherence}, top).  The waiting cores accomplish nothing,
+yet their bus traffic costs energy and slows down the memory accesses of all
+other cores, including the lock holder executing its critical section, which
+also has to fetch the block back when it unlocks.
+
+\needspace{7\baselineskip}
+The remedy is to test the lock variable with an ordinary load first and to
+use the atomic instruction only when the lock appears free:
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none, deletekeywords={lock}]
+lock:   LW   R1, 0(R2)   ; ordinary read of lock variable
+        BNEZ R1, lock    ; held: keep reading
+        ADDI R1, R0, 1
+        EXCH R1, 0(R2)   ; looks free: try to take it
+        BNEZ R1, lock    ; another thread won: start over
+\end{lstlisting}
+Waiting cores now only read the lock variable, so all of them keep the block
+in the shared state and their loads are cache hits: while the lock is held,
+the waiting cores cause no bus traffic at all
+(\cref{tab:l20-coherence}, bottom).  Writes, and with them invalidations,
+happen only around a release: the store of \texttt{unlock}, and the atomic
+attempts of the cores that find the lock free, of which only one succeeds.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{MSI state of the block holding the lock variable in the caches of
+    four cores (M, S, I: modified, shared, invalid) while core 0 holds the
+    lock.  Top: cores 1--3 spin on
+    \texttt{EXCH}.  Bottom: they test with \texttt{LW} first.}
+  \label{tab:l20-coherence}
+  \begin{tabular}{@{}lccccl@{}}
+    \toprule
+    Access & C0 & C1 & C2 & C3 & Bus traffic \\
+    \midrule
+    \multicolumn{6}{@{}l}{\emph{Spinning on atomic exchange}} \\
+    start: C0 holds the lock                  & M & I & I & I & \\
+    C1: \texttt{EXCH} (reads 1)               & I & M & I & I & miss, block moves \\
+    C2: \texttt{EXCH} (reads 1)               & I & I & M & I & miss, block moves \\
+    C3: \texttt{EXCH} (reads 1)               & I & I & I & M & miss, block moves \\
+    C1: \texttt{EXCH} (reads 1)               & I & M & I & I & miss, block moves \\
+    \quad\dots\ one miss per attempt, until   &   &   &   &   & \\
+    C0: \texttt{SW R0} (unlock)               & M & I & I & I & miss, block moves \\
+    \midrule
+    \multicolumn{6}{@{}l}{\emph{Testing first}} \\
+    start: C0 holds the lock                  & M & I & I & I & \\
+    C1: \texttt{LW} (reads 1)                 & S & S & I & I & miss \\
+    C2: \texttt{LW} (reads 1)                 & S & S & S & I & miss \\
+    C3: \texttt{LW} (reads 1)                 & S & S & S & S & miss \\
+    C1--C3: \texttt{LW}, repeatedly           & S & S & S & S & none (hits) \\
+    C0: \texttt{SW R0} (unlock)               & M & I & I & I & invalidation \\
+    C2: \texttt{LW} (reads 0)                 & S & I & S & I & miss \\
+    C2: \texttt{EXCH} (reads 0, acquires)     & I & I & M & I & invalidation \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Two points about the test-first lock are easy to get wrong.
+\begin{itemize}
+  \item \textbf{The load is only a filter.}  Mutual exclusion still comes
+    from the atomic instruction.  Between the \texttt{LW} that finds the
+    lock free and the \texttt{EXCH}, another thread may take the lock, so
+    the value returned by \texttt{EXCH} must still be tested.  A lock that
+    branches into the critical section on the result of the \texttt{LW}
+    alone is the broken lock of \cref{sec:l20-implementing}.
+  \item \textbf{The other instructions test first by themselves.}
+    \texttt{LL} is a read, and the lock of \cref{sec:l20-llsc} attempts the
+    \texttt{SC} only after \texttt{LL} has found the lock free; a
+    test-and-set writes only when it finds the lock free.  A waiting core
+    that keeps finding 1 never writes, so no extra load is needed.
+\end{itemize}
+
+\texttt{unlock}, finally, needs no atomic instruction: an ordinary store of
+0 suffices.  Only the thread that holds the lock executes \texttt{unlock},
+so two threads never release the same lock at the same time.  A thread
+trying to acquire the lock at that moment reads either 1, before the store,
+and keeps waiting, or 0, after it, and competes for the lock---both are
+correct outcomes.  With LL/SC the store also clears the link registers of
+cores that have just load-linked the variable; these cores read 1 and do not
+attempt an \texttt{SC}, so they are not affected.
+
+\needspace{9\baselineskip}
+\begin{keypoint}
+  Correctness requires the test and the write of the lock variable to be one
+  atomic step; performance requires the write to be rare.  Waiting threads
+  should only read the lock variable, so that its block stays shared in all
+  caches.
+\end{keypoint}
+
+\section{Barrier synchronization}
+\label{sec:l20-barrier}
+
+Locks make threads take turns.\source{Lesson 20, videos 18--22; H\&P
+§I.4.}  A different form of coordination makes threads wait for each
+other.
+
+\begin{definition}[Barrier synchronization]
+  In \term{barrier synchronization}[バリア同期] a group of $N$ threads calls
+  a \emph{barrier} at a common point in the program.  A thread that reaches
+  the barrier waits there; when the last of the $N$ threads arrives, all of
+  them continue (\cref{fig:l20-barrier}).
+\end{definition}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l20-barrier}
+  \caption{A barrier used in two successive rounds by three threads.  Each
+    round is released when its last thread arrives.}
+  \label{fig:l20-barrier}
+\end{figure}
+
+Barriers suit parallel programs that proceed in steps, where every thread
+computes its part of one step and the next step needs the results of all
+threads.  The shared-memory sum of Lesson 18 is an example: thread 0 may
+print the total only after all threads have added their partial sums, that
+is, after a barrier.
+
+\subsection{A simple implementation}
+
+A barrier uses two shared variables: a counter of the threads that have
+arrived, and a \emph{release flag} on which the waiting threads spin.
+\begin{lstlisting}[language=C, numbers=none, morekeywords={shared}]
+shared int    count = 0, release = 0;
+shared lock_t countLock;
+void barrier(void) {
+  lock(&countLock);
+  if (count == 0) release = 0;  /* first: close it */
+  int arrived = ++count;        /* count myself    */
+  unlock(&countLock);
+  if (arrived == N) {           /* last: open it   */
+    count = 0;
+    release = 1;
+  } else
+    while (release == 0)
+      ;                         /* wait            */
+}
+\end{lstlisting}
+The counter needs the lock: a lost increment (\cref{tab:l20-race}) would
+keep it below $N$ forever.  The first thread of a round clears the release
+flag, so that the threads of this round wait; the last one resets the
+counter for the next round and sets the flag, which ends the waiting loops
+of all the others.
+
+\subsection{Why the simple implementation fails}
+
+A barrier is normally called in every step of a loop, and reused in this
+way the implementation above deadlocks.  The flag is set while the other
+threads are still spinning on it, and nothing forces a thread to read it
+before it changes again.  Suppose one thread is slow to notice the release
+because it is handling an interrupt.  The other threads leave the barrier,
+compute the next step of the program and call the barrier again.  The first
+of them to arrive finds the counter at 0 and clears the release flag.  The
+slow thread then reads 0 and goes on waiting at a barrier that has long been
+released, while the other $N-1$ threads wait at the next barrier for a
+thread that never arrives.  All $N$ threads wait forever.
+
+A waiting thread must therefore be able to recognize that \emph{its own}
+round has been released, however late it looks at the flag.
+
+\subsection{A reusable barrier}
+
+The reusable barrier never clears the release flag; it only toggles it, once
+per round.  Each thread keeps a private variable \texttt{localSense} that it
+flips on entry, so that \texttt{localSense} is the value the flag will take
+when the current round is released; the last thread to arrive writes that
+value into the flag.  The counter, the flag and the lock are the shared
+variables of the previous implementation.
+\needspace{12\baselineskip}
+\begin{lstlisting}[language=C, numbers=none, morekeywords={shared,private}]
+private int localSense = 0;     /* one per thread  */
+void barrier(void) {
+  localSense = !localSense;     /* flip my sense   */
+  lock(&countLock);
+  int arrived = ++count;
+  unlock(&countLock);
+  if (arrived == N) {           /* last: open it   */
+    count = 0;
+    release = localSense;
+  } else
+    while (release != localSense)
+      ;                         /* wait            */
+}
+\end{lstlisting}
+
+Because the flag is never reinitialized, the thread that was slow above
+still finds the value that released its round, however late it reads the
+flag, and leaves the barrier.  A thread that reaches the next barrier while
+others are still waiting in this one does no harm: it only increments the
+counter, and its own \texttt{localSense} now holds the opposite value, so it
+waits for the next toggle.  Successive rounds alternate between the two
+values, so a thread can never mistake the release of the next round for its
+own.  Numbering the rounds instead of
+toggling a flag is an equivalent generalization: the sense is the parity of
+the round number.  In \cref{fig:l20-barrier}, \texttt{release} becomes 1
+when thread~2 completes the first round and 0 again when thread~0 completes
+the second.
+
+\begin{keypoint}[Lesson summary]
+  Threads that update shared data must synchronize, or updates are lost
+  depending on timing.  A lock provides mutual exclusion for a critical
+  section, and all accesses to a variable must use the same lock.  The
+  obvious lock built from ordinary loads and stores is incorrect, because
+  its own test and set would need a critical section; software solutions
+  such as Lamport's bakery algorithm are correct but too slow, so processors
+  provide atomic instructions.  Atomic exchange and test-and-set read and
+  write memory in one instruction, which is awkward for a load/store
+  pipeline; LL/SC uses two ordinary memory accesses and a link register that
+  makes the store fail if the location was written in between, which also
+  makes a short read-modify-write atomic without a lock.  A spin lock should
+  test the lock variable with a plain read before its atomic write, so that
+  waiting cores keep the block shared instead of moving it between caches;
+  unlock is a plain store.  Barrier synchronization makes a group of threads
+  wait for each other; a barrier that is reused must release each round with
+  a flag value of its own, toggled from round to round, rather than reset a
+  flag that a late thread has not yet seen.
+\end{keypoint}
+
+\end{document}
