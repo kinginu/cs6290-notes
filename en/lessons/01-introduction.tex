@@ -17,8 +17,8 @@ decision in the rest of the course.
 
 The discipline of designing a computer that is well suited to its purpose,
 using the fabrication technology that is available, is called
-\term{computer architecture}[コンピュータアーキテクチャ].\source{Lesson 1,
-videos 2--3; H\&P §1.1--1.3.}  Two points in this definition deserve emphasis.
+\term{computer architecture}[コンピュータアーキテクチャ].  Two points in this
+definition deserve emphasis.\source{Lesson 1, videos 2--3; H\&P §1.1--1.3.}
 
 \begin{itemize}
   \item \emph{Well suited to its purpose.}  A mobile phone, a laptop and a
@@ -29,7 +29,9 @@ videos 2--3; H\&P §1.1--1.3.}  Two points in this definition deserve emphasis.
   \item \emph{Available technology.}  The architect does not design
     transistors, but must know what the current process can deliver---how
     many transistors fit on a chip, how fast they switch, how much power they
-    dissipate---because those numbers bound what is achievable.
+    dissipate---because those numbers bound what is achievable.\margin{The
+    scale involved: 2300 transistors on the Intel 4004 (1971), 80 billion on
+    NVIDIA's H100 (2022).  Vendor data.}
 \end{itemize}
 
 \subsection{Why do we need it?}
@@ -59,7 +61,9 @@ of transistors that can be placed on a chip of a given area doubles roughly
 every 18 to 24 months.\source{\cite{moore1965}; Lesson 1, video 6; H\&P
 §1.4.}  It is a trend, not a law of physics, but it held for several decades
 and shaped the expectations of the whole industry.  The lecture derives the
-following consequences, all with the same 18--24-month doubling period:
+following consequences, all with the same 18--24-month doubling
+period:\caution{Moore said one year in 1965 and two years in 1975; the
+popular \enquote{18 months} is David House's figure, not his.}
 \begin{itemize}
   \item processor \emph{speed} doubles (more transistors allow more
     parallelism and smaller, faster gates);
@@ -95,7 +99,9 @@ is the reason why caches (Lessons 12--14) are so important.
 \begin{keypoint}
   Memory capacity keeps up with Moore's law; memory \emph{latency} does not.
   Most of the memory-system design in this course exists to hide that
-  latency.
+  latency.\margin{On Skylake an L1 hit costs 4 cycles and an L2 hit 12;
+  a DRAM access takes 60--\SI{90}{\nano\second}, i.e.\ 200--300 cycles at
+  \SI{3}{\giga\hertz}.  Intel optimization manual; 7-cpu.com.}
 \end{keypoint}
 
 \section{Speed, power and cost}
@@ -105,7 +111,9 @@ architect has to balance three quantities:\source{Lesson 1, videos 9--10.}
 \begin{description}
   \item[Performance] how fast the machine runs its intended workload;
   \item[Power] how much energy it consumes, which sets battery life for
-    portable devices and cooling cost for servers;
+    portable devices and cooling cost for servers;\margin{Budgets: phone SoC
+    2--\SI{5}{\watt}, desktop CPU 65--\SI{125}{\watt}, server CPU up to
+    \SI{400}{\watt}.  Vendor data.}
   \item[Cost] how much it costs to fabricate.
 \end{description}
 Which of these dominates depends on the product: weight and battery life for
@@ -130,7 +138,8 @@ where $C$ is the total capacitance being switched, $V$ the supply voltage,
 $f$ the clock frequency and $\alpha$ the \emph{activity factor}, the
 fraction of the capacitance that actually switches each cycle.\margin{$C$
 grows with chip size and transistor count; $\alpha$ depends on the workload
-and on how much logic is left idle.}
+and on how much logic is left idle.  H\&P writes \enquote{frequency
+switched} for the product $f\alpha$.}
 
 Two facts follow directly from \cref{eq:active-power}.
 \begin{itemize}
@@ -140,7 +149,11 @@ Two facts follow directly from \cref{eq:active-power}.
     lowered together and power falls roughly with $V^{3}$.
   \item Doubling the frequency at constant voltage doubles the power; the
     same speedup obtained by doubling the transistor count (more parallel
-    hardware) costs power only through the larger $C$.
+    hardware) costs power only through the larger $C$.\sidenote{Until about
+    2005 each new process shrank $V$ together with the transistor, so a chip
+    ran faster at constant power.  Leakage stopped voltage scaling near
+    \SI{1}{\volt}: clock rates stalled at 3--\SI{4}{\giga\hertz} and the extra
+    transistors went into more cores (Lesson 18).}
 \end{itemize}
 
 \begin{example}
@@ -193,18 +206,25 @@ fraction of dies that are functional.  Because defects fall at random
 positions, a larger die is more likely to contain one, so yield
 \emph{decreases} as die area increases.\margin{H\&P §1.6 gives an empirical
 model, $\text{yield} \approx 1/(1 + \text{defect density}\times
-\text{area})^{N}$.}
+\text{area})^{N}$; a mature process leaves about \num{0.1} defects per
+\si{\square\centi\metre}.}
 
 \subsection{Consequences}
 
 Combining \cref{eq:die-cost} with the yield behaviour gives the central
 result of this section: halving the die area \emph{more than} halves the
 cost per die, because it doubles the number of dies per wafer \emph{and}
-raises the yield.  Read together with Moore's law this offers the architect
+raises the yield.\tip{Dies per wafer $\approx \pi (d/2)^{2}/A - \pi
+d/\sqrt{2A}$; the second term removes the partial dies at the wafer edge.
+H\&P §1.6.}  Read together with Moore's law this offers the architect
 two options each technology generation:
 \begin{itemize}
   \item keep the die area constant and pack in twice the transistors---a
-    more capable chip at roughly the same cost; or
+    more capable chip at roughly the same cost;\margin{A \SI{300}{\milli\metre}
+    wafer offers \SI{707}{\square\centi\metre}, and the largest die one
+    lithography field can print is $26 \times \SI{33}{\milli\metre} =
+    \SI{858}{\square\milli\metre}$; NVIDIA's H100 uses
+    \SI{814}{\square\milli\metre} of it.} or
   \item keep the design constant and let it shrink to half the area---the
     same chip at well under half the cost.
 \end{itemize}
