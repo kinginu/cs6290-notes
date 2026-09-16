@@ -1,0 +1,420 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Memory Ordering}
+\lessoninfo{
+  video={Lesson 9, videos 1--14},
+  textbook={H\&P \cite{hennessy2017} §3.5--3.6},
+  keywords={memory dependence, load, store, commit, load-store queue, LSQ, store-to-load forwarding, out-of-order load-store execution, in-order load-store execution, re-execution, reorder buffer, reservation station},
+}
+
+With the reorder buffer of Lesson 8, an out-of-order processor handles every
+dependence that passes through registers and keeps exceptions precise.  Loads
+and stores, however, also depend on one another through memory, and whether a
+load reads the location that an earlier store writes is known only once both
+addresses have been computed, which is why Lesson 7 performed loads and stores
+in program order.  This lesson shows how they can execute out of order: stores
+write memory only at commit, a load-store queue keeps the uncommitted loads and
+stores in program order, and each load obtains its value either from memory or
+directly from the store that wrote it.
+
+\section{Dependences through memory}
+\label{sec:l09-dependences}
+
+The processor of Lesson 8 deals with control dependences and with every
+dependence that passes through a register.\source{Lesson 9, videos 1--2; H\&P
+§3.5--3.6.}  Branch prediction
+(Lesson 4) removes most of the cost of control dependences, and the ROB cancels
+the instructions of a mispredicted path; renaming (Lesson 6) removes the false
+dependences between writes to the same register; the scheduling of Tomasulo's
+algorithm (Lesson 7) makes each instruction wait until the register values it
+reads have been computed; and the ROB makes exceptions precise.
+
+Loads and stores remain.  They depend on one another through memory locations
+in the same way as instructions depend on one another through registers
+(\cref{sec:l07-load-store}):
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+SW  R1, 0(R2)      ; MEM[R2] <- R1
+ADD R4, R5, R6     ; R4 <- R5 + R6
+LW  R3, 0(R4)      ; R3 <- MEM[R4]
+\end{lstlisting}
+The load has a RAW dependence on the store exactly when R4 equals R2.  Two
+properties distinguish such a dependence from a dependence through a register.
+\begin{itemize}
+  \item It is not visible in the instructions themselves.  The register names
+    say nothing about the memory location, which is known only after the
+    address has been computed, often several cycles after the instruction was
+    issued.
+  \item Nothing renames memory.  The RAT maps register names only, so the
+    processor must find, for every load, the store whose value the load has to
+    read, or determine that there is none.
+\end{itemize}
+The rest of the lesson answers two questions: when a store actually writes
+memory, and where a load finds its value.
+
+\section{When memory is written}
+\label{sec:l09-write}
+
+A store executes like any other instruction once its operands are available,
+but it does not write memory at that time.\source{Lesson 9, video 3; H\&P
+§3.6.}  Executing the store computes the address and determines the value; the
+write itself takes place when the store commits.  A write to memory can no more
+be undone than a write to a register.  If a store wrote memory when it
+executed, an exception raised afterwards by an earlier instruction would let
+the handler see a location that, in program order, has not yet been written,
+and a store on a mispredicted path would change memory that the program never
+changes.  At commit, in contrast, the store is known to belong to the
+execution of the program, and stores commit in program order.
+
+Deferring the write creates a problem for loads.  A load could read memory as
+soon as it has computed its address, but a store that precedes it in program
+order may have executed and still be waiting to commit, or may not even have
+computed its address yet.  If that store writes the location the load reads,
+memory still holds the old value, and the load must instead obtain the value of
+the store.\margin{In the pipeline of Lesson 3, the MEM stage performs loads and
+stores in program order.}  The processor must therefore keep, in program order,
+the address and value of every store that has not yet committed, and every load
+must consult them.
+
+\begin{keypoint}
+  Stores execute out of order but write memory at commit, in program order.
+  Until then their values exist only inside the processor, and loads must look
+  for them there.
+\end{keypoint}
+
+\section{The load-store queue}
+\label{sec:l09-lsq}
+
+The uncommitted loads and stores are kept in a queue that works like the
+ROB.\source{Lesson 9, videos 4--5; H\&P §3.6.}
+
+\begin{definition}[Load-store queue]
+  \label{def:l09-lsq}
+  The \term{load-store queue}[ロードストアキュー]\index{LSQ|see{load-store
+  queue}} (LSQ) holds, in program order, every load and store that has been
+  issued but has not yet committed.  Each entry has four fields:
+  \begin{description}
+    \item[L/S] whether the instruction is a load or a store;
+    \item[Addr] the memory address, once it has been computed;
+    \item[Value] for a store, the value to be written; for a load, the value
+      it has obtained;
+    \item[C] set when the entry is complete: a load has obtained its value, or
+      a store has recorded both its address and its value.
+  \end{description}
+\end{definition}
+
+Like the ROB, the LSQ is a circular buffer with an issue pointer and a commit
+pointer (\cref{fig:l09-lsq}).  A load or store receives the entry at the issue
+pointer when it is issued, in addition to its ROB entry, and its LSQ entry is
+freed when it commits.  Other instructions do not use the LSQ.  A load records
+its address and then its value.  A store records its address as soon as its
+base register is available and its value as soon as the value register is,
+in either order.  Because a store keeps its entry until it commits and writes
+memory only then, the LSQ contains exactly the stores whose values are not yet
+in memory.\margin{The ROB also holds the loads and stores, but a separate queue
+keeps the address searches short.}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l09-lsq}
+  \caption{A load-store queue with eight entries; LSQ2 to LSQ7 are in use.  The
+    load in LSQ6 has computed the address \texttt{0x100}.  Its search skips
+    loads and the store to \texttt{0x108} and takes the value 17 from the
+    nearest earlier store to \texttt{0x100}.}
+  \label{fig:l09-lsq}
+\end{figure}
+
+When a load has computed its address, it records the address in its LSQ entry
+and searches the earlier entries, from its own entry back towards the commit
+pointer.  Loads are skipped, because reading a location does not change it;
+only stores matter.  The search ends at the first store with the same address
+or at the commit pointer.
+\begin{enumerate}
+  \item If it finds a store with the same address, this nearest matching store
+    is the last write to the location before the load in program order, so its
+    value is the one the load must read.  The load copies the value from the
+    store's LSQ entry, waiting for it if the store has not recorded its value
+    yet, and does not access memory at all.  Supplying a load with the value of
+    an uncommitted store in this way is called
+    \term{store-to-load forwarding}[ストアロードフォワーディング].
+  \item If it reaches the commit pointer without finding a matching store or a
+    store with an unknown address, no uncommitted store writes the location
+    before the load, so memory already holds the correct value, and the load
+    reads memory.
+\end{enumerate}
+If, before it ends, the search passes a store whose address has not been
+computed yet, that store may or may not write the location the load reads, and
+the processor cannot yet tell which.  This case is the difficult one, and the
+next section presents the ways of dealing with it.
+
+\section{Out-of-order and in-order load-store execution}
+\label{sec:l09-policies}
+
+For a load whose search passes a store with an unknown address, there are
+three options.\source{Lesson 9, videos 5--8; H\&P §3.6.}
+\begin{enumerate}
+  \item Loads and stores execute in program order among themselves, as in
+    Lesson 7.
+  \item The load waits until every earlier store has computed its address, so
+    that its search never meets an unknown address.
+  \item The load executes anyway, and a wrong value is detected and corrected
+    later.
+\end{enumerate}
+The first two options make loads wait; the third does not, but needs a check.
+A store's address is unknown until its base register is available, which can
+take long when that register is computed by a slow instruction.  In the
+following program the address of the store depends on a multiplication,
+whereas the address of the load is available almost at once:
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+I1:  MUL R1, R2, R3     ; R1 <- R2 * R3
+I2:  ADD R1, R1, R4     ; R1 <- R1 + R4 (an address)
+I3:  SW  R5, 0(R1)      ; MEM[R1] <- R5
+I4:  ADD R6, R6, R7     ; R6 <- R6 + R7 (an address)
+I5:  LW  R8, 0(R6)      ; R8 <- MEM[R6]
+I6:  SUB R9, R8, R5     ; R9 <- R8 - R5
+\end{lstlisting}
+We use the timing conventions of \cref{sec:l08-example}.  MUL takes 4 cycles;
+ADD, SUB, loads and stores take 1 cycle, in which a load computes its address
+and obtains its value and a store computes its address; the value R5 is
+available from the start.  I1 writes its result in cycle~6 and I2 in cycle~8,
+so the store I3 executes, and its address becomes known, only in cycle~9.  I4
+writes its result in cycle~6, so the load I5 could execute in cycle~7
+(\cref{fig:l09-policies}).
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l09-policies}
+  \caption{The program of \cref{sec:l09-policies} under two policies.  (a) I5
+    executes before the store I3 knows its address; I3 checks I5 in cycle~9.
+    (b) I5 waits until I3 has computed its address.  I1, I2 and I4 behave as in
+    (a).}
+  \label{fig:l09-policies}
+\end{figure}
+
+\subsection{Out-of-order load-store execution}
+
+\begin{definition}[Out-of-order load-store execution]
+  \label{def:l09-ooo}
+  Under \term{out-of-order load-store execution}[ロードストアのアウトオブオーダ実行]
+  (option~3), a load executes as soon as its address can be computed, whether
+  or not the earlier stores have computed theirs.  Its LSQ search passes over
+  stores with unknown addresses as if their addresses differed.
+\end{definition}
+
+In the example I5 executes in cycle~7 and I6, which uses its value, in
+cycle~9.  In return, every store must check its own address against the loads
+that have overtaken it.  When I3 computes its address in cycle~9, it searches
+the later LSQ entries for loads with the same address whose C bit is set, that
+is, loads that have already obtained a value.
+\begin{itemize}
+  \item If the address of I5 differs, nothing happens: I5 has obtained the
+    correct value, and I6 writes its result in cycle~10.
+  \item If the addresses are equal, I5 has obtained a value that I3
+    overwrites in program order, so every instruction that used this value,
+    directly or indirectly, has computed a wrong result.  The processor cancels
+    I5 and all instructions after it and executes them again, starting by
+    fetching I5.  None of them has committed, since I3 precedes them, so the
+    ROB discards them like the instructions of a mispredicted path
+    (\cref{sec:l08-recovery}).  When I5 executes again, its search finds I3,
+    and it receives the value by forwarding.
+\end{itemize}
+
+\subsection{In-order load-store execution}
+
+\begin{definition}[In-order load-store execution]
+  \label{def:l09-in-order}
+  Under \term{in-order load-store execution}[ロードストアのインオーダ実行]
+  (option~1), loads and stores execute in program order among themselves: a
+  load or store waits until every earlier load and store has executed, where a
+  store counts as executed once its address is known.  Other instructions
+  still execute out of order.
+\end{definition}
+
+In the example I5 waits for I3 and executes in cycle~10, and I6 executes in
+cycle~12 and writes its result in cycle~13.  No load ever obtains a wrong
+value, and nothing is re-executed.  But I5 waits three cycles also when its
+address differs from that of I3, and then the wait is pure loss.  Option~2
+gives the same timing here, because no load precedes I5; in general it waits
+less, since a load does not depend on an earlier load.
+
+\subsection{Comparison}
+
+Out-of-order load-store execution gains cycles whenever a load does not read a
+location written by an earlier store whose address is still unknown, and loses
+cycles when it does, because cancelling and re-executing the load and the
+instructions after it costs more than waiting would have.  Options 1 and 2
+delay every load that follows a store with an unknown address, whether the two
+conflict or not.  In real programs few loads actually read what such a store
+writes, so out-of-order load-store execution performs better, and it is the
+policy that high-performance processors use.
+
+\begin{keypoint}
+  In-order load-store execution never re-executes a load but makes loads wait
+  for stores they usually do not depend on.  Out-of-order load-store execution
+  lets loads run at once; correctness then relies on each store checking the
+  completed later loads when it computes its address.
+\end{keypoint}
+
+\section{Store-to-load forwarding}
+\label{sec:l09-forwarding}
+
+Store-to-load forwarding relates each load to the store whose value it must
+read, and a processor with out-of-order load-store execution uses this relation
+from both ends.\source{Lesson 9, video 9; H\&P ch.~3.}
+\begin{description}
+  \item[For a load] the value comes from the nearest earlier store with the
+    same address, the last store to write the location before the load in
+    program order.  An older store to the same address does not qualify: its
+    value is overwritten by the nearer one.  If the LSQ holds no earlier store
+    with this address, the value comes from memory.\caution{Search from the
+    load backwards: a search forward from the commit pointer finds the oldest
+    matching store.}
+  \item[For a store] the value goes to every later load with the same address,
+    up to the next store with that address.  The loads after that store receive
+    the value of that store instead.
+\end{description}
+A load applies the first rule in its search (\cref{sec:l09-lsq}), and a store
+applies the second in its check of the completed later loads
+(\cref{sec:l09-policies}).  \Cref{fig:l09-forwarding} shows the relation for
+seven loads and stores to two addresses.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l09-forwarding}
+  \caption{Store-to-load forwarding for seven loads and stores to
+    \texttt{0x40} and \texttt{0x48}, with the values of a sequential
+    execution.  L4 receives the value of S1, not of S5, which follows it; L7
+    receives the value of S5, which overwrites that of S1.  L2 precedes S3 and
+    reads memory.}
+  \label{fig:l09-forwarding}
+\end{figure}
+
+\section{A load-store queue example}
+\label{sec:l09-example}
+
+We now trace the loads and stores of \cref{fig:l09-forwarding}
+(\cref{ex:l09-lsq}) under out-of-order load-store execution.\source{Lesson 9,
+video 10; H\&P §3.6.}
+
+\begin{example}
+  \label{ex:l09-lsq}
+  The loads and stores of a program are, in program order,
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+S1:  SW  R1, 0(R2)     ; MEM[0x40] <- R1
+L2:  LW  R3, 8(R2)     ; R3 <- MEM[0x48]
+S3:  SW  R4, 8(R10)    ; MEM[R10+8] <- R4
+L4:  LW  R5, 0(R2)     ; R5 <- MEM[0x40]
+S5:  SW  R6, 0(R7)     ; MEM[R7] <- R6
+L6:  LW  R8, 8(R2)     ; R8 <- MEM[0x48]
+L7:  LW  R9, 0(R2)     ; R9 <- MEM[0x40]
+\end{lstlisting}
+  with $\text{R2} = \texttt{0x40}$, $\text{R1}=5$, $\text{R4}=6$ and
+  $\text{R6}=9$ available from the start.  $\text{R10} = \texttt{0x40}$ and
+  $\text{R7}=\texttt{0x40}$ are computed by slow instructions that precede S3
+  and S5, so these two stores learn their addresses late, in the order of
+  \cref{tab:l09-trace}.  Memory initially holds 20 at \texttt{0x40} and 30 at
+  \texttt{0x48}.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Execution of \cref{ex:l09-lsq}.  In each step one entry computes
+    its address: a load searches the earlier stores; a store checks the later
+    loads whose C bit is set.}
+  \label{tab:l09-trace}
+  \begin{tabular}{@{}clcll@{}}
+    \toprule
+    Step & Entry & Addr & Search or check & Outcome \\
+    \midrule
+    1 & S1 & \texttt{0x40} & no later load completed & value 5 recorded \\
+    2 & L2 & \texttt{0x48} & S1: other address & memory: 30 \\
+    3 & L4 & \texttt{0x40} & S3: unknown; S1: match & from S1: 5 \\
+    4 & S3 & \texttt{0x48} & L4: other address & no conflict \\
+    5 & L6 & \texttt{0x48} & S5: unknown; S3: match & from S3: 6 \\
+    6 & L7 & \texttt{0x40} & S5: unknown; S3: other; S1: match & from S1: 5 \\
+    7 & S5 & \texttt{0x40} & L6: other address; L7: match & L7 re-executed \\
+    8 & L7 & \texttt{0x40} & S5: match & from S5: 9 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+L4 and L6 pass over stores whose addresses are still unknown, and the later
+checks of S3 and S5 find no conflict with them.  L7 also passes over S5, but in
+step~7 S5 computes \texttt{0x40} and finds L7 completed with this address, with
+no store to \texttt{0x40} between them.  The value 5 that L7 obtained from S1
+is overwritten by S5 in program order, so L7 and every instruction after it are
+cancelled and executed again, and in step~8 L7 receives 9 from S5.
+
+After the entries commit in program order, memory holds 9 at \texttt{0x40}
+and 6 at \texttt{0x48}, and the loads have delivered $\text{R3}=30$,
+$\text{R5}=5$, $\text{R8}=6$ and $\text{R9}=9$, the results of a sequential
+execution.  With in-order load-store execution L4 would have waited for S3,
+and L6 and L7 for S5, and nothing would have been executed twice.
+
+\section{The LSQ, the ROB and the reservation stations}
+\label{sec:l09-rob-rs}
+
+Loads and stores pass through the same steps as other instructions, and the LSQ
+adds work to each step (\cref{tab:l09-steps}).\source{Lesson 9, videos 11--14;
+H\&P §3.6.}  A load or store is issued only when a ROB entry and an LSQ entry
+are both available; the LSQ entry takes the place of the reservation station
+that other instructions need with their ROB entry.  A load broadcasts its value on the CDB under the name of its ROB entry, exactly
+like an arithmetic result.  A store produces no register value, so nothing is
+broadcast, and its ROB entry is done as soon as the store has recorded both its
+address and its value.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{The steps of a load and a store with an LSQ.}
+  \label{tab:l09-steps}
+  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.15\linewidth}>{\raggedright\arraybackslash}p{0.38\linewidth}>{\raggedright\arraybackslash}p{0.38\linewidth}@{}}
+    \toprule
+    Step & Load & Store \\
+    \midrule
+    Issue & needs a free ROB entry and LSQ entry (no RS); the base register is
+      looked up in the RAT, and the RAT entry of the destination register is
+      set to the load's ROB entry & needs a free ROB entry and LSQ entry (no
+      RS); the base and value registers are looked up in the RAT; no RAT entry
+      changes \\
+    \addlinespace
+    Execute & computes the address and records it in the LSQ; searches the
+      earlier stores; copies a forwarded value or reads memory; sets C
+      & records the address when the base register is available and checks
+      the later loads whose C is set; records the value when it is available;
+      sets C once both are recorded \\
+    \addlinespace
+    Write result & broadcasts the value on the CDB; the ROB entry receives it
+      & nothing to broadcast \\
+    \addlinespace
+    Commit & the value is written to the register file, and the RAT entry is
+      reset if it still names this ROB entry; the ROB and LSQ entries are
+      freed & the value is written to memory; the ROB and LSQ entries are
+      freed \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Both queues are in program order, so the load or store at the commit pointer of
+the ROB is also the oldest entry of the LSQ, and the two entries are freed
+together.\index{commit}  A store leaves the LSQ exactly when its value is
+written to memory, so a later load always finds that value in one of the two
+places it looks: in the store's LSQ entry before the commit, in memory after
+it.
+
+\begin{keypoint}[Lesson summary]
+  Loads and stores depend on one another through memory addresses that are
+  known only after execution, and memory is not renamed.  Stores therefore
+  write memory at commit, in program order.  The load-store queue holds the
+  uncommitted loads and stores in program order, with their addresses, values
+  and completion bits.  A load takes its value from the nearest earlier store
+  with the same address by store-to-load forwarding, or from memory if there
+  is none.  Earlier stores with unknown addresses
+  are handled either by in-order load-store execution, where the load waits for
+  them, or by out-of-order load-store execution, where the load proceeds and a
+  store that later computes a matching address has the load and all
+  instructions after it re-executed; the latter is faster because such
+  conflicts are rare.  A load or store needs a ROB entry and an LSQ entry at
+  issue, where other instructions need a ROB entry and an RS.
+\end{keypoint}
+
+\end{document}

@@ -1,0 +1,58 @@
+% Out-of-order versus in-order load-store execution for the program of
+% section "Out-of-order and in-order load-store execution".  The store I3
+% computes its address only in cycle 9; the load I5 could execute in cycle 7.
+\begin{tikzpicture}[x=0.52cm,y=0.5cm, font=\scriptsize\sffamily, >={Stealth[length=1.6mm]},
+  c/.style={minimum width=0.52cm, minimum height=0.5cm, inner sep=0pt, draw=black},
+  iss/.style={c, fill=white},
+  ex/.style={c, fill=ln-accent!25},
+  sto/.style={c, fill=ln-caution!20},
+  wr/.style={c, fill=ln-accent, text=white, font=\scriptsize\bfseries\sffamily},
+  hd/.style={font=\scriptsize\bfseries\sffamily, anchor=west}]
+  % cycle axes and grids of both panels
+  \foreach \ya/\yb/\yc in {0/-0.4/-6.5, -8/-8.4/-11.5} {
+    \foreach \c in {1,...,13} { \node[text=ln-muted] at (\c,\ya) {\c}; }
+    \node[anchor=east, text=ln-muted] at (0.4,\ya) {\iflangja{サイクル}{cycle}};
+    \foreach \c in {1,...,14} { \draw[ln-rule, very thin] (\c-0.5,\yb) -- (\c-0.5,\yc); }
+  }
+  % ------------------------------------------------ (a) out-of-order
+  \node[hd] at (-6.2,0.9) {\iflangja{(a) ロードストアのアウトオブオーダ実行}%
+                                     {(a) out-of-order load-store execution}};
+  \foreach \y/\lab/\i/\ea/\eb/\w/\st in {
+      -1/{I1\enskip\texttt{MUL R1,R2,R3}}/1/2/5/6/ex,
+      -2/{I2\enskip\texttt{ADD R1,R1,R4}}/2/7/7/8/ex,
+      -3/{I3\enskip\texttt{SW\ \ R5,0(R1)}}/3/9/9/0/sto,
+      -4/{I4\enskip\texttt{ADD R6,R6,R7}}/4/5/5/6/ex,
+      -5/{I5\enskip\texttt{LW\ \ R8,0(R6)}}/5/7/7/8/ex,
+      -6/{I6\enskip\texttt{SUB R9,R8,R5}}/6/9/9/10/ex,
+      -9/{I3\enskip\texttt{SW\ \ R5,0(R1)}}/3/9/9/0/sto,
+      -10/{I5\enskip\texttt{LW\ \ R8,0(R6)}}/5/10/10/11/ex,
+      -11/{I6\enskip\texttt{SUB R9,R8,R5}}/6/12/12/13/ex} {
+    \node[anchor=east] at (0.4,\y) {\lab};
+    \node[iss] at (\i,\y) {I};
+    \pgfmathtruncatemacro{\lnwa}{\i+1}
+    \pgfmathtruncatemacro{\lnwb}{\ea-1}
+    \ifnum\lnwa<\ea
+      \draw[ln-muted, thick] (\lnwa-0.5,\y) -- (\lnwb+0.5,\y);
+    \fi
+    \foreach \e in {\ea,...,\eb} { \node[\st] at (\e,\y) {E}; }
+    \ifnum\w>0 \node[wr] at (\w,\y) {W}; \fi
+  }
+  % check of the store
+  \draw[->, ln-caution, thick] (9.28,-3.25) -- (9.28,-4.3) -- (7.3,-4.3) -- (7.3,-4.72);
+  \node[anchor=west, align=left, text=ln-caution, fill=white, inner sep=1pt] at (10.6,-4.5)
+    {\iflangja{I3 がアドレスを計算し，\\実行済みの I5 を検査}%
+              {I3 computes its address\\and checks I5}};
+  % ------------------------------------------------ (b) in-order
+  \node[hd] at (-6.2,-7.1) {\iflangja{(b) ロードストアのインオーダ実行}%
+                                      {(b) in-order load-store execution}};
+  \draw[->, ln-accent, thick] (9.3,-9.25) -- (9.7,-9.75);
+  % ------------------------------------------------ legend
+  \begin{scope}[shift={(0,-12.6)}]
+    \node[iss] at (-5.6,0) {I}; \node[anchor=west] at (-5.1,0) {\iflangja{発行}{issue}};
+    \draw[ln-muted, thick] (-2.7,0) -- (-1.7,0);
+    \node[anchor=west] at (-1.6,0) {\iflangja{待機}{waiting}};
+    \node[ex] at (1.6,0) {E}; \node[anchor=west] at (2.1,0) {\iflangja{実行}{execute}};
+    \node[sto] at (5.0,0) {E}; \node[anchor=west] at (5.5,0) {\iflangja{ストア実行}{store executes}};
+    \node[wr] at (10.0,0) {W}; \node[anchor=west] at (10.5,0) {\iflangja{結果書き込み}{write result}};
+  \end{scope}
+\end{tikzpicture}

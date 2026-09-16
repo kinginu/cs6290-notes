@@ -1,0 +1,58 @@
+% The load-store queue: loads and stores in program order between the commit
+% pointer and the issue pointer.  The load in LSQ6 searches the earlier
+% entries, skips loads and non-matching stores, and takes the value of the
+% nearest store with the same address.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  hd/.style={font=\footnotesize\bfseries\sffamily},
+  used/.style={draw, fill=ln-accent!12, minimum height=0.45cm, inner sep=0pt},
+  free/.style={draw, fill=white, minimum height=0.45cm, inner sep=0pt},
+  me/.style={draw, fill=ln-accent!35, minimum height=0.45cm, inner sep=0pt},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted},
+  ann/.style={font=\scriptsize\sffamily, anchor=west}]
+  % column headings
+  \node[hd] at (0.35,0.45) {L/S};
+  \node[hd] at (1.25,0.45) {Addr};
+  \node[hd] at (2.25,0.45) {Value};
+  \node[hd] at (2.95,0.45) {C};
+  % rows: entry / type / address / value / style
+  \foreach \r/\t/\a/\v/\st in {1/{}/{}/{}/free, 2/S/0x100/17/used,
+      3/L/0x108/4/used, 4/S/0x108/25/used, 5/L/{}/{}/used,
+      6/L/0x100/{}/me, 7/S/{}/{}/used, 8/{}/{}/{}/free} {
+    \pgfmathsetmacro{\y}{-(\r-1)*0.45}
+    \node[\st, minimum width=0.7cm] at (0.35,\y) {\t};
+    \node[\st, minimum width=1.1cm, font=\scriptsize\ttfamily] at (1.25,\y) {\a};
+    \node[\st, minimum width=0.9cm] at (2.25,\y) {\v};
+    \node[\st, minimum width=0.5cm] at (2.95,\y) {};
+    \node[lab, anchor=east] at (-0.05,\y) {LSQ\r};
+  }
+  % completion bits: set for LSQ2-LSQ4, and for LSQ6 by the forwarding
+  \foreach \y in {-0.45,-0.9,-1.35} {
+    \draw[thick] (2.83,\y) -- (2.92,\y-0.09) -- (3.08,\y+0.1);
+  }
+  \draw[thick, ln-accent] (2.83,-2.25) -- (2.92,-2.34) -- (3.08,-2.15);
+  % forwarded value in the searching load
+  \node[text=ln-accent, font=\footnotesize\bfseries\sffamily] at (2.25,-2.25) {17};
+  % pointers
+  \draw[->, thick, ln-accent] (-1.45,-0.45) -- (-0.85,-0.45);
+  \node[font=\scriptsize\sffamily, text=ln-accent, anchor=east] at (-1.45,-0.45)
+    {\iflangja{コミット}{commit}};
+  \draw[->, thick, ln-accent] (-1.45,-3.15) -- (-0.85,-3.15);
+  \node[font=\scriptsize\sffamily, text=ln-accent, anchor=east] at (-1.45,-3.15)
+    {\iflangja{発行}{issue}};
+  % search of the load in LSQ6
+  \draw[thick, ln-accent] (3.25,-2.25) -- (3.6,-2.25) -- (3.6,-0.45);
+  \draw[->, thick, ln-accent] (3.6,-0.45) -- (3.25,-0.45);
+  \foreach \y in {-0.9,-1.35,-1.8} { \draw[ln-accent] (3.52,\y) -- (3.68,\y); }
+  \node[ann, text=ln-accent] at (3.8,-2.25)
+    {\iflangja{0x100 のロード：先行エントリを探索}{load at 0x100: searches earlier entries}};
+  \node[ann, text=ln-muted] at (3.8,-1.8) {\iflangja{ロード：無視}{load: skipped}};
+  \node[ann, text=ln-muted] at (3.8,-1.35) {\iflangja{ストア，0x108：不一致}{store, 0x108: no match}};
+  \node[ann, text=ln-muted] at (3.8,-0.9) {\iflangja{ロード：無視}{load: skipped}};
+  \node[ann, text=ln-accent] at (3.8,-0.45)
+    {\iflangja{ストア，0x100：一致，値 17 をフォワード}{store, 0x100: match, value 17 forwarded}};
+  \node[ann, text=ln-muted] at (3.8,-2.7)
+    {\iflangja{後続のストア：探索しない}{later store: not examined}};
+  % program order
+  \draw[->, ln-muted] (-2.55,0.2) -- (-2.55,-3.35);
+  \node[lab, rotate=90] at (-2.8,-1.57) {\iflangja{プログラム順}{program order}};
+\end{tikzpicture}
