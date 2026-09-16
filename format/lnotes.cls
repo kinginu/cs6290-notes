@@ -58,6 +58,11 @@
 
 %% ------------------------------------------------------------------- fonts
 \RequirePackage{fontspec}
+%% amsmath and mathtools must come BEFORE unicode-math: loaded after it they
+%% reinstate the Computer-Modern \underbrace/\overbrace, whose extensible
+%% pieces then print as literal "z{}" characters and black boxes.
+\RequirePackage{amsmath}
+\RequirePackage{mathtools}
 \RequirePackage{unicode-math}
 \ifln@ja
   \setmainfont{Libertinus Serif}
@@ -342,8 +347,6 @@
 \RequirePackage{algpseudocode}
 
 %% ------------------------------------------------------------- math & misc
-\RequirePackage{amsmath}
-\RequirePackage{mathtools}
 \RequirePackage{siunitx}
 \RequirePackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,shapes,calc,fit,backgrounds}
