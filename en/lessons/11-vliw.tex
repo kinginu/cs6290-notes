@@ -32,7 +32,10 @@ hardware for renaming, window scheduling and the reorder buffer (Lessons
 6--8).  An in-order design stops at the first instruction that must wait for
 another, so it needs the compiler to place independent instructions next to
 each other (Lesson 10).  A VLIW processor executes, without any checking, one
-instruction of up to $N$ operations that the compiler has made independent.
+instruction of up to $N$ operations that the compiler has made
+independent.\caution{A wrong grouping is not slow but wrong: nothing checks,
+so two dependent operations in one instruction are executed anyway.
+Correctness rests on the compiler.}
 
 \begin{figure}[htbp]
   \centering
@@ -50,9 +53,12 @@ instruction of up to $N$ operations that the compiler has made independent.
   \index{VLIW|see{very long instruction word}} (VLIW) architecture is an
   instruction set architecture in which each instruction consists of up to $N$
   operations, each equivalent to one instruction of an ordinary ISA, that are
-  executed in parallel in the same cycle.  Choosing the operations that form
-  an instruction, and ensuring that they are independent, is the task of the
-  compiler; the processor performs no dependence checking.
+  executed in parallel in the same cycle.\margin{Real width: an IA-64
+  \emph{bundle} is 128~bits---three 41-bit operations and a 5-bit template
+  naming their execution units (Intel Itanium architecture manual).}  Choosing
+  the operations that form an instruction, and ensuring that they are
+  independent, is the task of the compiler; the processor performs no
+  dependence checking.
 \end{definition}
 
 An instruction that carries $N$ operations is about $N$ times as long as an
@@ -98,9 +104,12 @@ I8: SW  R7, 16(R8)    ; RAW with I7
   A VLIW compiler takes the operations in program order and places each one
   in the earliest instruction that follows all the operations it depends on
   and still has a free slot; slots left over are filled with NOPs
-  (\cref{tab:l11-packing}).  With four slots the eight operations occupy
-  four instructions, hence four cycles, where an ordinary ISA needs eight
-  instructions; with two slots they occupy five.
+  (\cref{tab:l11-packing}).\tip{Lower bound: $\lceil n/N\rceil$ instructions,
+  and never fewer than the longest dependence chain has
+  operations---$\max(2,4) = 4$ here.  Packing in program order can cost one
+  more, as the two-slot column shows.}  With four slots the eight operations
+  occupy four instructions, hence four cycles, where an ordinary ISA needs
+  eight instructions; with two slots they occupy five.
 \end{example}
 
 \begin{table}[htbp]
@@ -143,13 +152,18 @@ advantages.\source{Lesson 11, videos 4--5; H\&P §3.7, Appendix H.}
     unrolling\index{loop unrolling} (Lesson 10) removes the branches between
     iterations, so that their independent operations fill the slots.
 \end{itemize}
-It also has four disadvantages.
+It also has four disadvantages.\tip{The first two are what the compiler cannot
+know: the actual latencies, the actual addresses and the actual branch
+directions.}
 \begin{itemize}
   \item \textbf{Latencies are not known at compile time.}  The compiler
     groups operations as if each completes within its cycle.  If one takes
     longer, e.g.\ a load with a cache miss (Lesson 12), all later operations
     wait for it, even independent ones, whereas an out-of-order processor
-    keeps executing instructions that do not depend on it.
+    keeps executing instructions that do not depend on it.\margin{The number
+    the compiler must assume: on Skylake a load takes 4 cycles from L1, 12
+    from L2, about 40 from L3 and 200--300 from DRAM (Intel optimization
+    manual).}
   \item \textbf{Irregular code is hard.}  The compiler sees the program, not
     its execution.  When it cannot prove two operations independent---a store
     and a load through pointers that may address the same location, or
@@ -176,7 +190,12 @@ gain: a wider out-of-order processor finds more parallelism in an \emph{old}
 binary without recompilation.  A new VLIW processor with more slots either
 cannot run an old VLIW binary at all, because the instruction format has
 changed, or runs it with no more operations per cycle than the processor it
-was compiled for.
+was compiled for.\sidenote{Software can supply the missing compatibility.
+Transmeta's Crusoe (2000) executed no x86 instruction directly: a translator,
+the code morphing software, compiled blocks of x86 code into 128-bit VLIW
+instructions of four operations and cached them \cite{dehnert2003}; the later
+Efficeon used 256-bit instructions.  Nvidia's Denver (2014) translates Arm
+code the same way.}
 
 \begin{example}[An old binary on a wider VLIW processor]
   \label{ex:l11-compat}
@@ -226,7 +245,9 @@ call inlining\index{function call inlining} remove the branches, calls and
 returns that would separate operations.  A VLIW processor has no renaming
 hardware, so the compiler itself removes false dependences (Lesson 3) by
 writing results into otherwise unused registers, of which the instruction set
-provides many.
+provides many.\margin{IA-64 gives the compiler 128 integer and 128
+floating-point registers to rename into, against 32 in MIPS and 16 in x86-64
+(Lesson 5).}
 
 Branches limit the grouping, since the operations after a branch execute only
 on one of its paths.  A VLIW instruction set therefore provides good support
@@ -269,7 +290,10 @@ A \term{digital signal processor}[DSP]%
 \index{DSP|see{digital signal processor}} (DSP) is a processor specialized
 for digital signals such as audio, video and radio.  This market plays to the
 strengths of VLIW (\cref{sec:l11-good-bad}).\margin{H\&P lists the TI C6x
-DSPs as an example of the VLIW approach.}
+DSPs as an example of the VLIW approach.}\caution{The C6x marks the complement
+of a stop bit: the lowest bit of an operation set to~1 means \emph{in parallel
+with the next one}, so a group ends where that bit is~0; eight 32-bit
+operations make a 256-bit packet (TI C6000 reference guide).}
 \begin{itemize}
   \item Loops that apply the same computation to many samples dominate the
     code: regular code in which the compiler finds plenty of parallelism.
