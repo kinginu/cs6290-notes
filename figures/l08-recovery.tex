@@ -1,0 +1,47 @@
+% Branch misprediction recovery when the mispredicted branch reaches the commit
+% pointer: every later ROB entry is on the wrong path and is discarded, and
+% every RAT entry is reset to the register file.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  row/.style={draw, fill=ln-box, minimum height=0.45cm, inner sep=0pt},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted},
+  hd/.style={font=\scriptsize\bfseries\sffamily},
+  note/.style={font=\scriptsize\sffamily, anchor=west}]
+  % ROB
+  \node[hd] at (1.25,0.42) {\iflangja{命令}{Instruction}};
+  \node[hd] at (2.9,0.42) {Done};
+  \foreach \r/\ins/\done/\f in {1/{}/{}/white, 2/{BEQ R1,R4,Skip}/1/ln-box,
+      3/{ADD R5,R6,R7}/1/ln-caution!12, 4/{LW~~R8,0(R5)}/1/ln-caution!12,
+      5/{MUL R9,R5,R5}/1/ln-caution!12, 6/{SUB R6,R9,R7}/0/ln-caution!12,
+      7/{}/{}/white, 8/{}/{}/white} {
+    \pgfmathsetmacro{\y}{-(\r-1)*0.45}
+    \node[row, fill=\f, minimum width=2.5cm] at (1.25,\y) {\texttt{\ins}};
+    \node[row, fill=\f, minimum width=0.8cm] at (2.9,\y) {\done};
+    \node[lab, anchor=east] at (-0.05,\y) {ROB\r};
+  }
+  \node[note, text=ln-accent] at (3.35,-0.45) {\iflangja{予測ミス}{mispredicted}};
+  \node[note, text=ln-caution] at (3.35,-1.35) {\iflangja{例外}{exception}};
+  \node[note, text=ln-muted] at (3.35,-2.25) {\iflangja{実行中}{executing}};
+  % pointers
+  \draw[->, thick, ln-accent] (-1.45,-0.45) -- (-0.9,-0.45);
+  \node[font=\scriptsize\sffamily, text=ln-accent, anchor=east] at (-1.45,-0.45)
+    {\iflangja{コミット}{commit}};
+  \draw[->, thick, ln-accent] (-1.45,-2.7) -- (-0.9,-2.7);
+  \node[font=\scriptsize\sffamily, text=ln-accent, anchor=east] at (-1.45,-2.7)
+    {\iflangja{発行}{issue}};
+  % wrong path
+  \draw[thick, ln-caution] (4.75,-0.72) -- (4.9,-0.72) -- (4.9,-2.43) -- (4.75,-2.43);
+  \node[font=\scriptsize\sffamily, text=ln-caution, align=left, anchor=west] at (4.95,-1.57)
+    {\iflangja{誤った経路：\\すべて破棄}{wrong path:\\all discarded}};
+  % RAT before and after
+  \node[hd] at (7.7,0.42) {\iflangja{回復前}{before}};
+  \node[hd] at (8.7,0.42) {\iflangja{回復後}{after}};
+  \node[hd, anchor=south] at (8.2,0.62) {RAT};
+  \foreach \r/\reg/\before in {1/R1/--, 2/R5/ROB3, 3/R6/ROB6, 4/R8/ROB4, 5/R9/ROB5} {
+    \pgfmathsetmacro{\y}{-(\r-1)*0.45}
+    \node[lab, anchor=east] at (7.15,\y) {\reg};
+    \node[row, minimum width=1.0cm, font=\scriptsize\sffamily] at (7.7,\y) {\before};
+    \node[row, fill=white, minimum width=1.0cm, font=\scriptsize\sffamily] at (8.7,\y) {--};
+  }
+  \node[lab, align=left, anchor=north west] at (6.8,-2.2)
+    {\iflangja{--：レジスタ\\\phantom{--：}ファイルを指す}{--: points to the\\\phantom{--: }register file}};
+\end{tikzpicture}

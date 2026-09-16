@@ -1,0 +1,81 @@
+% Hardware organization of Tomasulo's algorithm with a reorder buffer: the RAT
+% names ROB entries, the CDB delivers results to the RSs and the ROB, and only
+% commit writes the register file.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  row/.style={draw, fill=ln-box, minimum height=0.42cm, inner sep=0pt,
+    font=\scriptsize\sffamily},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted},
+  hd/.style={font=\footnotesize\bfseries\sffamily},
+  stepl/.style={font=\scriptsize\itshape\sffamily, text=ln-accent},
+  unit/.style={draw, fill=white, trapezium, trapezium angle=65, shape border rotate=180,
+    minimum width=1.3cm, minimum height=0.55cm, inner sep=1pt}]
+  % ---------------------------------------------------------------- IQ
+  \foreach \r in {1,...,4} {
+    \node[row, minimum width=1.9cm] at (0.95,{-(\r-1)*0.42-0.21}) {};
+  }
+  \node[hd] at (0.95,0.25) {IQ};
+  % ---------------------------------------------------------------- RAT
+  \foreach \r/\v in {1/ROB2, 2/--, 3/ROB5, 4/ROB3} {
+    \node[row, minimum width=0.95cm] at (3.45,{-(\r-1)*0.42-0.21}) {\v};
+    \node[lab, anchor=east] at (2.95,{-(\r-1)*0.42-0.21}) {R\r};
+  }
+  \node[hd] at (3.45,0.25) {RAT};
+  % ---------------------------------------------------------------- REGS
+  \foreach \r/\v in {1/5, 2/-3, 3/12, 4/7} {
+    \node[row, fill=white, minimum width=0.95cm] at (5.45,{-(\r-1)*0.42-0.21}) {\v};
+    \node[lab, anchor=east] at (4.95,{-(\r-1)*0.42-0.21}) {R\r};
+  }
+  \node[hd] at (5.45,0.25) {\iflangja{レジスタ}{REGS}};
+  % ---------------------------------------------------------------- ROB
+  \node[lab] at (7.8,0.25) {Reg};
+  \node[lab] at (8.8,0.25) {Value};
+  \node[lab] at (9.8,0.25) {Done};
+  \foreach \r/\reg/\val/\done/\f in {1/{}/{}/{}/white, 2/R1/9/1/ln-box, 3/R4/{}/0/ln-box,
+      4/R3/{}/0/ln-box, 5/R3/21/1/ln-box, 6/{}/{}/{}/white} {
+    \pgfmathsetmacro{\y}{-(\r-1)*0.42-0.21}
+    \node[row, fill=\f, minimum width=0.8cm] at (7.8,\y) {\reg};
+    \node[row, fill=\f, minimum width=1.2cm] at (8.8,\y) {\val};
+    \node[row, fill=\f, minimum width=0.8cm] at (9.8,\y) {\done};
+    \node[lab, anchor=west] at (10.25,\y) {ROB\r};
+  }
+  \node[hd, anchor=south] at (8.8,0.45) {ROB};
+  \draw[->, thick, ln-accent] (7.38,-0.63) -- (6.65,-0.63) -- (6.65,-0.21) -- (5.97,-0.21);
+  \node[stepl, anchor=north] at (6.65,-0.66) {\iflangja{コミット}{commit}};
+  % ---------------------------------------------------------------- RSs
+  \foreach \r in {1,2,3} {
+    \node[row, minimum width=2.4cm] at (1.9,{-2.9-(\r-1)*0.42}) {};
+    \node[lab, anchor=east] at (0.65,{-2.9-(\r-1)*0.42}) {AD\r};
+  }
+  \foreach \r in {1,2} {
+    \node[row, minimum width=2.4cm] at (5.7,{-2.9-(\r-1)*0.42}) {};
+    \node[lab, anchor=east] at (4.45,{-2.9-(\r-1)*0.42}) {MD\r};
+  }
+  % ---------------------------------------------------------------- units
+  \node[unit] (add) at (1.9,-4.75) {$+,-$};
+  \node[unit] (mul) at (5.7,-4.75) {$\times,\div$};
+  \draw[->] (1.9,-3.95) -- (add.north);
+  \draw[->] (5.7,-3.53) -- (mul.north);
+  \node[stepl, anchor=west] at (1.95,-4.2) {\iflangja{ディスパッチ}{dispatch}};
+  \node[stepl, anchor=west] at (5.75,-4.0) {\iflangja{ディスパッチ}{dispatch}};
+  % ---------------------------------------------------------------- CDB
+  \draw[line width=1.6pt, ln-accent] (1.9,-5.6) -- (8.8,-5.6);
+  \draw[->] (add.south) -- (1.9,-5.6);
+  \draw[->] (mul.south) -- (5.7,-5.6);
+  \node[hd, text=ln-accent, anchor=north] at (4.0,-5.65) {CDB};
+  \node[stepl, anchor=north west] at (5.8,-5.65) {\iflangja{結果書き込み}{write result}};
+  % CDB to the RSs and to the ROB
+  \draw[->, ln-accent] (3.55,-5.6) -- (3.55,-3.32) -- (3.12,-3.32);
+  \draw[->, ln-accent] (7.35,-5.6) -- (7.35,-3.11) -- (6.92,-3.11);
+  \draw[->, ln-accent] (8.8,-5.6) -- (8.8,-2.54);
+  % ---------------------------------------------------------------- issue
+  \draw[thick] (0.95,-1.7) -- (0.95,-2.31) -- (7.38,-2.31);
+  \draw[->, thick] (7.0,-2.31) -- (7.38,-2.31);
+  \draw[->, thick] (1.9,-2.31) -- (1.9,-2.68);
+  \draw[->, thick] (5.7,-2.31) -- (5.7,-2.68);
+  \draw[<->, dashed] (3.45,-1.7) -- (3.45,-2.31);
+  \draw[->, dashed] (5.45,-1.7) -- (5.45,-2.31);
+  \draw[->, dashed] (7.38,-1.89) -- (6.75,-1.89) -- (6.75,-2.31);
+  \node[stepl, anchor=south east, inner xsep=1pt] at (7.36,-1.87)
+    {\iflangja{Done なら値}{value if Done}};
+  \node[stepl, anchor=south west] at (1.0,-2.31) {\iflangja{発行}{issue}};
+\end{tikzpicture}

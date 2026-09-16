@@ -1,0 +1,724 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{ReOrder Buffer}
+\lessoninfo{
+  video={Lesson 8, videos 1--40},
+  textbook={H\&P \cite{hennessy2017} §3.6, §3.8, §C.4; \cite{smith1988}},
+  keywords={exception, precise exception, phantom exception, reorder buffer, commit pointer, issue pointer, commit, branch misprediction recovery, register alias table, unified reservation station, superscalar, out-of-order execution},
+}
+
+Tomasulo's algorithm (Lesson 7) executes each instruction as soon as its
+operands are available and writes its result into the register file when the
+result is broadcast.  Renaming keeps the computed values correct, but two
+events that every real processor must handle break the scheme: exceptions and
+branch mispredictions.  In both cases instructions that follow the offending
+instruction in program order may already have overwritten registers, and these
+writes cannot be undone.  This lesson introduces the reorder buffer, which
+lets instructions execute out of order but updates the registers strictly in
+program order.  It traces the resulting processor in detail and ends with
+unified reservation stations, superscalar execution, and a precise account of
+which steps of an out-of-order processor actually work out of order.
+
+\section{Exceptions in out-of-order execution}
+\label{sec:l08-exceptions-ooo}
+
+An exception is an event, such as a division by zero or an access to an
+invalid memory address, that an instruction raises when it
+executes.\source{Lesson 8, videos 1--2; H\&P §C.4, §3.6.}  The processor
+saves the address of the excepting instruction and transfers control to an
+exception handler, usually part of the operating system.  When the handler
+has dealt with the cause, it may return to the saved address, so that the
+excepting instruction is executed again and the program continues after it.
+For the handler to work, and for the program to continue correctly after the
+return, the registers and memory must look as they would in a processor that
+executes one instruction at a time.
+
+\begin{definition}[Precise exception]
+  \label{def:l08-precise}
+  An exception is a \term{precise exception}[正確な例外] if, when the
+  handler starts, every instruction that precedes the excepting instruction
+  in program order has completed and updated the registers and memory, and
+  neither the excepting instruction nor any instruction that follows it has
+  changed them.
+\end{definition}
+
+Tomasulo's algorithm does not provide precise exceptions.  Consider:
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+I1:  DIV R1, R2, R3     ; R3 = 0: division by zero
+I2:  ADD R2, R4, R5     ; overwrites R2, read by I1
+I3:  ADD R6, R6, R7     ; R6 <- R6 + R7
+\end{lstlisting}
+I2 and I3 do not depend on I1, so they execute and write R2 and R6 within a
+few cycles of being issued.  The division takes many cycles, and in the model
+used here the divider reports the division by zero when the operation
+completes (\cref{fig:l08-exception}).  By then both later results are in the
+register file, and three things go wrong.
+\begin{itemize}
+  \item The handler sees values of R2 and R6 that no sequential execution
+    stopped at I1 could produce.
+  \item After the return, I1 is executed again and now reads the value of R2
+    written by I2, which in program order it must never see.
+  \item I2 and I3 are also executed a second time.  I2 merely recomputes the
+    same value, but I3 adds R7 to R6 twice.
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l08-exception}
+  \caption{An exception under Tomasulo's algorithm (I: issue, E: execute,
+    W: write result).  I2 and I3 write R2 and R6 long before the division I1
+    reports the division by zero.}
+  \label{fig:l08-exception}
+\end{figure}
+
+\section{Branch mispredictions}
+\label{sec:l08-mispredictions}
+
+Branch mispredictions cause the same problem.\source{Lesson 8, video 3; H\&P
+§3.6.}  In the following program the branch predictor lets the processor
+fetch and issue I3 to I6 while I2 waits for the result of the division:
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+I1:        DIV R1, R2, R3     ; takes many cycles
+I2:        BEQ R1, R4, Skip   ; predicted not taken
+I3:        ADD R5, R6, R7     ; I3-I6: executed only
+I4:        LW  R8, 0(R5)      ;   if not taken
+I5:        MUL R9, R5, R5
+I6:        SUB R6, R9, R7
+           ...
+     Skip: ...
+\end{lstlisting}
+I2 needs R1 and cannot execute before the division completes, whereas I3 has
+its operands at once and I4 a cycle after I3.  Under Tomasulo's algorithm R5
+and R8 are written long before the branch is resolved.  If the branch turns
+out to be taken, the instructions of the wrong path can be removed from the
+reservation stations and fetching can restart at \texttt{Skip}, but R5 and R8
+have been overwritten with values that the program never computes, and their
+correct values are lost.
+
+A second problem arises when an instruction on the wrong path raises an
+exception.  The program uses R5 as an address only when the branch is not
+taken; when it is taken, the value $\text{R6}+\text{R7}$ need not be a valid
+address, and the load I4 may raise an exception long before I2 executes.
+
+\begin{definition}[Phantom exception]
+  \label{def:l08-phantom}
+  An exception raised by an instruction that lies on a mispredicted path, and
+  therefore is never executed in a sequential execution of the program, is
+  called a \term{phantom exception}[ファントム例外].
+\end{definition}
+
+A phantom exception must not reach the handler: in program order, the
+instruction that raised it does not exist.
+
+\section{Correct out-of-order execution}
+\label{sec:l08-correct}
+
+Both problems have the same cause.  An instruction changes the registers as
+soon as it has computed its result, before it is known that every earlier
+instruction has completed without an exception or a
+misprediction.\source{Lesson 8, video 4; H\&P §3.6; \cite{smith1988}.}  The
+remedy is to separate computing a result from making it visible:
+\begin{itemize}
+  \item instructions still \emph{execute} out of order, as soon as their
+    operands are ready;
+  \item results are still \emph{broadcast} out of order, so that waiting
+    instructions receive them without delay;
+  \item but results are \emph{written into the registers} in program order,
+    and only once it is certain that the instruction belongs to the program's
+    execution.
+\end{itemize}
+Holding the results until they may be written requires a structure that
+remembers the program order of the instructions after they have been issued.
+The reservation stations cannot do this: an instruction leaves its
+reservation station as soon as its result is broadcast, and the stations are
+allocated in no particular order.
+
+\begin{keypoint}
+  Execute out of order, broadcast out of order, but write the registers in
+  program order.
+\end{keypoint}
+
+\section{The reorder buffer}
+\label{sec:l08-rob}
+
+The structure that remembers the program order is a queue of the issued
+instructions.\source{Lesson 8, videos 5--10; H\&P §3.6.}
+
+\begin{definition}[Reorder buffer]
+  \label{def:l08-rob}
+  The \term{reorder buffer}[リオーダバッファ]\index{ROB|see{reorder buffer}}
+  (ROB) holds, in program order, every instruction that has been issued but
+  has not yet passed the commit step of \cref{def:l08-commit}, in which its
+  result is written into the register file.  Each entry has three fields:
+  \begin{description}
+    \item[Reg] the destination register of the instruction;
+    \item[Value] its result, once computed;
+    \item[Done] a bit that is set when Value holds the result.
+  \end{description}
+\end{definition}
+
+The lecture draws only these three fields.  An entry must also record whether
+the instruction raised an exception or is a mispredicted branch, and the
+address of the instruction, which commit needs in order to take the exception
+or to restart fetching (\cref{sec:l08-recovery,sec:l08-rob-exceptions}).
+
+The ROB is a circular buffer managed by two pointers
+(\cref{fig:l08-rob}).  The \term{issue pointer}[発行ポインタ] names the entry
+that the next issued instruction receives, and it advances by one entry for
+every issued instruction.  The oldest instruction that has not yet committed
+is found at the \term{commit pointer}[コミットポインタ].  The entries from the
+commit pointer up to, but not including, the issue pointer are in use and hold
+instructions in program order; all others are free.  Since equal pointers
+would describe both an empty and a full buffer, an occupancy count or a full
+bit distinguishes the two.  In normal operation both pointers only advance,
+wrapping around from the last entry to the first; recovery moves the issue
+pointer back (\cref{sec:l08-recovery}).  When every entry is in use, no
+instruction can be issued until the oldest one leaves the ROB.  Every issued
+instruction receives an entry, including a branch, which writes no register:
+its entry keeps its place in the program order and, as shown below, records
+whether it was mispredicted.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l08-rob}
+  \caption{A reorder buffer with eight entries.  The shaded entries, from the
+    commit pointer up to the issue pointer, are in use; here this range wraps
+    around from ROB8 to ROB1.}
+  \label{fig:l08-rob}
+\end{figure}
+
+\subsection{Issue, dispatch and write result}
+
+With a ROB, the three steps of Tomasulo's algorithm change as
+follows.\index{Tomasulo's algorithm}
+\begin{description}
+  \item[Issue] The instruction needs a free reservation station (RS) and the
+    free ROB entry at the issue pointer; if either is missing, issue waits.
+    The ROB entry receives the destination register and a cleared Done bit,
+    and the issue pointer advances.  Each operand is then looked up in the
+    RAT, whose entries now name ROB entries instead of RSs:
+    \begin{itemize}
+      \item if the RAT entry points to the register file, the value is
+        copied from the register;
+      \item if it names a ROB entry whose Done bit is set, the value is copied
+        from that entry;
+      \item otherwise the RS records the ROB entry as the tag of the operand
+        and waits for a broadcast with that tag.
+    \end{itemize}
+    Finally, the RAT entry of the destination register is set to the new ROB
+    entry, and the RS records that entry as the tag of its result.
+  \item[Dispatch] As before, an instruction whose operands are all available
+    starts executing.  Its RS is freed at this point.
+  \item[Write result] The result is broadcast on the CDB together with its
+    tag, the ROB entry.  Waiting RSs capture it as before, and the ROB
+    entry stores it and sets its Done bit.  Neither the register file nor the
+    RAT is changed.
+\end{description}
+
+The second lookup case is new.  A result stays in the ROB from write result
+until commit, and during that time the RAT keeps naming the ROB entry; an
+instruction issued in that interval must find the value there, because the
+broadcast it would otherwise wait for has already happened.
+
+The earlier release of RSs is also new.\index{reservation station}  In
+Tomasulo's algorithm an RS must stay allocated until write result, because
+the station itself is the tag under which the result is broadcast.  With a ROB
+the tag is the ROB entry, so the RS is no longer needed once the
+operation has started, and the same number of RSs can hold more waiting
+instructions.
+
+\subsection{Commit}
+
+A fourth step completes every instruction.
+
+\begin{definition}[Commit]
+  \label{def:l08-commit}
+  In the \term{commit}[コミット]\index{retirement|see{commit}} step the
+  processor examines the entry at the commit pointer.  If its Done bit is
+  set, the value is written into the destination register, and if the RAT
+  entry of that register still names this ROB entry, the RAT entry is reset
+  to point to the register file.  The commit pointer then advances, which
+  frees the entry.
+\end{definition}
+
+If the instruction at the commit pointer is not done, nothing commits, even if
+later entries are: results enter the register file only in program order.  The
+RAT entry is reset only when it still names the committing entry; otherwise a
+later instruction writes the same register, and the RAT must keep naming that
+instruction's entry (\cref{sec:l08-rat}).  Commit is also called
+\emph{retirement}.
+
+\subsection{Hardware organization}
+
+\Cref{fig:l08-organization} shows the organization of Lesson 7 with a ROB
+added.  The CDB now delivers results to the RSs and to the ROB, the RAT names
+ROB entries, and the register file is written only by commit.  An instruction
+passes through six steps: fetch, decode, issue, execute (from dispatch until
+the operation completes), write result and commit.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l08-organization}
+  \caption{Tomasulo's organization with a reorder buffer.  Issue allocates an
+    RS and a ROB entry and renames the operands through the RAT; operand
+    values come from the register file or from a Done ROB entry.  Results go
+    from the CDB to the RSs and the ROB; commit copies the value at the commit
+    pointer into the register file.}
+  \label{fig:l08-organization}
+\end{figure}
+
+\begin{note}
+  At any moment the most recent value of an architectural register, in the
+  program order of the instructions issued so far, is in one of three places:
+  in the register file, when the RAT points there; in a ROB entry whose Done
+  bit is set; or not yet computed, in a ROB entry whose Done bit is clear.  The
+  register file itself always holds the values as of the last committed
+  instruction.
+\end{note}
+
+\section{Branch misprediction recovery}
+\label{sec:l08-recovery}
+
+With a ROB, instructions on a mispredicted path cannot change the register
+file as long as they are removed before they commit.\source{Lesson 8, videos
+11--12; H\&P §3.6.}  In the program of \cref{sec:l08-mispredictions}, I3 to
+I6 are issued while I2 waits for R1, and all of them except I6, which is
+still executing, write their results into their ROB entries.  When I2 finally executes and
+the processor finds that the branch was mispredicted, the misprediction is
+recorded in the ROB entry of I2, and nothing else happens yet.  Instructions
+before the branch are unaffected and continue to execute and commit.
+
+When the branch reaches the commit pointer, every instruction before it has
+committed, so the register file holds exactly the values that a sequential
+execution has after the branch.  Every instruction still in the processor
+follows the branch and is on the wrong path.  The processor now performs
+\term{branch misprediction recovery}[分岐予測ミス回復], which consists of four
+actions (\cref{fig:l08-recovery}):
+\begin{enumerate}
+  \item discard all ROB entries by setting the issue pointer equal to the
+    commit pointer, which leaves the ROB empty;
+  \item reset every RAT entry to point to the register file;
+  \item free all RSs and abandon the operations in the execution units, whose
+    results could only go to discarded ROB entries;
+  \item restart fetching at the correct successor of the branch.
+\end{enumerate}
+A correctly predicted branch simply commits: the commit pointer advances and
+nothing else happens.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l08-recovery}
+  \caption{Recovery when the mispredicted branch I2 reaches the commit pointer.
+    I1 has already committed; the ROB entries of I3 to I6 are discarded,
+    including the exception recorded for I4, and all RAT entries return to
+    the register file.}
+  \label{fig:l08-recovery}
+\end{figure}
+
+\begin{note}
+  Recovering at commit is the simplest scheme and the one used in the lecture.
+  Real processors start recovery as soon as the mispredicted branch executes,
+  discarding only the ROB entries after the branch and restarting fetching at
+  once, so that no cycles are lost while the branch waits to commit (H\&P
+  §3.6).  The RAT must then be brought back to its state at the branch, for
+  example from a copy saved when the branch was issued.
+\end{note}
+
+\section{Exceptions with a reorder buffer}
+\label{sec:l08-rob-exceptions}
+
+Exceptions are handled by treating an exception as one more result of the
+instruction that raises it.\source{Lesson 8, videos 13--15; H\&P §3.6.}  When
+an instruction raises an exception during execution, the processor records
+the exception in the instruction's ROB entry instead of invoking the handler.
+When that entry reaches the commit pointer, the exception is taken: the
+processor discards the ROB entries, resets the RAT, and frees the RSs and
+execution units exactly as in misprediction recovery, saves the address of the
+excepting instruction, and starts fetching the exception handler.
+
+This removes both problems of
+\cref{sec:l08-exceptions-ooo,sec:l08-mispredictions}.
+\begin{description}
+  \item[Precise exceptions] When the excepting instruction reaches the commit
+    pointer, all earlier instructions have committed and no later instruction
+    has written the register file.  Stores likewise write memory only when
+    they commit (Lesson~9), so memory is also unchanged by later instructions.
+    The handler sees exactly the state of \cref{def:l08-precise}; after the
+    return, the later instructions are executed from that state.
+  \item[No phantom exceptions] An exception on a mispredicted path is recorded
+    in an entry that follows the mispredicted branch.  The branch commits
+    first, and its recovery discards the entry together with the exception,
+    which is never taken.  In \cref{fig:l08-recovery} the exception of I4
+    disappears when I2 commits.
+\end{description}
+
+\subsection{The outside view of execution}
+\label{sec:l08-outside}
+
+The ROB separates two notions of when an instruction is executed.  Inside the
+processor, an instruction executes when an execution unit performs its
+operation, in any order.  The programmer, the operating system and the
+exception handler, however, see only the register file, memory and the
+program counter, and for them an instruction is executed when it commits.
+Commits happen one instruction after another in program order, exactly as in a
+processor that completes each instruction before starting the next.  An
+instruction whose result is in the ROB but has not committed has, seen from
+outside, not been executed yet; if its result is discarded, it has never been
+executed at all.  The example of \cref{sec:l08-example} ends with an
+instance.
+
+\section{RAT updates on commit}
+\label{sec:l08-rat}
+
+The conditional RAT update of \cref{def:l08-commit} is needed because a
+register may have several pending writers.\source{Lesson 8, video 16; H\&P
+§3.6.}\index{register alias table}  Suppose the instructions in ROB2 and ROB5
+both write R4, and ROB2 commits while ROB5 is still in the ROB.  The RAT entry
+of R4 names ROB5, because that instruction was issued later.
+\begin{itemize}
+  \item Commit writes the value of ROB2 into R4.  This is the correct
+    architectural value after ROB2, and it is the value an exception handler
+    must see if an instruction between ROB2 and ROB5 raises an exception.
+  \item The RAT entry must nevertheless keep naming ROB5.  An instruction
+    issued now follows ROB5 in program order and must use the value of ROB5,
+    not the older value that has just entered the register file.
+\end{itemize}
+When ROB5 commits, the RAT entry of R4 still names ROB5 unless an even later
+writer has been issued in the meantime, and only then is it reset.  The
+opposite mistake, leaving a RAT entry that names a committed entry, is equally
+wrong: the entry is freed at commit and may soon be given to an unrelated
+instruction.
+
+\section{A reorder buffer example}
+\label{sec:l08-example}
+
+We now trace a complete program through a processor with a
+ROB.\source{Lesson 8, videos 17--30; H\&P §3.6.}  The processor has three
+RSs for addition and subtraction (AD1 to AD3), two for multiplication and
+division (MD1, MD2) and a ROB of eight entries.  ADD and SUB take 1 cycle, MUL
+4 cycles and DIV 6 cycles, and there are enough execution units that no ready
+instruction waits for one.  The steps follow these conventions:
+\begin{itemize}
+  \item one instruction is issued per cycle, into the free RS of the required
+    kind with the lowest number;
+  \item an RS freed by a dispatch in cycle $C$, and a ROB entry freed by a
+    commit in cycle $C$, can be given to a new instruction from cycle $C+1$;
+  \item an instruction is dispatched no earlier than the cycle after its issue
+    and the cycle after the broadcast of each operand it waits for;
+  \item an operation dispatched in cycle $D$ with an execution time of $k$
+    cycles executes in cycles $D$ to $D+k-1$ and writes its result in cycle
+    $D+k$; there is one CDB, and in this example no two results are written
+    in the same cycle;
+  \item an instruction commits no earlier than the cycle after its write
+    result, and at most one instruction commits per cycle.
+\end{itemize}
+
+\needspace{12\baselineskip}
+\begin{example}
+  \label{ex:l08-trace}
+  The program is
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+I1:  DIV R1, R2, R3     ; R1 <- R2 / R3
+I2:  ADD R4, R5, R6     ; R4 <- R5 + R6
+I3:  MUL R2, R4, R4     ; R2 <- R4 * R4
+I4:  SUB R5, R1, R6     ; R5 <- R1 - R6
+I5:  ADD R4, R4, R3     ; R4 <- R4 + R3
+I6:  ADD R6, R2, R4     ; R6 <- R2 + R4
+\end{lstlisting}
+  with initial values $\text{R1}=5$, $\text{R2}=48$, $\text{R3}=4$,
+  $\text{R4}=2$, $\text{R5}=7$ and $\text{R6}=3$.  All RAT entries point to
+  the register file, and both ROB pointers are at ROB1.
+\end{example}
+
+\paragraph{Cycles 1--6: issue.}
+One instruction is issued per cycle, I$k$ into ROB$k$.  I1 copies 48 and 4
+from the register file into MD1 and sets the RAT entry of R1 to ROB1.  In
+cycle~2 I1 is dispatched and frees MD1, and I2 is issued into AD1 with the
+values 7 and~3.  I3, issued in cycle~3, finds ROB2 in the RAT entry of R4; ROB2
+is not done, so both operands of I3 wait for ROB2.  I3 can use MD1 again,
+which under Tomasulo's algorithm alone would stay occupied by I1 until
+cycle~8.  I4 is issued into AD1, freed by I2 in cycle~3; its first operand
+waits for ROB1, its second is 3.  In cycle~4 I2 writes its result: ROB2
+receives 10, and I3 captures it.  In cycle~5 I5 is issued into AD2 and finds
+the RAT entry of R4 still naming ROB2, which is done, so it copies 10 from the
+ROB, not from the register file, which still holds the old value~2; I5 then
+renames R4 to ROB5.  In
+cycle~6 I6 is issued into AD3, because AD2, freed by the dispatch of I5 in the
+same cycle, can be used only from cycle~7; I6 waits for ROB3 and ROB5.
+\Cref{tab:l08-rob-state,tab:l08-rat-state} show the state at the end of
+cycle~6: AD1 holds I4 and AD3 holds I6, all other RSs are free, and the
+register file is unchanged.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{ROB of \cref{ex:l08-trace} at the end of cycles 6 and 10.  At the
+    end of cycle~6 the commit pointer is at ROB1, at the end of cycle~10 at
+    ROB3; the issue pointer is at ROB7 in both.}
+  \label{tab:l08-rob-state}
+  \begin{tabular}{@{}llcrcrc@{}}
+    \toprule
+    & & & \multicolumn{2}{c}{Cycle 6} & \multicolumn{2}{c}{Cycle 10} \\
+    \cmidrule(lr){4-5}\cmidrule(l){6-7}
+    Entry & Instruction & Reg & Value & Done & Value & Done \\
+    \midrule
+    ROB1 & \texttt{DIV R1, R2, R3} & R1 &     & 0 & \multicolumn{2}{c}{committed} \\
+    ROB2 & \texttt{ADD R4, R5, R6} & R4 & 10  & 1 & \multicolumn{2}{c}{committed} \\
+    ROB3 & \texttt{MUL R2, R4, R4} & R2 &     & 0 & 100 & 1 \\
+    ROB4 & \texttt{SUB R5, R1, R6} & R5 &     & 0 & 9   & 1 \\
+    ROB5 & \texttt{ADD R4, R4, R3} & R4 &     & 0 & 14  & 1 \\
+    ROB6 & \texttt{ADD R6, R2, R4} & R6 &     & 0 &     & 0 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{RAT and register file of \cref{ex:l08-trace}.  A dash means that
+    the RAT entry points to the register file.}
+  \label{tab:l08-rat-state}
+  \begin{tabular}{@{}lcrcrr@{}}
+    \toprule
+    & \multicolumn{2}{c}{Cycle 6} & \multicolumn{2}{c}{Cycle 10} & End \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(l){6-6}
+    Register & RAT & Value & RAT & Value & Value \\
+    \midrule
+    R1 & ROB1 & 5  & --   & 12 & 12  \\
+    R2 & ROB3 & 48 & ROB3 & 48 & 100 \\
+    R3 & --   & 4  & --   & 4  & 4   \\
+    R4 & ROB5 & 2  & ROB5 & 10 & 14  \\
+    R5 & ROB4 & 7  & ROB4 & 7  & 9   \\
+    R6 & ROB6 & 3  & ROB6 & 3  & 114 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Cycles 7--8: results, but no commit.}
+I5 writes 14 into ROB5 in cycle~7 and I1 writes 12 into ROB1 in cycle~8; I6
+and I4 capture these values.  Although ROB2 has been done since cycle~4 and
+ROB5 since cycle~7, nothing commits, because ROB1, at the commit pointer, is
+not done until the end of cycle~8.
+
+\paragraph{Cycles 9--10: the first commits.}
+In cycle~9 I1 commits: R1 becomes 12 and, since the RAT entry of R1 still names
+ROB1, it is reset to the register file.  In the same cycle I3 writes 100 into
+ROB3 and I4 is dispatched.  In cycle~10 I2 commits and R4 becomes 10, but the
+RAT entry of R4 names ROB5 and is left unchanged, as \cref{sec:l08-rat}
+requires.  I4 writes 9 and I6 is dispatched.
+
+\paragraph{Cycles 11--14: the remaining commits.}
+I6 writes 114 in cycle~11.  I3, I4, I5 and I6 commit in cycles 11 to 14, one
+per cycle.  Each is the last writer of its register, so each resets its RAT
+entry.  At the end the ROB is empty, all RAT entries point to the register
+file, and the registers hold $\text{R1}=12$, $\text{R2}=100$, $\text{R3}=4$,
+$\text{R4}=14$, $\text{R5}=9$ and $\text{R6}=114$, the values of a sequential
+execution.
+
+At the end of cycle~10 the register file holds 10 in R4 while the RAT sends
+readers of R4 to ROB5, which holds 14.  Both are right: 10 is the value of R4
+after I2, the last committed instruction, and 14 is the value after I5, the
+last issued writer.
+
+The example also illustrates the outside view of \cref{sec:l08-outside}.
+Suppose that I4 raises an exception when it executes in cycle~9.  The exception
+is recorded in ROB4, I2 and I3 still commit in cycles 10 and~11, and in
+cycle~12 I4 reaches the commit pointer and the exception is taken.  The
+handler finds $\text{R1}=12$, $\text{R2}=100$ and $\text{R4}=10$, but not
+$\text{R4}=14$, although I5 wrote 14 into ROB5 in cycle~7, before I1 had
+even finished: from outside, execution stopped exactly before I4.
+
+\section{Timing with a reorder buffer}
+\label{sec:l08-timing}
+
+The cycle-by-cycle state of a ROB processor can be summarized by the cycle in
+which each instruction passes each step, as for Tomasulo's algorithm in
+Lesson~7, with one additional column for commit.\source{Lesson 8, videos
+31--34; H\&P §3.6.}  We keep the notation of Lesson~7: $I_n$, $D_n$ and $W_n$
+are the cycles of issue, dispatch and write result of instruction $n$, $k_n$
+is its execution time, and $P(n)$ is the set of instructions that produce its
+operands; $C_n$ denotes its commit cycle.  Under the conventions of
+\cref{sec:l08-example}, $I_n$ is the first cycle after $I_{n-1}$ in which an
+RS of the required kind and a ROB entry are free.  An RS released by the
+dispatch of instruction $m$ is free from cycle $D_m+1$, and a ROB entry
+released by the commit of $m$ from cycle $C_m+1$.  With enough execution units
+and no competition for the CDB, the other cycles follow from
+\begin{equation}
+  D_n = 1 + \max\Bigl(I_n,\; \max_{p \in P(n)} W_p\Bigr), \qquad
+  W_n = D_n + k_n, \qquad
+  C_n = \max\bigl(W_n + 1,\; C_{n-1} + 1\bigr),
+  \label{eq:l08-timing}
+\end{equation}
+where the first equation is the bound of \cref{eq:l07-dispatch} with a free
+execution unit.\tip{Fill in the table row by row in program order, each row
+from left to right, with Commit last.}  Unlike execution, commit depends on
+the preceding instruction even when the two share no data.  The point at which
+RSs are released and the number of commits per cycle are design assumptions
+that change the table.  If an RS is released only at write result, as in
+Lesson~7, it is free from cycle $W_m+1$; if two instructions may commit in the
+same cycle,
+$C_n = \max(W_n+1,\; C_{n-1},\; C_{n-2}+1)$.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Timing of \cref{ex:l08-trace}.  The Execute column gives the cycles
+    $D_n$ to $D_n+k_n-1$ in which the operation is performed.}
+  \label{tab:l08-timing}
+  \begin{tabular}{@{}llcccc@{}}
+    \toprule
+    & Instruction & Issue & Execute & Write result & Commit \\
+    \midrule
+    I1 & \texttt{DIV R1, R2, R3} & 1 & 2--7 & 8  & 9  \\
+    I2 & \texttt{ADD R4, R5, R6} & 2 & 3    & 4  & 10 \\
+    I3 & \texttt{MUL R2, R4, R4} & 3 & 5--8 & 9  & 11 \\
+    I4 & \texttt{SUB R5, R1, R6} & 4 & 9    & 10 & 12 \\
+    I5 & \texttt{ADD R4, R4, R3} & 5 & 6    & 7  & 13 \\
+    I6 & \texttt{ADD R6, R2, R4} & 6 & 10   & 11 & 14 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\Cref{tab:l08-timing} lists the result for the example.  The Execute and
+Write result columns are out of order: I5 writes its result before I1, I3 and
+I4, which precede it.  The Commit column is increasing.  I2 and I5 commit six
+cycles after writing their results, held up by the slow division at the head
+of the ROB and, after it commits in cycle~9, by the limit of one commit per
+cycle: every later instruction commits exactly one cycle after its
+predecessor.  This waiting delays no computation: I3 and I5 obtained the
+result of I2, and I6 those of I3 and I5, without waiting for any commit.  The
+ROB delays only the moment at which results become part of the architectural
+state.
+
+\needspace{4\baselineskip}
+The ROB can nevertheless limit execution when it is too small.  With only four
+entries, I5 could not be issued before cycle~10, the cycle after I1 commits,
+and it would execute several cycles later than in \cref{tab:l08-timing} although its
+operands are available from cycle~5.  A ROB must therefore be large enough to
+hold all instructions issued while a slow instruction waits to commit.
+
+\section{Unified reservation stations}
+\label{sec:l08-unified}
+
+In \cref{fig:l08-organization} each kind of execution unit has its own group of
+RSs, and the size of each group is fixed at design time.\source{Lesson 8,
+video 35; H\&P ch.~3.}  Programs differ in their mix of operations, so a
+program with many additions can find all adder RSs occupied, and issue must
+wait, while the multiplier RSs are empty.  Because instructions are issued in
+program order, even a multiplication that follows the waiting addition cannot
+use the free multiplier RSs.
+
+\begin{definition}[Unified reservation stations]
+  \label{def:l08-unified}
+  A \term{unified reservation station}[統合リザベーションステーション] is a
+  single pool of RSs shared by all operations: an instruction can be issued
+  into any free RS of the pool.
+\end{definition}
+
+Issue then waits only when all RSs are occupied, so the same number of RSs is
+used more effectively.  The cost lies in dispatch: instead of choosing among
+the RSs of one group for one execution unit, the dispatch logic must find, for
+each free execution unit, the ready instructions in the whole pool whose
+operation that unit performs, and select among them.
+
+\section{Superscalar processors}
+\label{sec:l08-superscalar}
+
+Lesson~6 showed that the IPC of a processor is limited by the number of
+instructions it can handle per cycle (\cref{sec:l06-ipc}).\source{Lesson 8,
+video 36; H\&P §3.8.}
+
+\begin{definition}[Superscalar processor]
+  \label{def:l08-superscalar}
+  A \term{superscalar}[スーパースカラ] processor performs every step on more
+  than one instruction per cycle: it fetches, decodes and issues several
+  instructions, dispatches several to execution units, writes several results
+  and commits several instructions in each cycle.
+\end{definition}
+
+Every step needs its own hardware for this.  Fetch and decode must handle
+several instructions at once; issue must rename several instructions in the
+same cycle, each seeing the RAT updates of the ones before it; dispatch needs
+several execution units; writing several results needs several CDBs, and
+every RS operand must compare its tag against all of them; commit must
+examine several entries at the commit pointer and write several registers.
+
+The steps form a chain through which every instruction passes, so the
+processor sustains no more instructions per cycle than its most restrictive
+step handles.  A processor that fetches, decodes and dispatches four
+instructions per cycle but issues three and commits two completes, in the
+long run, at most two instructions per cycle, however much ILP the program
+has.  Widening one step pays off only if that step is the bottleneck.
+
+\section{Terminology}
+\label{sec:l08-terminology}
+
+The names used in this course for the steps of an out-of-order processor are
+not universal.\source{Lesson 8, video 37; H\&P ch.~3.}  Papers, textbooks
+and processor documentation use several alternatives
+(\cref{tab:l08-terminology}).\caution{The same word can name different steps:
+in some texts \emph{dispatch} is what this course calls issue, and
+\emph{issue} what it calls dispatch.}  Some of them call commit
+\emph{complete}; in this chapter, by contrast, an operation completes when its
+execution ends.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Names of the steps in this course and in other texts.}
+  \label{tab:l08-terminology}
+  \begin{tabular}{@{}ll@{}}
+    \toprule
+    This course & Names in other texts \\
+    \midrule
+    Issue & issue, allocate, dispatch \\
+    Dispatch & dispatch, execute, issue \\
+    Commit & commit, complete, retire, graduate \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{What is out of order}
+\label{sec:l08-order}
+
+A processor with out-of-order execution\index{out-of-order execution} does not
+perform all of its steps out of order (\cref{fig:l08-order}).\source{Lesson 8,
+videos 38--40; H\&P §3.6.}
+\begin{description}
+  \item[Fetch and decode] take instructions in program order, along the
+    predicted path.
+  \item[Issue] is in program order.  Renaming requires it, because each
+    instruction must see the RAT as left by all instructions before it, and
+    ROB entries are allocated in program order.
+  \item[Execute and write result] are out of order: an instruction starts as
+    soon as its operands are ready and finishes when its operation completes.
+    These are the only steps in which a later instruction overtakes an
+    earlier one.
+  \item[Commit] is in program order again; the ROB restores the order that
+    execution relaxed.
+\end{description}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l08-order}
+  \caption{The steps of an out-of-order processor with a ROB.  Only execution
+    and write result take place out of program order.}
+  \label{fig:l08-order}
+\end{figure}
+
+\begin{keypoint}[Lesson summary]
+  Tomasulo's algorithm writes results into the registers as soon as they are
+  broadcast, so exceptions are not precise, mispredicted instructions corrupt
+  registers, and wrong-path instructions can raise phantom exceptions.  The
+  reorder buffer keeps issued instructions in program order between a commit
+  pointer and an issue pointer.  The RAT names ROB entries, results are
+  broadcast to the RSs and the ROB, RSs are freed at dispatch, and only commit,
+  one ROB entry after another in program order, writes the register file and
+  resets a RAT entry that still names the committing entry.  A mispredicted
+  branch or an excepting instruction is acted on when it commits: the ROB is
+  emptied, the RAT points back to the register file, the RSs and execution
+  units are cleared, and fetching restarts at the correct address.  Timing
+  tables gain a commit column that follows \cref{eq:l08-timing}.  Unified
+  reservation stations share one RS pool among all operations; a superscalar
+  processor handles several instructions per cycle in every step and is limited
+  by its narrowest step.  Only execution and write result are out of order.
+\end{keypoint}
+
+\end{document}
