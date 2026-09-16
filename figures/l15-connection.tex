@@ -1,0 +1,37 @@
+% Path from the processor to DRAM.  (a) Traditional organization: the
+% processor reaches the memory controller in the northbridge over the
+% front-side bus; the northbridge drives the memory bus.  (b) Integrated
+% memory controller: the memory bus is attached to the processor itself.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  box/.style={draw, fill=ln-box, align=center, inner sep=3pt},
+  mc/.style={draw, fill=ln-accent!15, align=center, inner sep=2pt, font=\scriptsize\sffamily},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted}]
+  % \lndimms{x}{y}: three DRAM modules centred at (x,y)
+  \def\lndimms#1#2{%
+    \foreach \k in {0,1,2} {
+      \draw[fill=white] (#1-0.75+0.12*\k,#2-0.45+0.14*\k) rectangle (#1+0.55+0.12*\k,#2+0.25+0.14*\k);
+    }
+    \node[font=\scriptsize\sffamily] at (#1+0.04,#2+0.08) {DRAM};
+  }
+  % ================================================= (a)
+  \node[anchor=west] at (0,1.9) {\iflangja{(a) ノースブリッジ経由}{(a) through the northbridge}};
+  \node[box, minimum width=1.9cm, minimum height=1.0cm] (cpu) at (1.0,0) {\iflangja{プロセッサ}{processor}};
+  \node[box, minimum width=2.3cm, minimum height=1.3cm] (nb) at (5.1,0) {};
+  \node[anchor=north] at (5.1,0.6) {\iflangja{ノースブリッジ}{northbridge}};
+  \node[mc] at (5.1,-0.25) {\iflangja{メモリコントローラ}{memory controller}};
+  \lndimms{9.6}{0}
+  \node[box, font=\scriptsize\sffamily] (gfx) at (5.1,1.5) {\iflangja{グラフィックス}{graphics}};
+  \node[box, font=\scriptsize\sffamily] (sb) at (5.1,-1.55) {\iflangja{サウスブリッジ}{southbridge}};
+  \draw[<->, very thick, ln-accent] (cpu) -- node[lab, above] {FSB} (nb);
+  \draw[<->, very thick, ln-accent] (nb.east) -- node[lab, above] {\iflangja{メモリバス}{memory bus}} (8.8,0);
+  \draw[<->] (nb) -- (gfx);
+  \draw[<->] (nb) -- (sb);
+  \draw[->] (sb.east) -- (7.0,-1.55) node[lab, anchor=west] {I/O};
+  % ================================================= (b)
+  \node[anchor=west] at (0,-2.55) {\iflangja{(b) メモリコントローラ統合}{(b) integrated memory controller}};
+  \node[box, minimum width=4.3cm, minimum height=1.2cm, anchor=west] (cpu2) at (0.05,-3.5) {};
+  \node[anchor=west] at (0.2,-3.5) {\iflangja{プロセッサ}{processor}};
+  \node[mc, anchor=east] at (4.25,-3.5) {\iflangja{メモリコントローラ}{memory controller}};
+  \lndimms{9.6}{-3.5}
+  \draw[<->, very thick, ln-accent] (cpu2.east) -- node[lab, above] {\iflangja{メモリバス}{memory bus}} (8.8,-3.5);
+\end{tikzpicture}

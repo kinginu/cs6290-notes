@@ -1,0 +1,57 @@
+% One memory bit.  (a) 6T SRAM cell: two cross-coupled inverters hold the
+% bit; two access transistors, gated by the word line, connect the two
+% nodes of the loop to the bit lines B and not-B.  (b) 1T DRAM cell: one
+% access transistor connects the bit line to a storage capacitor.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, line cap=round,
+  dot/.style={circle, fill, inner sep=0pt, minimum size=3.2pt},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted}]
+  % \lnnmos{x}{y}: horizontal access transistor, channel centred at x, leads
+  % at height y, gate wire going up to the word line at y=2.4
+  \def\lnnmos#1#2{%
+    \draw (#1-0.3,#2) -- (#1-0.3,#2+0.15) -- (#1+0.3,#2+0.15) -- (#1+0.3,#2);
+    \draw[very thick] (#1-0.3,#2+0.3) -- (#1+0.3,#2+0.3);
+    \draw (#1,#2+0.3) -- (#1,2.4) node[dot] {};
+  }
+  % ================================================= (a) SRAM cell
+  \draw[ln-accent, thick] (0,2.4) -- (6.0,2.4);
+  \node[lab, anchor=south] at (3.0,2.42) {\iflangja{ワード線}{word line}};
+  \draw[ln-accent, thick] (0.4,2.8) -- (0.4,-1.0) node[below, text=black] {$B$};
+  \draw[ln-accent, thick] (5.6,2.8) -- (5.6,-1.0) node[below, text=black] {$\overline{B}$};
+  % access transistors
+  \lnnmos{1.25}{1.4}
+  \draw (0.4,1.4) node[dot] {} -- (0.95,1.4);
+  \draw (1.55,1.4) -- (2.2,1.4);
+  \lnnmos{4.75}{1.4}
+  \draw (3.8,1.4) -- (4.45,1.4);
+  \draw (5.05,1.4) -- (5.6,1.4) node[dot] {};
+  % storage nodes
+  \draw (2.2,1.4) -- (2.2,-0.2) -- (2.8,-0.2);
+  \draw (3.8,1.4) -- (3.8,-0.2) -- (3.25,-0.2);
+  % upper inverter (left to right)
+  \draw[fill=ln-box] (2.75,0.45) -- (2.75,0.95) -- (3.2,0.7) -- cycle;
+  \draw[fill=white] (3.26,0.7) circle (0.06);
+  \draw (2.2,0.7) node[dot] {} -- (2.75,0.7);
+  \draw (3.32,0.7) -- (3.8,0.7) node[dot] {};
+  % lower inverter (right to left)
+  \draw[fill=ln-box] (3.25,-0.45) -- (3.25,0.05) -- (2.8,-0.2) -- cycle;
+  \draw[fill=white] (2.74,-0.2) circle (0.06);
+  \draw (2.68,-0.2) -- (2.2,-0.2);
+  \node[lab] at (3.0,1.05) {\iflangja{インバータ対}{inverter loop}};
+  \node[anchor=north] at (3.0,-1.45) {\iflangja{(a) SRAM セル（6 トランジスタ）}{(a) SRAM cell (6 transistors)}};
+  % ================================================= (b) DRAM cell
+  \draw[ln-accent, thick] (7.2,2.4) -- (10.6,2.4);
+  \node[lab, anchor=south] at (9.7,2.42) {\iflangja{ワード線}{word line}};
+  \draw[ln-accent, thick] (7.8,2.8) -- (7.8,-1.0) node[below, text=black, lab] {\iflangja{ビット線}{bit line}};
+  \lnnmos{8.65}{1.4}
+  \draw (7.8,1.4) node[dot] {} -- (8.35,1.4);
+  \draw (8.95,1.4) -- (9.6,1.4) -- (9.6,0.55);
+  % capacitor and ground
+  \draw[very thick] (9.3,0.55) -- (9.9,0.55);
+  \draw[very thick] (9.3,0.38) -- (9.9,0.38);
+  \draw (9.6,0.38) -- (9.6,-0.2);
+  \draw (9.38,-0.2) -- (9.82,-0.2);
+  \draw (9.46,-0.3) -- (9.74,-0.3);
+  \draw (9.54,-0.4) -- (9.66,-0.4);
+  \node[lab, anchor=west] at (9.95,0.47) {\iflangja{キャパシタ}{capacitor}};
+  \node[anchor=north] at (8.9,-1.45) {\iflangja{(b) DRAM セル（1 トランジスタ）}{(b) DRAM cell (1 transistor)}};
+\end{tikzpicture}
