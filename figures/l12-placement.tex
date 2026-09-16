@@ -1,0 +1,28 @@
+% Where block number 13 may be placed in an 8-line cache that is
+% direct-mapped, 2-way set-associative, or fully associative.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily]
+  \def\rh{0.34}
+  \foreach \cx/\ttl/\how in {
+      1.7/{\iflangja{ダイレクトマップ}{direct-mapped}}/{\iflangja{ライン}{line} $13 \bmod 8 = 5$},
+      5.5/{\iflangja{2 ウェイセットアソシアティブ}{2-way set-associative}}/{\iflangja{セット}{set} $13 \bmod 4 = 1$},
+      9.3/{\iflangja{フルアソシアティブ}{fully associative}}/{\iflangja{任意のライン}{any line}}} {
+    \node[font=\sffamily\scriptsize\bfseries, anchor=south, text width=3.4cm, align=center] at (\cx,0.08) {\ttl};
+    \node[font=\sffamily\scriptsize, anchor=north] at (\cx,-8*\rh-0.1) {\how};
+    \foreach \i in {0,...,7} {
+      \node[font=\sffamily\scriptsize, text=ln-muted, anchor=east] at (\cx-0.8,-\rh*\i-\rh/2) {\i};
+    }
+  }
+  % highlighted lines
+  \fill[ln-accent!15] (0.9,-5*\rh) rectangle (2.5,-6*\rh);
+  \fill[ln-accent!15] (4.7,-2*\rh) rectangle (6.3,-4*\rh);
+  \fill[ln-accent!15] (8.5,0) rectangle (10.1,-8*\rh);
+  % grids
+  \foreach \cx in {1.7,5.5,9.3} {
+    \foreach \i in {0,...,7} { \draw (\cx-0.8,-\rh*\i) rectangle (\cx+0.8,-\rh*\i-\rh); }
+  }
+  % set boundaries and labels in the 2-way cache
+  \foreach \s in {0,...,3} {
+    \draw[thick] (4.7,-2*\s*\rh) rectangle (6.3,-2*\s*\rh-2*\rh);
+    \node[font=\sffamily\scriptsize, text=ln-muted, anchor=west] at (6.35,-2*\s*\rh-\rh) {\iflangja{セット}{set}\ \s};
+  }
+\end{tikzpicture}

@@ -1,0 +1,780 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Cache Review}
+\lessoninfo{
+  video={Lesson 12, videos 1--45},
+  textbook={H\&P \cite{hennessy2017} §2.1, §B.1--B.2},
+  keywords={locality principle, temporal locality, spatial locality, cache hit, cache miss, AMAT, miss penalty, block offset, tag, valid bit, direct-mapped cache, set-associative cache, LRU, dirty bit},
+}
+
+Lessons 3--11 made processors complete ever more instructions per second,
+yet every instruction has to be fetched from memory, many also load or
+store data, and Lesson 1 showed that memory speed falls ever further behind
+processor speed (the memory wall).  This lesson reviews the mechanism that
+bridges the gap: the cache, a small and fast memory that serves most accesses
+without waiting for the large and slow main memory, because programs access
+memory with locality.  It covers how cache performance is measured, how a
+cache is organized and searched, which block is evicted on a miss, and how
+writes are handled; virtual memory (Lesson 13) and the advanced cache
+techniques of Lesson 14 build directly on this material.
+
+\section{The locality principle}
+\label{sec:l12-locality}
+
+Caches work because the memory accesses of a program are far from
+random.\source{Lesson 12, videos 1--6; H\&P §2.1; \cite{denning2005}.}
+
+\begin{definition}[Locality principle]
+  The observation that what a program does in the near future is likely to be
+  close to what it has done in the recent past is called the
+  \term{locality principle}[局所性の原理].
+\end{definition}
+
+For memory references, \enquote{close} has two meanings.  Suppose a program
+has just accessed address~$X$.
+
+\begin{definition}[Temporal and spatial locality]
+  A program exhibits \term{temporal locality}[時間的局所性] when it is likely
+  to access the same address~$X$ again soon.  It exhibits
+  \term{spatial locality}[空間的局所性] when it is likely to access addresses
+  near~$X$ soon.
+\end{definition}
+
+Both kinds follow from the way programs are structured.  A loop executes the
+same instructions over and over (temporal locality), and those instructions
+are fetched from consecutive addresses (spatial locality).  A variable updated
+in every iteration is accessed at the same address again and again; the
+elements of an array processed in order lie at consecutive addresses.
+
+\begin{example}
+  \label{ex:l12-locality}
+  The loop below copies R6 bytes from the buffer at address R4 to the
+  buffer at address R5.
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+Loop:  LB   R3, 0(R4)      ; R3 <- source byte
+       SB   R3, 0(R5)      ; destination byte <- R3
+       ADDI R4, R4, 1      ; next source byte
+       ADDI R5, R5, 1      ; next destination byte
+       ADDI R6, R6, -1     ; one byte less to copy
+       BNE  R6, R0, Loop   ; repeat for all bytes
+\end{lstlisting}
+  The six instruction fetches have both kinds of locality: they go to
+  consecutive addresses, and the same six addresses are fetched in every
+  iteration.  The data accesses form two streams, one through each buffer.
+  Every byte is read or written exactly once, so the data has no temporal
+  locality.  It has spatial locality nevertheless: the accesses alternate
+  between two buffers that may be far apart, but each of them is adjacent to
+  the previous access to the same buffer.  Spatial locality only requires
+  accesses near \emph{recently} accessed addresses, not near the one
+  accessed last.
+\end{example}
+
+\section{Caches}
+\label{sec:l12-caches}
+
+Locality suggests how to give the processor fast access to a large
+memory.\source{Lesson 12, videos 7--9; H\&P §B.1; \cite{wilkes1965}.}
+Going to main memory for every fetch, load and store is slow.  Making all of
+main memory as fast as the processor is not possible either: fast memory is
+expensive per bit, and a larger memory is inherently slower to access.  The
+remaining option is to keep a small amount of fast memory inside the
+processor itself and to place in it the data that was accessed recently,
+together with the data around it.  By temporal and spatial locality, most
+accesses then find their data there.
+
+\begin{definition}[Cache]
+  A \term{cache}[キャッシュ] is a small, fast memory that holds copies of the
+  recently accessed parts of a larger and slower memory, so that most
+  accesses can be served from the copies.
+\end{definition}
+
+Every memory access of the processor first looks for its data in the cache
+(\cref{fig:l12-cache-position}).  If the data is there, the access is a
+\term{cache hit}[キャッシュヒット], and the data is read or written in the
+cache.
+
+Otherwise the access is a \term{cache miss}[キャッシュミス]: the data is
+obtained from main memory and copied into the cache, so that further accesses
+to it, and by spatial locality to its neighbours, will hit.  Because the
+cache is consulted on every access, the lookup itself must be very fast, which
+is a second reason, besides cost, why the cache has to be small.  A small
+cache cannot hold everything, and misses are therefore unavoidable.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l12-cache-position}
+  \caption{Every memory access goes to the cache; only misses go on to main
+    memory.}
+  \label{fig:l12-cache-position}
+\end{figure}
+
+\section{Cache performance}
+\label{sec:l12-performance}
+
+The benefit of a cache is measured by the average time a memory access
+takes.\source{Lesson 12, videos 10--12; H\&P §B.2.}  The following
+quantities enter it.
+
+\begin{definition}[Hit rate, miss rate]
+  The \term{hit rate}[ヒット率] is the fraction of memory accesses that are
+  cache hits; the \term{miss rate}[ミス率] is the fraction that are misses.
+  Hit rate $+$ miss rate $= 1$.
+\end{definition}
+
+\begin{definition}[Hit time, miss penalty]
+  The \term{hit time}[ヒット時間] is the time needed to look up the cache and
+  access the data in it.  The \term{miss penalty}[ミスペナルティ] is the
+  \emph{additional} time a miss takes: fetching the data from main memory
+  and placing it in the cache.
+\end{definition}
+
+A miss also pays the hit time, since the cache has to be searched before the
+miss is detected; a miss therefore takes the hit time plus the miss penalty.
+Weighting both cases by their frequency gives the
+\term{average memory access time}[平均メモリアクセス時間]%
+\index{AMAT|see{average memory access time}} (AMAT):
+\begin{equation}
+  \begin{aligned}
+    \text{AMAT}
+    &= (1-\text{miss rate}) \times \text{hit time}
+       + \text{miss rate} \times (\text{hit time} + \text{miss penalty}) \\
+    &= \text{hit time} + \text{miss rate} \times \text{miss penalty} .
+  \end{aligned}
+  \label{eq:l12-amat}
+\end{equation}
+\caution{The miss penalty is the \emph{extra} time of a miss: subtract the
+hit time from the total time of a miss.}
+
+A good AMAT requires three things.
+\begin{itemize}
+  \item A low hit time: the cache must be small and simple.
+  \item A low miss rate: the cache must be large enough, and organized
+    cleverly enough, to hold the data the program is about to use.
+  \item A low miss penalty.  The miss penalty is dominated by the access time
+    of main memory and is large; Lesson 14 reduces it with further levels of
+    cache.
+\end{itemize}
+The first two goals conflict: a larger cache misses less often but takes
+longer to search.  The best cache size balances them, and AMAT is the
+measure by which they are balanced.
+
+\begin{example}
+  \label{ex:l12-amat}
+  Main memory adds a miss penalty of \SI{60}{\nano\second}.  Three candidate
+  caches are compared:
+  \begin{center}\small
+    \begin{tabular}{@{}lccc@{}}
+      \toprule
+      Cache & Hit time & Miss rate & AMAT \\
+      \midrule
+      Small  & \SI{1}{\nano\second}   & \SI{6}{\percent} & $1 + 0.06\times 60 = \SI{4.6}{\nano\second}$ \\
+      Medium & \SI{1.5}{\nano\second} & \SI{3}{\percent} & $1.5 + 0.03\times 60 = \SI{3.3}{\nano\second}$ \\
+      Large  & \SI{3}{\nano\second}   & \SI{2}{\percent} & $3 + 0.02\times 60 = \SI{4.2}{\nano\second}$ \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  The medium cache is best.  The large cache misses less often, but its
+  longer hit time costs more than the misses it saves.
+  All three are an order of magnitude better than accessing main memory on
+  every access.
+\end{example}
+
+\begin{note}
+  A cache pays off only if a hit is much faster than an access to main
+  memory and misses are rare.  With a hit time close to the access time of
+  main memory, even a hit is about as slow as an access without a cache;
+  with frequent misses, the miss penalty dominates.  In both cases AMAT
+  approaches or even exceeds the access time of main memory alone.
+\end{note}
+
+\subsection{Caches in real processors}
+
+Real processors have more than one level of cache.\source{Lesson 12, video
+13; H\&P §2.1.}  The cache that is consulted first, and that directly serves
+the reads and writes of the processor, is the smallest and fastest; only its
+misses go on to further, larger cache levels (L2, L3; Lesson 14) and finally
+to main memory.  This first level is called the \term{L1 cache}[L1
+キャッシュ].  L1 caches are typically 16--64~KB (1~KB $= 2^{10}$ bytes):
+large enough that about \SI{90}{\percent} of accesses hit, and small enough
+that a hit takes only one to three clock cycles.
+
+\section{Blocks and lines}
+\label{sec:l12-blocks}
+
+To determine quickly whether data is in the cache, the cache is organized as
+a table of fixed-size entries.\source{Lesson 12, videos 14--18; H\&P §B.1.}
+Data is moved between main memory and the cache not byte by byte but in
+units called blocks.
+
+\begin{definition}[Cache block]
+  A \term{cache block}[キャッシュブロック] is a run of consecutive bytes of
+  memory that is copied into the cache, and evicted from it, as a unit.  The
+  number of bytes in a block is the \term{block size}[ブロックサイズ].
+\end{definition}
+
+The block size trades spatial locality against cache space.
+\begin{itemize}
+  \item If blocks are very small (in the extreme, one byte), an access to
+    the next byte, which spatial locality makes likely, misses again, and
+    each byte needs its own bookkeeping.
+  \item If blocks are very large, most of a block is data that will not be
+    used soon.  It occupies space in which other recently used data could
+    have been kept, and fewer blocks fit into the cache.
+\end{itemize}
+Typical block sizes are 32--128 bytes.  The number of blocks a
+cache can hold is its size divided by the block size: a
+16~KB cache with 64-byte blocks holds
+$2^{14}/2^{6} = 256$ blocks.
+
+\subsection{Where blocks start}
+
+Blocks do not start at arbitrary addresses.  If they did, a block covering
+addresses 100--227 and another covering 200--327 could both be in the cache,
+an address could lie in several cached blocks, and finding out whether an
+address is cached would require comparing address ranges.  Instead, memory
+is divided into fixed, non-overlapping blocks that start at multiples of the
+block size: with 128-byte blocks, at addresses 0, 128, 256, \ldots\
+(\cref{fig:l12-blocks}).  Every address then belongs to exactly one block.
+
+\begin{definition}[Cache line]
+  A \term{cache line}[キャッシュライン] is a slot in the cache that can hold
+  one block.  Memory is divided into blocks and the cache into lines; a line
+  has the size of a block, and holds different blocks at different times.
+\end{definition}
+
+Block sizes, and therefore line sizes, are always powers of two.  Only then
+can the block of an address and the position within the block be found by
+selecting bits of the address, as the next section shows, rather than by a
+division.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l12-blocks}
+  \caption{Main memory divided into 128-byte blocks and a cache of
+    four lines.  Lines~0 and~2 hold copies of blocks~4 and~1; lines~1 and~3
+    hold nothing valid.}
+  \label{fig:l12-blocks}
+\end{figure}
+
+\section{Block number, tag and valid bit}
+\label{sec:l12-tags}
+
+With a block size of $2^{k}$ bytes, an address~$A$ splits into two
+fields.\source{Lesson 12, videos 19--23; H\&P §B.1.}
+
+\begin{definition}[Block offset and block number]
+  The low-order $k$ bits of the address are its
+  \term{block offset}[ブロックオフセット], the position of the byte within
+  its block.  The remaining high-order bits are its
+  \term{block number}[ブロック番号], which identifies the block:
+  \begin{equation}
+    \text{block number} = \bigl\lfloor A / 2^{k} \bigr\rfloor ,
+    \qquad
+    \text{block offset} = A \bmod 2^{k} .
+    \label{eq:l12-block-number}
+  \end{equation}
+\end{definition}
+
+\begin{example}
+  \label{ex:l12-block-number}
+  With 128-byte blocks ($k=7$), the address \texttt{0x0040A7C6} has
+  block offset $\texttt{0xC6} \mathbin{\&} \texttt{0x7F} = \texttt{0x46} = 70$
+  and block number $\texttt{0x0040A7C6} \gg 7 = \texttt{0x814F}$.  The byte
+  is at position~70 of block \texttt{0x814F}, which covers the addresses
+  \texttt{0x0040A780} to \texttt{0x0040A7FF}.
+\end{example}
+
+\subsection{Tags}
+
+Since a line holds different blocks at different times, each line must
+record which block it currently holds.  This record is the
+\term{tag}[タグ] of the line: the block number of the block in the line, or,
+as the following sections show, the part of the block number that is not
+already implied by the position of the line.  A lookup computes the block
+number of the address and compares it with the tags of the lines in which
+the block could be.  A match is a hit, and the block offset then selects the
+byte within the line.
+
+\subsection{The valid bit}
+
+When the processor is turned on, the lines of the cache contain arbitrary
+bits, including arbitrary tags.  A tag that happens to match a block number
+would produce a hit on data that was never loaded.
+
+\begin{definition}[Valid bit]
+  The \term{valid bit}[有効ビット] of a line indicates whether the line holds
+  a block.  All valid bits are cleared at start-up, and a line's valid bit is
+  set when a block is loaded into it.
+\end{definition}
+
+Emptying a line, or the whole cache, thus only requires clearing valid bits;
+the tags and data can be left as they are.  The one exception is a block
+that has been written in the cache but not yet in main memory
+(\cref{sec:l12-write}): it must be written back first.
+
+A lookup is a hit only if the line is valid and its stored tag matches the
+tag field of the address:
+\begin{equation}
+  \text{hit} \;=\; V \wedge (\text{stored tag} = \text{tag of the address}) .
+  \label{eq:l12-hit}
+\end{equation}
+As long as no part of the block number selects the line, as in this section,
+the tag field is the whole block number; the organizations of the following
+sections use some of its bits to select the line and keep only the remaining
+bits in the tag.
+
+\begin{keypoint}
+  An address is a block number and an offset.  The tag identifies which
+  block a line holds, the valid bit whether it holds one at all, and the
+  offset picks the byte.  Where a block may be placed, the subject of the
+  next section, decides \emph{which} lines have to be searched.
+\end{keypoint}
+
+\section{Where a block can be placed}
+\label{sec:l12-placement}
+
+Caches differ in how many of their lines a given block may be placed
+in.\source{Lesson 12, video 24; H\&P §B.1.}  This number is the
+\term{associativity}[連想度] of the cache.  It determines how many tags a
+lookup must compare, and how often different blocks compete for the same
+lines.  Three organizations are distinguished (\cref{fig:l12-placement}):
+\begin{description}
+  \item[Direct-mapped] each block can be placed in exactly one line
+    (\cref{sec:l12-dm}).
+  \item[Set-associative] each block can be placed in any of $N$ lines that
+    form a set (\cref{sec:l12-sa}).
+  \item[Fully associative] each block can be placed in any line of the
+    cache (\cref{sec:l12-fa}).
+\end{description}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l12-placement}
+  \caption{The lines in which block number~13 may be placed in an 8-line
+    cache of each organization.}
+  \label{fig:l12-placement}
+\end{figure}
+
+\section{Direct-mapped caches}
+\label{sec:l12-dm}
+
+The simplest of the three organizations gives every block a single line of
+the cache.\source{Lesson 12, videos 25--28; H\&P §B.1.}  In a
+\term{direct-mapped cache}[ダイレクトマップキャッシュ] every block has exactly
+one line in which it can be placed, and that line is selected by the
+low-order bits of the block number.
+
+\begin{definition}[Index]
+  The \term{index}[インデックス] is the group of address bits that selects
+  where in the cache a block may be placed.  In a direct-mapped cache with
+  $2^{n}$ lines it consists of the $n$ low-order bits of the block number.
+\end{definition}
+
+The address is thus split into three fields (\cref{fig:l12-direct-mapped}):
+the offset in the $k$ lowest bits, above it the index in the next $n$ bits,
+and the tag in all remaining bits.  The line stores only these tag bits, not
+the whole block number: all blocks that can be placed in line~$i$ have
+index~$i$, so the index part of their block numbers is known from the line
+itself.
+
+A lookup reads the one line selected by the index, compares its tag with the
+tag of the address, and checks the valid bit (\cref{eq:l12-hit}).
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l12-direct-mapped}
+  \caption{Lookup in a direct-mapped 64~KB cache with
+    128-byte blocks.  The index selects one of 512 lines; a single
+    comparator checks its tag.}
+  \label{fig:l12-direct-mapped}
+\end{figure}
+
+\begin{example}
+  \label{ex:l12-dm-fields}
+  For a direct-mapped 64~KB cache with 128-byte blocks
+  and 32-bit addresses there are $512 = 2^{9}$ lines: offset bits 6--0,
+  index bits 15--7, tag bits 31--16.  The address \texttt{0x0040A7C6} of
+  \cref{ex:l12-block-number}, block number \texttt{0x814F}, has index
+  $\texttt{0x814F} \mathbin{\&} \texttt{0x1FF} = \texttt{0x14F} = 335$ and
+  tag $\texttt{0x814F} \gg 9 = \texttt{0x0040}$.  It hits if line~335 is
+  valid and holds tag \texttt{0x0040}.
+\end{example}
+
+\subsection{Advantages and disadvantages}
+
+The strength of a direct-mapped cache is that only one line has to be
+examined.  A single comparator suffices, so the lookup is fast, cheap and
+energy-efficient: the hit time is as low as it can be for a cache of a given
+size.
+
+Its weakness is that blocks with the same index compete for a single line.
+If a program alternates between two such blocks, each access evicts the block
+the other access needs, and every access misses, even when the rest of the
+cache is empty.  These conflicts raise the miss rate.
+
+\begin{example}
+  \label{ex:l12-dm-conflict}
+  An 8-line direct-mapped cache with 16-byte blocks uses offset bits
+  3--0, index bits 6--4 and tag bits 31--7.  A program alternately accesses
+  addresses \texttt{0x1000} (block \texttt{0x100}) and \texttt{0x1084}
+  (block \texttt{0x108}).  Both blocks have index~0, with tags \texttt{0x20}
+  and \texttt{0x21}.  Each access replaces the block loaded by the previous
+  one, so every access is a miss, however long the program continues.
+\end{example}
+
+\section{Set-associative caches}
+\label{sec:l12-sa}
+
+A set-associative organization relaxes the one-line
+restriction.\source{Lesson 12, videos 29--31; H\&P §B.1.}
+
+\begin{definition}[Set-associative cache]
+  A \term{set-associative cache}[セットアソシアティブキャッシュ] divides its
+  lines into \emph{sets} of $N$ lines each; a block can be placed in any
+  line of one particular set.  Such a cache is called $N$-way
+  set-associative.
+\end{definition}
+
+The index now selects a set rather than a line.  A cache with $2^{s}$ sets
+has an $s$-bit index, and the tag again consists of all bits above the
+index.  A lookup compares the tag of the address with the tags of all $N$
+lines of the selected set, in parallel, and hits if any valid line matches
+(\cref{fig:l12-set-associative}); the matching line supplies the data.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l12-set-associative}
+  \caption{Lookup in a 2-way set-associative cache with four sets, the
+    organization of \cref{ex:l12-sa-conflict}.  The index (here~0, as in
+    that example) selects a set; each of its two lines hits if it is valid
+    and its tag matches.}
+  \label{fig:l12-set-associative}
+\end{figure}
+
+\begin{example}
+  \label{ex:l12-sa-conflict}
+  Organize the 8 lines of \cref{ex:l12-dm-conflict} as a 2-way
+  set-associative cache.  It has 4 sets, so the index is bits 5--4 and the
+  tag bits 31--6.  Block \texttt{0x100} goes to set~0 with tag
+  \texttt{0x40}, and block \texttt{0x108} to set~0 with tag \texttt{0x42}.
+  The two blocks still share a set, but the set has two lines: after the
+  first access to each block has missed and loaded it, every further access
+  hits.
+\end{example}
+
+Compared with a direct-mapped cache of the same size, an $N$-way
+set-associative cache needs $N$ comparators and a selection of the matching
+line's data, which makes the hit time longer, but it suffers fewer conflicts
+and so has a lower miss rate.
+
+\section{Fully associative caches}
+\label{sec:l12-fa}
+
+At the other extreme, a block may be placed
+anywhere.\source{Lesson 12, videos 32--33; H\&P §B.1.}
+
+\begin{definition}[Fully associative cache]
+  In a \term{fully associative cache}[フルアソシアティブキャッシュ] any
+  block can be placed in any line.
+\end{definition}
+
+There is nothing to select, so there is no index: the tag is the entire
+block number, and a lookup compares it with the tag of every line in the
+cache.  Two blocks never have to compete for a line while another line is
+free, but a comparator is needed for every line, which makes a large fully
+associative cache slow and expensive.
+
+\subsection{One scheme for all three}
+
+Direct-mapped and fully associative caches are the two extremes of
+set-associative caches.  A direct-mapped cache is 1-way set-associative, with
+as many sets as lines; a fully associative cache has a single set containing
+all lines.  For every organization, with addresses of $a$ bits,
+\begin{equation}
+  \begin{aligned}
+    \text{offset bits} &= \log_2(\text{block size}), \\
+    \text{index bits}  &= \log_2(\text{number of sets})
+                        = \log_2\bigl(\text{lines}/N\bigr), \\
+    \text{tag bits}    &= a - \text{index bits} - \text{offset bits} ,
+  \end{aligned}
+  \label{eq:l12-fields}
+\end{equation}
+where $N=1$ for a direct-mapped cache (index bits $= \log_2(\text{lines})$)
+and $N = \text{lines}$ for a fully associative cache (0 index bits).  For
+the 64~KB cache with 128-byte blocks of
+\cref{ex:l12-dm-fields}, the tag grows from 16 bits when direct-mapped to
+25 bits when fully associative; \cref{tab:l12-organizations} in
+\cref{sec:l12-summary} lists the intermediate cases.\tip{A cache of $C$ bytes has
+$a - \log_2(C/N)$ tag bits.  Each doubling of $N$ moves one bit from the index
+to the tag.}
+
+\begin{keypoint}
+  Associativity trades hit time against miss rate.  More ways per set means
+  more tag comparisons on every access, but fewer conflicts, because a block
+  is evicted only when every line of its set is occupied by another block.
+\end{keypoint}
+
+\section{Cache replacement}
+\label{sec:l12-replacement}
+
+On a miss, the new block must be placed in one of the lines allowed for
+it.\source{Lesson 12, videos 34--36; H\&P §B.1.}  If one of those lines is
+not valid, that line is used.  If all of them hold valid blocks, one block
+has to be evicted.  A direct-mapped cache has no choice; in set-associative
+and fully associative caches the victim is chosen by the
+\term{replacement policy}[置換アルゴリズム].
+\begin{description}
+  \item[Random] evict a randomly chosen block of the set.  Simple, but it
+    ignores how the blocks are being used.
+  \item[FIFO] (first in, first out) evict the block that has been in the
+    cache longest, regardless of whether it is still in use.
+  \item[LRU] evict the block whose most recent access lies furthest in the
+    past.
+\end{description}
+
+\begin{definition}[Least recently used]
+  The \term{least recently used}[LRU]\index{LRU|see{least recently used}}
+  (LRU) policy evicts, among the blocks that may be replaced, the one that
+  has not been accessed for the longest time.
+\end{definition}
+
+LRU exploits temporal locality: a block accessed recently is likely to be
+accessed again soon, so the least recently used block is the one least likely
+to be needed.
+
+\subsection{Implementing LRU with counters}
+
+LRU can be implemented with a counter per line.  In an $N$-way
+set-associative cache each line has a $\log_2 N$-bit counter.  At start-up
+the counters of each set are initialized to the values $0, 1, \ldots, N-1$,
+in any order, and the update rule below keeps it that way: every value
+occurs exactly once in each set.  The line with counter~0 is the least
+recently used and the one with counter $N-1$ the most recently used.  On
+every access to a line whose counter is~$c$:
+\begin{enumerate}
+  \item every counter in the set that is greater than $c$ is decremented;
+  \item the counter of the accessed line is set to $N-1$.
+\end{enumerate}
+On a miss, the victim is the line with counter~0; once the new block is in
+it, the access is treated like any other and the counters are updated as
+above.  \Cref{tab:l12-lru-trace} traces one 4-way set.\caution{Update the
+counters on \emph{every} access, hits included; updating them only on loads
+gives FIFO.}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{LRU counters of one 4-way set holding blocks A--D, shown as
+    block:counter for each of its four lines.}
+  \label{tab:l12-lru-trace}
+  \begin{tabular}{@{}llcccc@{}}
+    \toprule
+    Access & Result & Line 0 & Line 1 & Line 2 & Line 3 \\
+    \midrule
+    (initial) &                     & A:0 & B:1 & C:2 & D:3 \\
+    C         & hit                 & A:0 & B:1 & C:3 & D:2 \\
+    A         & hit                 & A:3 & B:0 & C:2 & D:1 \\
+    E         & miss, B evicted     & A:2 & E:3 & C:1 & D:0 \\
+    D         & hit                 & A:1 & E:2 & C:0 & D:3 \\
+    B         & miss, C evicted     & A:0 & E:1 & B:3 & D:2 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The cost of this implementation is $\log_2 N$ bits per line and, more
+importantly, activity on every access: even a hit may change all $N$
+counters of the set.  For highly associative caches this costs considerable
+hardware and energy, which motivates the cheaper approximations of LRU in
+Lesson 14.
+
+\section{Write policy}
+\label{sec:l12-write}
+
+Writes raise two questions that reads do not.\source{Lesson 12, videos
+37--40; H\&P §B.1.}
+
+\begin{enumerate}
+  \item \emph{Is a block brought into the cache on a write miss?}  A cache
+    that brings it in follows the
+    \term{write-allocate policy}[ライトアロケート方式]; a no-write-allocate
+    cache writes the value to main memory only.  Most caches are
+    write-allocate: by locality, a block that has just been written is likely
+    to be read or written again soon.
+  \item \emph{When does main memory receive the written value?}  Here two
+    policies exist.
+\end{enumerate}
+
+\begin{definition}[Write-through and write-back]
+  Under the \term{write-through policy}[ライトスルー方式] a write updates
+  the block in the cache and immediately also the block in main memory.
+
+  Under the \term{write-back policy}[ライトバック方式] a write updates only
+  the block in the cache; main memory is updated when the block is evicted
+  from the cache.
+\end{definition}
+
+Write-through keeps main memory always up to date, but every write then pays
+the access time of main memory, which is what the cache was meant to avoid.
+Caches therefore use write-back: many writes to a block while it is in the
+cache cost at most a single write to main memory, at eviction.  A write-back
+cache is normally also write-allocate; otherwise every write to a block that
+is not in the cache would go to main memory, however often the block is
+written.
+
+Writing every evicted block back would, however, also write blocks that were
+only read and are identical to their copies in memory.
+
+\begin{definition}[Dirty bit]
+  The \term{dirty bit}[ダーティビット] of a line indicates whether its block
+  has been written since it was loaded.  It is cleared when a block is loaded
+  and set when the block is written.  On eviction, a dirty block is written to
+  main memory; a clean block is simply discarded.
+\end{definition}
+
+\begin{example}
+  \label{ex:l12-write-back}
+  Blocks X and Y map to the same line of a direct-mapped cache, which is
+  initially invalid.  \Cref{tab:l12-write-back} follows a sequence of
+  accesses under write-back.  The two consecutive writes to Y cost a single
+  memory write, at step~6, and evicting Y at step~8 costs none, because Y
+  was not written after it was loaded at step~7.  Write-back needs 3 memory
+  writes in total; write-through would need one per write, i.e.~4.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{A single line under the write-back policy
+    (\cref{ex:l12-write-back}).  D is the dirty bit after the access.}
+  \label{tab:l12-write-back}
+  \begin{tabular}{@{}cllll@{}}
+    \toprule
+    Step & Access  & Result & Memory operations        & Line after \\
+    \midrule
+    1    & read X  & miss   & read X                    & X, D$=$0 \\
+    2    & write X & hit    & ---                       & X, D$=$1 \\
+    3    & read Y  & miss   & write X back, read Y      & Y, D$=$0 \\
+    4    & write Y & hit    & ---                       & Y, D$=$1 \\
+    5    & write Y & hit    & ---                       & Y, D$=$1 \\
+    6    & write X & miss   & write Y back, read X      & X, D$=$1 \\
+    7    & read Y  & miss   & write X back, read Y      & Y, D$=$0 \\
+    8    & read X  & miss   & read X                    & X, D$=$0 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Putting it together}
+\label{sec:l12-summary}
+
+A cache is fully described by a few design choices, from which its structure
+follows.\source{Lesson 12, videos 41--45; H\&P §B.1.}
+\begin{description}
+  \item[Cache size and block size] give the number of lines and the offset
+    bits.
+  \item[Associativity] gives the number of sets, hence the index and tag bits
+    (\cref{eq:l12-fields}).
+  \item[Replacement policy] LRU adds a $\log_2 N$-bit counter to every line
+    (none for direct-mapped caches).
+  \item[Write policy] write-back adds a dirty bit to every line.
+\end{description}
+Every line thus stores a valid bit, a dirty bit, an LRU counter and a tag in
+addition to its data.  \Cref{fig:l12-access-flow} shows how these are used on
+one access.  A hit reads or writes the data and updates the LRU counters.  A
+miss first chooses a victim, writes it back if it is valid and dirty, and
+loads the new block; the access then proceeds as a hit.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l12-access-flow}
+  \caption{One memory access in a set-associative cache with LRU replacement
+    and the write-back policy.}
+  \label{fig:l12-access-flow}
+\end{figure}
+
+\begin{example}
+  \label{ex:l12-summary-trace}
+  Consider the 2-way set-associative cache of \cref{ex:l12-sa-conflict}
+  (16-byte blocks, index bits 5--4, tag bits 31--6), now with LRU replacement
+  and the write-back policy.  \Cref{tab:l12-summary-trace} follows its set~1 through
+  five accesses; both lines of the set are valid throughout.  The first
+  access hits and only updates the counters.  The second misses, and its
+  victim is way~1, whose counter is~0; that block is dirty and is written
+  back before the new block is loaded.  The fourth access is a write miss
+  whose victim is clean, so nothing is written back, and the loaded block
+  becomes dirty at once.  The last access evicts the block with tag
+  \texttt{0x40}, which the third access has written, and writes it back.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Set~1 of a 2-way set-associative cache with LRU replacement and
+    write-back (\cref{ex:l12-summary-trace}): tag, dirty bit and LRU counter
+    of each way after each access.  All tags, including those of the memory
+    operations, are hexadecimal.}
+  \label{tab:l12-summary-trace}
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}llccccccl@{}}
+    \toprule
+    & & \multicolumn{3}{c}{Way 0} & \multicolumn{3}{c}{Way 1} & \\
+    \cmidrule(lr){3-5}\cmidrule(lr){6-8}
+    Access & Result & Tag & D & LRU & Tag & D & LRU & Memory operations \\
+    \midrule
+    (initial)             &      & 40 & 0 & 0 & 43 & 1 & 1 & \\
+    read \texttt{0x1018}  & hit  & 40 & 0 & 1 & 43 & 1 & 0 & --- \\
+    read \texttt{0x1054}  & miss & 40 & 0 & 0 & 41 & 0 & 1 & write back 43, load 41 \\
+    write \texttt{0x101C} & hit  & 40 & 1 & 1 & 41 & 0 & 0 & --- \\
+    write \texttt{0x1098} & miss & 40 & 1 & 0 & 42 & 1 & 1 & load 42 \\
+    read \texttt{0x1058}  & miss & 41 & 0 & 1 & 42 & 1 & 0 & write back 40, load 41 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{example}
+  \label{ex:l12-overhead}
+  \Cref{tab:l12-organizations} works out the organization of a
+  64~KB cache with 128-byte blocks, 32-bit addresses,
+  LRU replacement and write-back, for several associativities.  For the
+  8-way cache, the address \texttt{0x0040A7C6} (block number
+  \texttt{0x814F}) has index $\texttt{0x814F} \mathbin{\&} \texttt{0x3F} = 15$
+  and tag $\texttt{0x814F} \gg 6 = \texttt{0x205}$.  Its 512 lines need
+  $512 \times 24 = \num{12288}$ bits of metadata, i.e.\ 1536 bytes,
+  about \SI{2.3}{\percent} of the 64~KB of data.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Address fields and metadata bits per line (valid $+$ dirty $+$
+    LRU counter $+$ tag) of a 64~KB cache with 128-byte blocks and 32-bit
+    addresses.}
+  \label{tab:l12-organizations}
+  \begin{tabular}{@{}lrcccc@{}}
+    \toprule
+    Organization & Sets & Offset & Index & Tag & Metadata per line \\
+    \midrule
+    Direct-mapped     & 512 & 7 & 9 & 16 & $1+1+0+16 = 18$ \\
+    2-way             & 256 & 7 & 8 & 17 & $1+1+1+17 = 20$ \\
+    8-way             & 64  & 7 & 6 & 19 & $1+1+3+19 = 24$ \\
+    Fully associative & 1   & 7 & 0 & 25 & $1+1+9+25 = 36$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Lesson 13 applies the same ideas---blocks, tags and replacement---to the
+translation of virtual addresses, and Lesson 14 turns to techniques that
+lower the hit time, the miss rate and the miss penalty of the basic cache
+described here.
+
+\begin{keypoint}[Lesson summary]
+  Programs access memory with temporal and spatial locality, so a small, fast
+  cache of recently used blocks serves most accesses.  Its benefit is
+  measured by $\text{AMAT} = \text{hit time} + \text{miss rate} \times
+  \text{miss penalty}$ (\cref{eq:l12-amat}).  Memory is divided into
+  power-of-two blocks placed into cache lines; an address splits into tag,
+  index and offset, and a line hits when it is valid and its tag matches.
+  Direct-mapped, set-associative and fully associative caches differ in how
+  many lines a block may occupy, trading hit time against miss rate.  On a
+  miss LRU evicts the least recently used block, and the write-back policy
+  with a dirty bit writes a block to memory only when a modified block is
+  evicted.
+\end{keypoint}
+
+\end{document}

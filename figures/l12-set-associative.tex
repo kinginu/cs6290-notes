@@ -1,0 +1,54 @@
+% Lookup in a 2-way set-associative cache with 4 sets (8 lines, 16-byte
+% blocks, 32-bit addresses): the index selects a set, both tags are compared,
+% and each comparison is ANDed with the valid bit of its line.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  gate/.style={draw, fill=ln-box, minimum width=0.7cm, minimum height=0.5cm, inner sep=1pt, font=\sffamily\scriptsize},
+  cmp/.style={draw, circle, fill=white, inner sep=1pt, minimum size=0.5cm}]
+  % --- address fields
+  \draw[fill=ln-accent!15] (0.6,0) rectangle (4.0,0.55);
+  \node at (2.3,0.275) {\iflangja{タグ}{tag}\ (31\,\dots\,6)};
+  \draw[fill=ln-box] (4.0,0) rectangle (6.4,0.55);
+  \node at (5.2,0.275) {\iflangja{インデックス}{index}\ (5\,\dots\,4)};
+  \draw[fill=white] (6.4,0) rectangle (8.8,0.55);
+  \node at (7.6,0.275) {\iflangja{オフセット}{offset}\ (3\,\dots\,0)};
+  % --- two ways, four sets; set 0 selected
+  \foreach \x in {1.6,5.8} {
+    \fill[ln-accent!15] (\x,-1.1) rectangle (\x+3.4,-1.55);
+    \node[font=\sffamily\scriptsize, text=ln-muted, anchor=south] at (\x+0.2,-1.1) {V};
+    \node[font=\sffamily\scriptsize, text=ln-muted, anchor=south] at (\x+1.1,-1.1) {\iflangja{タグ}{tag}};
+    \node[font=\sffamily\scriptsize, text=ln-muted, anchor=south] at (\x+2.6,-1.1) {\iflangja{データ}{data}};
+    \foreach \i in {0,...,3} {
+      \draw (\x,-1.1-0.45*\i) rectangle (\x+0.4,-1.55-0.45*\i);
+      \draw (\x+0.4,-1.1-0.45*\i) rectangle (\x+1.8,-1.55-0.45*\i);
+      \draw (\x+1.8,-1.1-0.45*\i) rectangle (\x+3.4,-1.55-0.45*\i);
+    }
+  }
+  \node[font=\sffamily\scriptsize, text=ln-muted, anchor=north] at (4.2,-2.95) {\iflangja{ウェイ 0}{way 0}};
+  \node[font=\sffamily\scriptsize, text=ln-muted, anchor=north] at (8.4,-2.95) {\iflangja{ウェイ 1}{way 1}};
+  \foreach \i in {0,...,3} {
+    \node[font=\sffamily\scriptsize, text=ln-muted, anchor=west] at (9.25,-1.325-0.45*\i) {\iflangja{セット}{set}\ \i};
+  }
+  % --- index selects a set in both ways
+  \draw (5.4,0) -- (5.4,-1.325);
+  \fill (5.4,-1.325) circle (1.2pt);
+  \draw[->] (5.4,-1.325) -- (5.0,-1.325);
+  \draw[->] (5.4,-1.325) -- (5.8,-1.325);
+  % --- per way: tag comparator, AND with the valid bit
+  \foreach \x/\w in {1.6/0,5.8/1} {
+    \node[cmp] (c\w) at (\x+1.2,-3.6) {$=$};
+    \node[gate] (a\w) at (\x+0.4,-4.35) {AND};
+    \draw[->] (\x+1.2,-2.9) -- (c\w.north);
+    \draw[->] (\x+0.2,-2.9) -- (\x+0.2,-4.1);
+    \draw[->] (c\w.west) -| (\x+0.6,-4.1);
+  }
+  % --- tag of the address to both comparators
+  \draw (1.0,0) -- (1.0,-5.5) -- (7.0,-5.5);
+  \draw[->] (7.0,-5.5) -- (c1.south);
+  \fill (2.8,-5.5) circle (1.2pt);
+  \draw[->] (2.8,-5.5) -- (c0.south);
+  % --- either way hits
+  \node[gate] (or) at (4.5,-4.35) {OR};
+  \draw[->] (a0.east) -- (or.west);
+  \draw[->] (a1.west) -- (or.east);
+  \draw[->] (or.south) -- (4.5,-4.95) node[below] {\iflangja{ヒット}{hit}};
+\end{tikzpicture}
