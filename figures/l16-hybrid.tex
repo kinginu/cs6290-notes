@@ -1,0 +1,19 @@
+% Hybrid disk: a controller that serves most requests from a flash cache
+% holding the frequently used data; the magnetic disk holds all data.
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.6mm]},
+  box/.style={draw, fill=ln-box, align=center, inner sep=3pt, minimum height=0.9cm},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted, align=center}]
+  \node[box, minimum width=4.2cm] (ctl) at (0,0) {\iflangja{コントローラ}{controller}};
+  \node[box, fill=ln-accent!20, minimum width=1.9cm] (flash) at (-1.15,-1.9)
+    {\iflangja{フラッシュ}{flash}\\[-1pt]{\scriptsize\iflangja{よく使うデータ}{frequently used}}};
+  \node[box, minimum width=1.9cm] (disk) at (1.15,-1.9)
+    {\iflangja{磁気ディスク}{magnetic disk}\\[-1pt]{\scriptsize\iflangja{全データ}{all data}}};
+  \draw[<->, very thick, ln-accent] (-1.15,-0.45) -- (flash.north)
+    node[lab, midway, left] {\iflangja{大部分}{most}};
+  \draw[<->] (1.15,-0.45) -- (disk.north)
+    node[lab, midway, right] {\iflangja{残り}{rest}};
+  \draw[<->, thick] (0,1.2) -- (ctl.north) node[lab, pos=0.25, right] {\iflangja{I/O バス}{I/O bus}};
+  \node[draw=ln-muted, dashed, rounded corners=2pt, fit=(ctl)(flash)(disk), inner sep=5pt] (hyb) {};
+  \node[lab, anchor=north] at (hyb.south) {\iflangja{ハイブリッドディスク}{hybrid disk}};
+\end{tikzpicture}}

@@ -1,0 +1,506 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Storage}
+\lessoninfo{
+  video={Lesson 16, videos 1--14},
+  textbook={H\&P \cite{hennessy2017} §2.2, §D.1--D.2},
+  keywords={magnetic disk, platter, cylinder, sector, seek time, rotational latency, optical disk, magnetic tape, sequential access, flash memory, solid-state disk, hybrid disk, I/O bus, mezzanine bus},
+}
+
+Lesson 15 showed that main memory is built from DRAM, which loses its
+contents as soon as power is removed.  Programs and data that must survive
+have to be kept on storage devices, which also hold the pages that virtual
+memory (Lesson 13) cannot fit into physical memory.  This lesson describes
+the main storage technologies---magnetic disks, optical disks, magnetic tape
+and semiconductor storage based on DRAM or flash memory---with emphasis on
+what determines their access time and how it evolves, and it shows how
+storage and other I/O devices are connected to the processor.
+
+\section{Storage}
+\label{sec:l16-storage}
+
+Storage keeps data \emph{persistently}: unlike main memory, a storage device
+retains its contents when the computer is switched off.\source{Lesson 16,
+videos 1--2; H\&P §D.1.}  It serves two purposes.
+\begin{description}
+  \item[Files] Programs, the data they work on and the settings of the
+    system and its applications are kept in files, which must survive from
+    one session to the next.
+  \item[Virtual memory] The pages that do not fit into physical memory are
+    kept on storage, and a page fault reads such a page back into memory
+    (Lesson 13).
+\end{description}
+
+Two properties of a storage device matter to the architect.  Its
+\emph{performance} is described by the two metrics of Lesson 2: throughput,
+the amount of data or the number of requests handled per second, and
+latency, the time a single access takes.  Storage throughput improves over
+time, but more slowly than processor speed; storage latency improves even
+more slowly, more slowly than the latency of DRAM, so the gap between the
+processor and storage is wider still than the memory wall of Lesson 1.  Its
+\emph{reliability} matters at least as much: storage is where data is
+expected to be safe, and a lost file is often worse than a crashed program.
+Reliability is the subject of Lesson 17.
+
+\section{Magnetic disks}
+\label{sec:l16-disk}
+
+A \term{magnetic disk}[磁気ディスク]\index{hard disk|see{magnetic disk}}
+(hard disk) records bits as the direction of magnetization of tiny regions of
+a magnetic coating.\source{Lesson 16, video 3; H\&P §D.1.}  It is built
+from rotating disks covered with this coating and from heads that move over
+them (\cref{fig:l16-disk}).
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l16-disk}
+  \caption{Structure of a magnetic disk.  (a)~Platters on a spindle, with one
+    head per surface; the arms of all heads form the head assembly, and the
+    dashed lines mark one cylinder.  (b)~One surface, divided into
+    concentric tracks and each track into sectors; one track and one of its
+    sectors are highlighted.}
+  \label{fig:l16-disk}
+\end{figure}
+
+The coating covers both surfaces of each \term{platter}[プラッタ], a rigid
+circular disk.  Several platters are stacked on a common
+\term{spindle}[スピンドル], which a motor turns at a constant speed, so that
+all platters rotate together (\cref{fig:l16-disk}a).
+
+Each surface is read and written by its own
+\term{disk head}[磁気ヘッド], which is mounted at the end of an arm and
+floats a tiny distance above the surface without touching it; a head that
+touches the rotating surface damages it.  All arms are attached to one
+actuator and move together as the \emph{head assembly}, which can place the
+heads anywhere between the outer edge of the platters and the spindle.
+
+With the head assembly held in one position, each head passes over a circle
+of its surface as the platter rotates.  This circle is a
+\term{track}[トラック], and a surface holds many concentric tracks
+(\cref{fig:l16-disk}b).  Because the heads move together, they are always
+positioned over tracks at the same distance from the spindle, one on each
+surface.  These tracks together form a \term{cylinder}[シリンダ]: moving the
+head assembly selects a cylinder, and selecting one of the heads selects a
+surface, and therefore a single track, within it.
+
+Along the track the data is divided into blocks of fixed size.  Such a block,
+a \term{sector}[セクタ], is the smallest unit that the disk reads or writes.
+A sector begins with a short preamble, which lets the disk recognize the
+start of the sector and synchronize with its bits; the data follows, and the
+sector ends with an error-correcting code with which the disk checks, and
+where possible corrects, the data it reads (Lesson 17).
+
+The capacity of a disk follows directly from this organization:
+\begin{equation}
+  \text{capacity} \;=\; \#\text{platters} \times 2
+    \times \frac{\text{tracks}}{\text{surface}}
+    \times \frac{\text{sectors}}{\text{track}}
+    \times \frac{\text{bytes}}{\text{sector}} ,
+  \label{eq:l16-capacity}
+\end{equation}
+where the factor 2 counts the two surfaces of a platter and the number of
+tracks per surface equals the number of cylinders.\margin{Real disks place
+more sectors on the longer outer tracks; sectors per track is then an
+average.}
+
+\begin{example}
+  \label{ex:l16-capacity}
+  A disk has two platters with \num{100000} tracks per surface, on average
+  \num{2000} sectors per track, and \num{4096} bytes per sector.  By
+  \cref{eq:l16-capacity} it holds $2\times 2\times \num{100000}\times
+  \num{2000} = \num{8e8}$ sectors, or $\num{8e8}\times \num{4096} \approx
+  \num{3.3e12}$ bytes, i.e.\ about 3.3~TB.
+\end{example}
+
+\section{Disk access time}
+\label{sec:l16-access}
+
+To read or write a sector, the disk has to bring the right head over the
+right place of the rotating surface, and then the data has to travel to
+main memory.\source{Lesson 16, videos 4--5; H\&P §D.1.}  For a disk whose
+platters are already spinning, the time of one access consists of five
+parts.
+\begin{description}
+  \item[Seek time] The \term{seek time}[シーク時間] is the time the head
+    assembly needs to move the heads to the cylinder that contains the
+    sector.  It grows with the distance the heads have to travel.
+  \item[Rotational latency] The \term{rotational latency}[回転待ち時間] is
+    the time from the arrival of the head at the track until the start of
+    the sector rotates under the head.
+  \item[Data read time] The sector passes under the head at the speed of
+    rotation, and it is read (or written) during this time; an access to
+    several consecutive sectors takes correspondingly longer.
+  \item[Controller time] The disk controller processes the request, for
+    example checking the error-correcting code of each sector read.
+  \item[I/O bus time] The data is transferred between the disk and main
+    memory over the I/O bus (\cref{sec:l16-io}).
+\end{description}
+\begin{equation}
+  t_{\text{access}} \;=\; t_{\text{seek}} + t_{\text{rot}} + t_{\text{read}}
+    + t_{\text{controller}} + t_{\text{bus}} .
+  \label{eq:l16-access}
+\end{equation}
+If the disk is still busy with earlier requests, a new request also waits in
+a queue before its own access begins.  This queueing delay, the time until
+the earlier accesses have finished and the heads can move again, is often
+significant.
+
+The two rotation-dependent terms follow from the rotation speed, usually
+given in revolutions per minute (RPM).  One revolution takes $60/\text{RPM}$
+seconds.\tip{In milliseconds a revolution takes $\num{60000}/\text{RPM}$: at
+\num{7200}~RPM it is \SI{8.33}{\milli\second}, so the average rotational
+latency is about \SI{4.2}{\milli\second}.}  The start of the sector may be
+anywhere on the track when the head arrives, so the rotational latency lies
+between zero and one revolution and is half a revolution on average.  Reading
+$n$ consecutive sectors takes the fraction $n/(\text{sectors per track})$ of a
+revolution:
+\begin{equation}
+  \overline{t_{\text{rot}}} \;=\; \frac{1}{2}\cdot\frac{60}{\text{RPM}} ,
+  \qquad
+  t_{\text{read}} \;=\; \frac{n}{\text{sectors per track}}\cdot
+    \frac{60}{\text{RPM}} .
+  \label{eq:l16-rot}
+\end{equation}
+
+\begin{example}
+  \label{ex:l16-access}
+  A disk rotates at \num{10000}~RPM and has an average seek time of
+  \SI{4}{\milli\second}.  A request reads 100 consecutive sectors of a track
+  that holds 500 sectors; the controller needs \SI{0.3}{\milli\second} and
+  the transfer over the I/O bus \SI{0.5}{\milli\second}.  One revolution
+  takes $\num{60000}/\num{10000} = \SI{6}{\milli\second}$, so by
+  \cref{eq:l16-rot} the average rotational latency is
+  \SI{3}{\milli\second} and the data read time is $100/500 \times
+  \SI{6}{\milli\second} = \SI{1.2}{\milli\second}$.  By
+  \cref{eq:l16-access} the access takes on average $4 + 3 + 1.2 + 0.3 + 0.5
+  = \SI{9}{\milli\second}$ (\cref{fig:l16-access-time}).  Had the 100
+  sectors been scattered over the disk, each would have needed its own seek
+  and rotational latency, and the request would have taken more than
+  \SI{700}{\milli\second}.
+\end{example}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l16-access-time}
+  \caption{The access of \cref{ex:l16-access}, drawn to scale.  Mechanical
+    movement accounts for \SI{8.2}{\milli\second} of the
+    \SI{9}{\milli\second}.}
+  \label{fig:l16-access-time}
+\end{figure}
+
+\begin{keypoint}
+  A disk access is dominated by mechanical movement: moving the head
+  assembly and waiting for the platter to turn.  It takes milliseconds,
+  i.e.\ millions of clock cycles of a processor, which is why a page fault
+  (Lesson 13) is so expensive.
+\end{keypoint}
+
+\section{Trends for magnetic disks}
+\label{sec:l16-trends}
+
+The components of a magnetic disk improve at very different
+rates.\source{Lesson 16, video 6; H\&P §D.2.}
+\begin{description}
+  \item[Capacity] depends on how densely bits are recorded on the surface.
+    For many years it doubled roughly every one to two years; this growth
+    has slowed considerably since about 2010.
+  \item[Seek time] is typically \SIrange{5}{10}{\milli\second} and improves
+    only very slowly.  What improvement there is comes mainly from smaller
+    platter diameters, which shorten the distance the heads travel.
+  \item[Rotation speed] rose slowly, from about \num{5000}~RPM to
+    \num{10000}--\num{15000}~RPM for the fastest drives; most drives spin at
+    \num{5400}--\num{7200}~RPM.  A faster rotation requires stronger
+    materials and produces more noise, heat and power consumption.
+  \item[Controller and bus time] are electronic and improve at a good rate,
+    but they are a small part of the access time (\cref{fig:l16-access-time}).
+\end{description}
+
+The latency of a disk access is therefore set by mechanics and materials
+rather than by the progress of transistor technology that Moore's law
+describes (Lesson 1).  It improves far more slowly than processor speed, even
+though capacity grew quickly for many years.  Higher recording density does
+shorten the data read time of a given amount of data, since more bytes pass
+under the head in each revolution, but it does not affect the seek time or
+the rotational latency.
+
+\section{Optical disks}
+\label{sec:l16-optical}
+
+An \term{optical disk}[光ディスク] is a single rotating disk like one platter
+of a magnetic disk, with data along a track, but it records bits as marks that
+change how the surface reflects light, and it reads them with a laser
+instead of a magnetic head.\source{Lesson 16, video 7.}  The laser works at a
+distance from the disk and focuses through a transparent protective layer,
+so dust and fingerprints on the surface are far less harmful than on a
+magnetic platter, which must be sealed inside its drive.  An optical disk can
+therefore be removed from its drive and carried to another one: it is
+\emph{portable}.\margin{On CDs, DVDs and Blu-ray discs the data lies along a
+single spiral track.}
+
+Portability has a price.  A disk written in one drive must be readable in
+every other drive, so the recording format has to be fixed by an industry
+standard: CD, then DVD, then Blu-ray.  A denser recording technology becomes
+useful only after a new standard has been agreed on and drives, media and
+content for it have become widespread, which takes years.  Optical disks
+therefore improve in large, infrequent steps.  The platters of a magnetic
+disk never leave their drive; a manufacturer can adopt a better recording
+technology in its next product as long as the drive still connects through
+the same standard interface.
+
+\section{Magnetic tape}
+\label{sec:l16-tape}
+
+A \term{magnetic tape}[磁気テープ] records data on a long, thin strip
+coated with magnetic material, which is kept wound up in a cartridge and
+pulled past the read/write head of the drive.\source{Lesson 16, videos
+8--9.}  A tape has a large capacity, and its cartridges are replaceable: one
+drive can read and write any number of cheap cartridges.  Its drawback is
+the way data is reached.
+
+\begin{definition}[Sequential access]
+  A medium provides \term{sequential access}[順次アクセス] if data can be
+  reached only in order: to access a location, the medium has to be moved
+  past all the data between the current position and the requested one, so
+  the access time grows with that distance.
+\end{definition}
+
+A disk, by contrast, reaches any sector directly, without passing over the
+data in between: one seek and at most one revolution take at most some tens
+of milliseconds, wherever the sector lies (\cref{ex:l16-tape}).  Its access
+time still depends on the seek distance, so a disk provides random access
+(Lesson 15) only approximately, but far more closely than a tape.  Sequential
+access suits one use particularly well: \emph{backup}, where large amounts of
+data are written in one pass and read back rarely, and then usually in one
+pass as well.  It is unsuitable for virtual memory, whose page faults read
+pages from arbitrary locations.  Tape is therefore used as backup storage
+rather than as the storage from which programs and files are used.
+
+\begin{example}
+  \label{ex:l16-tape}
+  A tape of \SI{1000}{\metre} is wound at
+  \SI[per-mode=symbol]{5}{\metre\per\second}.  With the tape at its
+  beginning, data in the middle is reached after
+  \SI{100}{\second} and data at the end after \SI{200}{\second}.  A disk
+  whose longest seek takes \SI{15}{\milli\second} and whose revolution takes
+  \SI{6}{\milli\second} reaches any sector within about
+  \SI{21}{\milli\second}, about \num{9500} times faster than the tape
+  reaches its end.  For reading a whole backup from start to finish, the
+  winding time does not matter.
+\end{example}
+
+Tape is gradually being displaced.  Its production volume is small, so its
+cost per gigabyte falls more slowly than that of magnetic disks, which are
+made in huge numbers; disks, for example external disks attached over USB,
+have become cheap enough to take over much of the backup role.
+
+\section{Solid-state disks}
+\label{sec:l16-ssd}
+
+Semiconductor memory has no moving parts, and an access to it takes
+nanoseconds to a fraction of a millisecond instead of the milliseconds of a
+disk.\source{Lesson 16, video 10; H\&P §2.2, §D.1.}  Its cost per gigabyte,
+however, is much higher.  DRAM costs on the order of a hundred times more per
+gigabyte than a magnetic disk, while its latency is about \num{100000} times
+lower (tens of nanoseconds against milliseconds).  Storage built from
+semiconductor memory is used where speed justifies this cost.
+
+\begin{definition}[Solid-state disk]
+  A \term{solid-state disk}[SSD]\index{SSD|see{solid-state disk}} (SSD) is a
+  storage device built from semiconductor memory, without moving parts, that
+  is used like a disk: it stores blocks of data and connects through a disk
+  interface such as SATA or directly over PCI Express.
+\end{definition}
+
+An SSD can be built from either of two kinds of memory.
+\begin{description}
+  \item[DRAM with a battery] DRAM is volatile, so a battery keeps it powered
+    when the computer is off.  Such an SSD is extremely fast and extremely
+    expensive per gigabyte, and its data is safe only as long as the battery
+    lasts, which makes it unsuitable for keeping data over long periods.
+  \item[Flash memory] Most SSDs use \term{flash memory}[フラッシュメモリ],
+    a semiconductor memory that keeps its contents without power: its bits
+    are stored as charge trapped in transistors, where it remains for years.
+\end{description}
+
+\caution{Flash memory (\enquote{flash}) has nothing to do with a pipeline
+flush (Lesson 3).}
+
+A flash SSD is slower than DRAM but still much faster than a magnetic disk,
+needs little power, and retains its data without a battery.  Its cost per
+gigabyte lies between those of DRAM and disk, so for the same price it
+offers much less capacity than a disk: for a long time, typical flash SSDs
+held gigabytes where disks held terabytes.
+
+\section{Hybrid magnetic--flash disks}
+\label{sec:l16-hybrid}
+
+Magnetic disks and flash memory have complementary
+strengths.\source{Lesson 16, videos 11--12.}  A magnetic disk offers a huge
+capacity at a low cost per gigabyte, but it is slow, consumes considerable
+power while its platters spin, and is vulnerable to shocks during operation.
+Flash memory is fast, consumes little power and has no moving parts, but it
+costs more per gigabyte.
+
+\begin{definition}[Hybrid disk]
+  A \term{hybrid disk}[ハイブリッドディスク] combines a magnetic disk with a
+  smaller amount of flash memory in one device.  The magnetic disk holds all
+  data, and the flash memory serves as a cache for the data that is used most
+  frequently (\cref{fig:l16-hybrid}).
+\end{definition}
+
+Temporal and spatial locality (Lesson 12) apply to files as they do to memory
+accesses: the operating system, the applications in daily use and the files
+being worked on account for most accesses.  If they are kept in flash, most
+requests are served at the speed of flash and without mechanical movement,
+while the capacity and the cost per gigabyte remain close to those of the
+disk.  When requests are served from flash, the disk can even stop spinning,
+which saves power and makes the device less sensitive to shocks; a request
+that then does need the disk waits, often for seconds, until the platters
+spin again.
+
+\begin{marginfigure}
+  \input{figures/l16-hybrid}
+  \caption{A hybrid disk.  Most requests are served by the flash cache.}
+  \label{fig:l16-hybrid}
+\end{marginfigure}
+
+The average access time behaves like the AMAT of a cache
+(\cref{eq:l12-amat}).  A request served from flash takes the hit time, and a
+request served by the disk takes the total time of a miss.  The controller
+knows where each block lies, so a miss does not read the flash first, and the
+miss penalty is the difference between the two times.
+
+\begin{example}
+  \label{ex:l16-hybrid}
+  A hybrid disk combines flash with an access time of
+  \SI{0.1}{\milli\second} and the disk of \cref{ex:l16-access}, which is kept
+  spinning.  For the request of that example, a hit also pays the controller
+  and I/O bus times, $0.1 + 0.3 + 0.5 = \SI{0.9}{\milli\second}$, and a miss
+  takes \SI{9}{\milli\second}, so the miss penalty is
+  \SI{8.1}{\milli\second}.  If \SI{95}{\percent} of the requests find their
+  data in flash, the average access time is $0.9 + 0.05 \times 8.1 \approx
+  \SI{1.3}{\milli\second}$, about 7 times shorter than with the disk alone,
+  although the flash holds only a small part of the data.  The controller and
+  the I/O bus now account for most of the time of a hit.
+\end{example}
+
+\Cref{tab:l16-compare} summarizes the technologies of this and the previous
+section.  Which one is preferable depends on the requirement that dominates:
+the lowest cost for a large amount of data favors a magnetic disk, speed,
+low power and robustness favor flash, and a hybrid disk approaches both for
+workloads whose accesses concentrate on a small part of the data.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Magnetic disks and semiconductor storage compared.}
+  \label{tab:l16-compare}
+  \begin{tabular}{@{}lllll@{}}
+    \toprule
+                        & Magnetic disk & DRAM SSD     & Flash SSD & Hybrid disk \\
+    \midrule
+    Access              & slow (ms)     & fastest      & fast      & fast for most \\
+    Cost per GB         & low           & very high    & medium    & low \\
+    Power               & high          & high         & low       & lower \\
+    Moving parts        & yes           & no           & no        & yes \\
+    Keeps data unpowered & yes          & while battery lasts & yes & yes \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{keypoint}
+  A hybrid disk applies the principle of caching to storage: flash in front
+  of a magnetic disk gives most requests the speed and low power of flash at
+  nearly the cost per gigabyte of the disk.
+\end{keypoint}
+
+\section{Connecting I/O devices}
+\label{sec:l16-io}
+
+Storage devices, like other input/output (I/O) devices, are not attached
+directly to the processor.\source{Lesson 16, videos 13--14.}  They are
+connected through buses defined by industry standards.
+
+\begin{definition}[I/O bus]
+  An \term{I/O bus}[I/O バス] is a standardized bus through which I/O
+  devices are connected to a computer.  The standard fixes the connectors,
+  the electrical signals and the protocol; PCI Express, SATA, SCSI and USB
+  are examples.
+\end{definition}
+
+Standardization lets any device built to the standard work with any computer
+that provides the bus, whoever manufactured either of them, and a computer
+maker can offer one kind of interface for a wide range of devices.  The
+price is a limited rate of improvement.  A new version of a standard has to
+be agreed on by many companies, and devices built for the older version
+should keep working, so a bus cannot adopt a faster technology as soon as it
+becomes available.  The more devices depend on a standard, the more slowly
+it changes.
+
+I/O devices also differ enormously in the throughput they need: a graphics
+adapter moves huge amounts of data, a disk much less, a keyboard almost none.
+A single fast bus would force every device to have an expensive fast
+interface, and a single slow bus would throttle the fast devices.  The buses
+are therefore arranged in a hierarchy (\cref{fig:l16-io-buses}).
+
+\begin{definition}[Mezzanine bus]
+  A \term{mezzanine bus}[メザニンバス] is a fast, short I/O bus between the
+  processor and the slower I/O buses; today it is PCI Express.  Fast devices
+  such as the graphics adapter are connected to it directly, and the
+  controllers of the slower buses are attached to it.
+\end{definition}
+
+A SATA or SCSI controller on the mezzanine bus provides a SATA (or SCSI) bus
+for disks and optical drives, and a USB host controller provides a USB bus,
+extended by hubs, for external devices such as keyboards and flash drives.
+These buses serve naturally slower devices, for which a stable standard
+matters more than speed; they are slower than the mezzanine bus and change
+less often.  In PC chipsets the SATA and USB controllers are integrated into
+one chip, the \term{southbridge}[サウスブリッジ], which is connected to the
+northbridge (Lesson 15).
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l16-io-buses}
+  \caption{The hierarchy of buses.  The graphics adapter is connected
+    directly to the mezzanine bus; disks and other slower devices are
+    reached through the SATA and USB controllers on it, which provide
+    slower standard I/O buses.  In PC chipsets these controllers form the
+    southbridge (dashed).}
+  \label{fig:l16-io-buses}
+\end{figure}
+
+Each controller translates between the bus it provides and the mezzanine
+bus.  The data of a disk read travels from the disk over SATA to the SATA
+controller, over the mezzanine bus and through the northbridge into main
+memory; this path is the I/O bus time of \cref{eq:l16-access}.  Fast devices
+sit close to the processor, and the many slow devices are confined to their
+own buses behind the controllers, where they do not slow down the fast
+ones.\margin{Newer processors integrate the northbridge and connect to the
+southbridge directly.}
+
+Whatever the technology and however it is connected, storage is where data
+is expected to survive, yet every storage device eventually fails.  Lesson
+17 shows how a system can keep its data and its service despite such
+failures.
+
+\begin{keypoint}[Lesson summary]
+  Storage holds files and the pages of virtual memory persistently, and its
+  latency improves even more slowly than that of DRAM.  A magnetic disk
+  stores data in sectors on the tracks of rotating platters
+  (\cref{eq:l16-capacity}); an access (\cref{eq:l16-access}) is dominated by
+  the seek time and the rotational latency, half a revolution on average,
+  and this mechanical latency improves only slowly, while capacity grew
+  quickly for many years.  Optical disks are portable but improve slowly
+  because of standardization; magnetic tape offers cheap capacity with
+  sequential access
+  and serves for backup.  Solid-state disks built from DRAM or flash memory
+  avoid mechanical movement at a higher cost per gigabyte, and a hybrid disk
+  uses flash as a cache for a magnetic disk.  I/O devices are connected
+  through standardized I/O buses arranged in a hierarchy: fast devices sit
+  directly on a fast, short mezzanine bus such as PCI Express, and slower
+  devices on slower, more stable buses such as SATA and USB, whose
+  controllers are attached to the mezzanine bus.
+\end{keypoint}
+
+\end{document}

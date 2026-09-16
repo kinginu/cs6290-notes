@@ -1,0 +1,69 @@
+% Structure of a magnetic disk.  (a) Edge-on view: platters on a spindle,
+% one head per surface on arms that form the head assembly; the dashed
+% lines mark one cylinder.  (b) Top view of one surface: concentric tracks
+% divided into sectors; one track and one sector are highlighted.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.6mm]},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted},
+  pin/.style={draw=ln-muted, thin}]
+  % ================================================= (a) edge-on view
+  \node[anchor=west] at (-0.2,3.35) {\iflangja{(a) 側面}{(a) side view}};
+  % spindle
+  \draw[fill=ln-muted!35] (1.45,-0.15) rectangle (1.75,2.45);
+  % platters
+  \foreach \y in {0.4,1.2,2.0} {
+    \draw[fill=ln-accent!30] (0.1,\y-0.05) rectangle (3.1,\y+0.05);
+  }
+  % one cylinder: all tracks at the same radius
+  \draw[ln-accent, dashed, thick] (2.35,0.15) -- (2.35,2.25);
+  \draw[ln-accent, dashed, thick] (0.85,0.15) -- (0.85,2.25);
+  % head assembly: actuator and arms, one head per surface
+  \draw[fill=ln-box] (4.3,0.12) rectangle (4.55,2.28);
+  \foreach \y in {0.4,1.2,2.0} {
+    \foreach \s in {1,-1} {
+      \draw[very thick, ln-muted] (4.3,\y+\s*0.15) -- (2.5,\y+\s*0.15);
+      \fill[ln-accent] (2.22,\y+\s*0.07) rectangle (2.5,\y+\s*0.19);
+    }
+  }
+  % rotation
+  \draw[->, thick] (1.05,2.62) arc[start angle=190, end angle=350, x radius=0.55, y radius=0.14];
+  % labels
+  \node[lab, anchor=south] at (1.6,2.75) {\iflangja{スピンドル}{spindle}};
+  \draw[pin] (0.35,0.35) -- (0.35,-0.25);
+  \node[lab, anchor=north] at (0.35,-0.22) {\iflangja{プラッタ}{platter}};
+  \draw[pin] (2.35,0.15) -- (2.35,-0.25);
+  \node[lab, anchor=north] at (2.35,-0.22) {\iflangja{シリンダ}{cylinder}};
+  \draw[pin] (2.42,2.2) -- (3.2,2.74);
+  \node[lab, anchor=south] at (3.3,2.72) {\iflangja{ヘッド}{head}};
+  \node[lab, anchor=north] at (4.43,0.05) {\iflangja{ヘッドアセンブリ}{head assembly}};
+  % ================================================= (b) top view
+  \begin{scope}[xshift=6.3cm]
+    \node[anchor=west] at (-0.2,3.35) {\iflangja{(b) 1 面の上面}{(b) top view of one surface}};
+    \coordinate (c) at (2.0,1.2);
+    \draw[fill=ln-box] (c) circle[radius=1.5];
+    \foreach \r in {0.5,0.65,...,1.4} {
+      \draw[ln-rule] (c) circle[radius=\r];
+    }
+    \foreach \a in {0,30,...,330} {
+      \draw[ln-rule] ($(c)+(\a:0.5)$) -- ($(c)+(\a:1.4)$);
+    }
+    % one track and one sector
+    \draw[ln-accent, thick] (c) circle[radius=0.95];
+    \fill[ln-accent] ($(c)+(30:1.02)$) arc[start angle=30, end angle=60, radius=1.02]
+      -- ($(c)+(60:0.88)$) arc[start angle=60, end angle=30, radius=0.88] -- cycle;
+    % spindle
+    \draw[fill=ln-muted!35] (c) circle[radius=0.3];
+    % head on its arm
+    \draw[very thick, ln-muted] (3.75,-0.05) -- ($(c)+(-12:0.95)$);
+    \fill[ln-muted] (3.75,-0.05) circle[radius=0.08];
+    \fill[ln-accent] ($(c)+(-12:0.95)$) circle[radius=0.07];
+    % rotation
+    \draw[->, thick] ($(c)+(105:1.65)$) arc[start angle=105, end angle=165, radius=1.65];
+    % labels
+    \draw[pin] ($(c)+(45:0.95)$) -- (3.45,2.7);
+    \node[lab, anchor=south] at (3.45,2.67) {\iflangja{セクタ}{sector}};
+    \draw[pin] ($(c)+(215:0.95)$) -- (0.1,-0.2);
+    \node[lab, anchor=north] at (0.1,-0.17) {\iflangja{トラック}{track}};
+    \draw[pin] ($(c)+(-12:0.95)$) -- (3.55,1.45);
+    \node[lab, anchor=west] at (3.52,1.5) {\iflangja{ヘッド}{head}};
+  \end{scope}
+\end{tikzpicture}
