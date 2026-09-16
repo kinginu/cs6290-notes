@@ -67,7 +67,9 @@ Loop:  LB   R3, 0(R4)      ; R3 <- source byte
   between two buffers that may be far apart, but each of them is adjacent to
   the previous access to the same buffer.  Spatial locality only requires
   accesses near \emph{recently} accessed addresses, not near the one
-  accessed last.
+  accessed last.\caution{Spatial locality is about distance, not
+  regularity: a stream of accesses with a large constant stride is perfectly
+  regular and has none.}
 \end{example}
 
 \section{Caches}
@@ -99,7 +101,11 @@ obtained from main memory and copied into the cache, so that further accesses
 to it, and by spatial locality to its neighbours, will hit.  Because the
 cache is consulted on every access, the lookup itself must be very fast, which
 is a second reason, besides cost, why the cache has to be small.  A small
-cache cannot hold everything, and misses are therefore unavoidable.
+cache cannot hold everything, and misses are therefore
+unavoidable.\sidenote{The idea is Wilkes's \enquote{slave memory} of 1965
+\cite{wilkes1965}.  The first commercial machine to have one was the IBM
+System/360 Model~85 of 1968, whose 16~KB buffer its designers named the
+\emph{cache} \cite{liptay1968}.}
 
 \begin{figure}[htbp]
   \centering
@@ -161,7 +167,10 @@ measure by which they are balanced.
 
 \begin{example}
   \label{ex:l12-amat}
-  Main memory adds a miss penalty of \SI{60}{\nano\second}.  Three candidate
+  Main memory adds a miss penalty of
+  \SI{60}{\nano\second}.\margin{At \SI{3}{\giga\hertz} this penalty is 180
+  cycles; a 4-wide processor (Lesson 6) loses some 700 instruction slots
+  while it waits.}  Three candidate
   caches are compared:
   \begin{center}\small
     \begin{tabular}{@{}lccc@{}}
@@ -197,7 +206,9 @@ misses go on to further, larger cache levels (L2, L3; Lesson 14) and finally
 to main memory.  This first level is called the \term{L1 cache}[L1
 キャッシュ].  L1 caches are typically 16--64~KB (1~KB $= 2^{10}$ bytes):
 large enough that about \SI{90}{\percent} of accesses hit, and small enough
-that a hit takes only one to three clock cycles.
+that a hit takes only one to three clock cycles.\margin{Sizes today:
+Skylake has a 32~KB L1 per core, a 256~KB L2 and an 8~MB shared L3; Zen~3 has
+32~KB, 512~KB and 32~MB (7-cpu.com).}
 
 \section{Blocks and lines}
 \label{sec:l12-blocks}
@@ -222,7 +233,9 @@ The block size trades spatial locality against cache space.
     used soon.  It occupies space in which other recently used data could
     have been kept, and fewer blocks fit into the cache.
 \end{itemize}
-Typical block sizes are 32--128 bytes.  The number of blocks a
+Typical block sizes are 32--128 bytes.\margin{Real block sizes: 64 bytes on
+every x86-64 processor and on most Arm cores, 128 bytes on Apple's M1 and
+M2.}  The number of blocks a
 cache can hold is its size divided by the block size: a
 16~KB cache with 64-byte blocks holds
 $2^{14}/2^{6} = 256$ blocks.
@@ -243,7 +256,10 @@ block size: with 128-byte blocks, at addresses 0, 128, 256, \ldots\
   has the size of a block, and holds different blocks at different times.
 \end{definition}
 
-Block sizes, and therefore line sizes, are always powers of two.  Only then
+Block sizes, and therefore line sizes, are always powers of
+two.\caution{The lecture keeps \emph{block} (in memory) and \emph{line} (its
+slot in the cache) apart; H\&P and vendor manuals call both a cache line.}
+Only then
 can the block of an address and the position within the block be found by
 selecting bits of the address, as the next section shows, rather than by a
 division.
@@ -311,7 +327,9 @@ would produce a hit on data that was never loaded.
 Emptying a line, or the whole cache, thus only requires clearing valid bits;
 the tags and data can be left as they are.  The one exception is a block
 that has been written in the cache but not yet in main memory
-(\cref{sec:l12-write}): it must be written back first.
+(\cref{sec:l12-write}): it must be written back first.\margin{x86 has both
+operations: \texttt{WBINVD} writes dirty blocks back before clearing the
+valid bits, \texttt{INVD} clears them and discards the data.}
 
 A lookup is a hit only if the line is valid and its stored tag matches the
 tag field of the address:
@@ -345,7 +363,8 @@ lines.  Three organizations are distinguished (\cref{fig:l12-placement}):
   \item[Set-associative] each block can be placed in any of $N$ lines that
     form a set (\cref{sec:l12-sa}).
   \item[Fully associative] each block can be placed in any line of the
-    cache (\cref{sec:l12-fa}).
+    cache (\cref{sec:l12-fa}).\margin{Typical associativities: Skylake L1
+    8-way, L2 4-way, L3 16-way; Zen~3 L1 8-way, L2 8-way, L3 16-way.}
 \end{description}
 
 \begin{figure}[htbp]
@@ -411,7 +430,9 @@ size.
 Its weakness is that blocks with the same index compete for a single line.
 If a program alternates between two such blocks, each access evicts the block
 the other access needs, and every access misses, even when the rest of the
-cache is empty.  These conflicts raise the miss rate.
+cache is empty.  These conflicts raise the miss rate.\margin{Misses caused
+by this competition are \emph{conflict misses}, one of the three causes of
+misses classified in Lesson 14.}
 
 \begin{example}
   \label{ex:l12-dm-conflict}
@@ -466,7 +487,9 @@ lines of the selected set, in parallel, and hits if any valid line matches
 Compared with a direct-mapped cache of the same size, an $N$-way
 set-associative cache needs $N$ comparators and a selection of the matching
 line's data, which makes the hit time longer, but it suffers fewer conflicts
-and so has a lower miss rate.
+and so has a lower miss rate.\margin{Why 32~KB 8-way L1 caches are common: 64
+sets of 64-byte blocks span 4~KB, so index and offset fit in the page offset
+and the lookup can start before translation (Lesson 14).}
 
 \section{Fully associative caches}
 \label{sec:l12-fa}
@@ -483,7 +506,9 @@ There is nothing to select, so there is no index: the tag is the entire
 block number, and a lookup compares it with the tag of every line in the
 cache.  Two blocks never have to compete for a line while another line is
 free, but a comparator is needed for every line, which makes a large fully
-associative cache slow and expensive.
+associative cache slow and expensive.\margin{Fully associative structures
+stay small: TLBs of 64--512 entries (Lesson 13) are fully associative or
+nearly so; caches are not.}
 
 \subsection{One scheme for all three}
 
@@ -549,7 +574,9 @@ LRU can be implemented with a counter per line.  In an $N$-way
 set-associative cache each line has a $\log_2 N$-bit counter.  At start-up
 the counters of each set are initialized to the values $0, 1, \ldots, N-1$,
 in any order, and the update rule below keeps it that way: every value
-occurs exactly once in each set.  The line with counter~0 is the least
+occurs exactly once in each set.\tip{The counters of a set stay a permutation
+of $0,\ldots,N-1$: a value that appears twice in a row of a trace means an
+update was missed.}  The line with counter~0 is the least
 recently used and the one with counter $N-1$ the most recently used.  On
 every access to a line whose counter is~$c$:
 \begin{enumerate}
@@ -619,7 +646,9 @@ Caches therefore use write-back: many writes to a block while it is in the
 cache cost at most a single write to main memory, at eviction.  A write-back
 cache is normally also write-allocate; otherwise every write to a block that
 is not in the cache would go to main memory, however often the block is
-written.
+written.\caution{The two choices are independent: write-through or write-back
+says \emph{when} memory is updated, write-allocate or not \emph{what a write
+miss does}.}
 
 Writing every evicted block back would, however, also write blocks that were
 only read and are identical to their copies in memory.
@@ -638,7 +667,11 @@ only read and are identical to their copies in memory.
   accesses under write-back.  The two consecutive writes to Y cost a single
   memory write, at step~6, and evicting Y at step~8 costs none, because Y
   was not written after it was loaded at step~7.  Write-back needs 3 memory
-  writes in total; write-through would need one per write, i.e.~4.
+  writes in total; write-through would need one per write,
+  i.e.~4.\sidenote{Write-through is not extinct: the Pentium~4 and AMD's
+  Bulldozer wrote their L1 data caches through to the next level and absorbed
+  the writes in a buffer.  Such an L1 needs no dirty bits and never writes
+  back; both families later returned to write-back L1 caches.}
 \end{example}
 
 \begin{table}[htbp]
@@ -695,7 +728,9 @@ loads the new block; the access then proceeds as a hit.
   Consider the 2-way set-associative cache of \cref{ex:l12-sa-conflict}
   (16-byte blocks, index bits 5--4, tag bits 31--6), now with LRU replacement
   and the write-back policy.  \Cref{tab:l12-summary-trace} follows its set~1 through
-  five accesses; both lines of the set are valid throughout.  The first
+  five accesses; both lines of the set are valid throughout.\tip{Memory
+  traffic under write-back: one read per miss plus one write per eviction of
+  a dirty block; hits cost nothing.}  The first
   access hits and only updates the counters.  The second misses, and its
   victim is way~1, whose counter is~0; that block is dirty and is written
   back before the new block is loaded.  The fourth access is a write miss
@@ -737,7 +772,9 @@ loads the new block; the access then proceeds as a hit.
   \texttt{0x814F}) has index $\texttt{0x814F} \mathbin{\&} \texttt{0x3F} = 15$
   and tag $\texttt{0x814F} \gg 6 = \texttt{0x205}$.  Its 512 lines need
   $512 \times 24 = \num{12288}$ bits of metadata, i.e.\ 1536 bytes,
-  about \SI{2.3}{\percent} of the 64~KB of data.
+  about \SI{2.3}{\percent} of the 64~KB of data.\margin{Metadata is a reason
+  not to shrink blocks: with 16-byte blocks the same 8-way cache would have
+  4096 lines of 24 bits, 12~KB or \SI{19}{\percent} of its data.}
 \end{example}
 
 \begin{table}[htbp]
