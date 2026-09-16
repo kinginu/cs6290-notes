@@ -30,12 +30,17 @@ location that other cores have cached causes \emph{coherence traffic}:
 invalidations sent to the other caches, and coherence misses when those
 cores access the block again.  With more cores the chip performs more writes
 per second in total, so the rate of coherence messages grows with the
-number of cores.  On a shared bus this traffic soon becomes the bottleneck:
+number of cores.\margin{The lecture's \enquote{hundreds} has arrived: AMD's
+EPYC 9965 puts 192 cores in one socket within a \SI{500}{W} budget, about
+\SI{2.6}{W} per core.}  On a shared bus this traffic soon becomes the
+bottleneck:
 \begin{itemize}
   \item a bus carries one transfer at a time, so the cores wait for each
     other's coherence messages and cache misses;
   \item a bus that connects more cores is longer and has more devices
-    attached, so each transfer is slower as well.
+    attached, so each transfer is slower as well.\margin{Intel's last
+    front-side bus, shared by every socket, peaked at 12.8~GB/s; QuickPath
+    replaced it with point-to-point links in 2008.}
 \end{itemize}
 
 A many-core chip therefore needs two things: an on-chip interconnect whose
@@ -75,7 +80,13 @@ a chip.
 \end{description}
 Such a chip is built by replicating a \term{tile}[タイル]: a core with its
 private caches and its router, to which later sections add a part of the
-structures that all cores share.
+structures that all cores share.\sidenote{Intel's server chips made the
+same move: the Xeon Scalable family of 2017 replaced the ring of earlier Xeons by a mesh, to
+escape the \enquote{latencies and bandwidth constraints associated with
+previous ring-based architecture} (Intel, \emph{Xeon Processor Scalable
+Family Technical Overview}), and every server Xeon since has used one.
+Tilera's TILE64 had already put 64 tiles of processor, cache and router on a
+mesh in 2007.}
 
 \begin{figure}[htbp]
   \centering
@@ -96,7 +107,9 @@ wraparound links, however, are long or cross other links.  The
 \emph{flattened butterfly} and the \emph{hypercube} link each router to more
 routers---to all routers of its own row and column in a flattened butterfly,
 to $\log_{2}N$ routers in a hypercube---which shortens the paths further but
-requires long, crossing links that are hard to build on a chip.
+requires long, crossing links that are hard to build on a chip.\margin{Off
+the chip they are practical: IBM's Blue Gene/L used a 3-D torus and Blue
+Gene/Q a 5-D one, and Cray's XC supercomputers a dragonfly network.}
 
 If the traffic were spread evenly over the links, a network of $L$ links,
 each carrying up to $C$ messages per second, would carry
@@ -108,7 +121,9 @@ messages per second, where $h$ is the average number of hops per message,
 because a message occupies a link on every hop.  A $k\times k$ mesh has
 $L=2k(k-1)$ links, and for a destination drawn at random among the other
 tiles the average distance is $h=2k/3$ hops, which grows only with the
-square root of the number of cores $N=k^{2}$.
+square root of the number of cores $N=k^{2}$.\tip{Along one dimension of a
+$k$-node line the mean distance is $(k^{2}-1)/3k$; two dimensions, with the
+source tile itself excluded, give exactly $2k/3$.}
 
 \Cref{eq:l22-throughput} is an average-load estimate that no real routing
 reaches.  The load on a link is the sum of the rates of all messages routed
@@ -166,7 +181,10 @@ bottleneck of its own.
 
 The size of the LLC is the number of cores times the size of a slice, so it
 grows automatically with the number of cores, while each slice remains
-small and fast and the requests of the cores are spread over many slices.
+small and fast and the requests of the cores are spread over many
+slices.\margin{Intel's server LLC is sliced exactly so: \SI{1.375}{MB} per
+core on the Xeon Scalable family, \SI{38.5}{MB} over the 28 cores of a
+Platinum 8180.}
 
 \begin{figure}[htbp]
   \centering
@@ -188,7 +206,10 @@ in one of two ways.
     consecutive sets go to consecutive tiles.  The blocks are spread evenly,
     but without regard to which core uses them: the blocks of a thread are
     scattered over all tiles, and most of its LLC accesses travel to a
-    distant tile.
+    distant tile.\caution{Real chips do not take a field of the address:
+    Intel selects the slice with an undocumented hash that XORs many
+    physical address bits, so that even strided accesses spread over the
+    slices \cite{irazoqui2015}.}
   \item[By page number] Bits of the physical page number select the tile, so
     all blocks of a page are in the same slice.  The operating system
     decides which physical frame each page receives; it can give a thread
@@ -245,8 +266,14 @@ makes the directory small enough, is which blocks have an entry at all.
 
 An entry is needed only for a block that is held by at least one private
 cache (L1 or L2), that is, whose entry would have at least one presence bit
-set.  A block that is only in the LLC or in main memory would have an entry
-of zeros, and a missing entry says the same thing.  The directory therefore
+set.\sidenote{Intel's Xeon Scalable family needed exactly this structure.
+Its earlier LLC was inclusive, so the LLC tags themselves recorded which
+private caches held a block; the 2017 redesign made the LLC non-inclusive
+(\SI{1.375}{MB} per core against \SI{1}{MB} of L2) and added a separate
+\emph{snoop filter} to track \enquote{cache lines in the L1 or MLC of cores
+when it is not allocated in the LLC} (Intel, \emph{Xeon Processor Scalable
+Family Technical Overview}).}  A block that is only in the LLC or in main
+memory would have an entry of zeros, and a missing entry says the same thing.  The directory therefore
 allocates an entry when a private cache obtains a block that has none, and
 the entry is no longer needed once no private cache holds the block.  When a
 new entry is needed but all entries of the tile are in use, the directory
@@ -344,8 +371,10 @@ but loses from the lower frequency:
   \frac{1}{(1-f_{\mathrm{par}}) + \dfrac{f_{\mathrm{par}}}{N}} ,
   \label{eq:l22-perf}
 \end{equation}
-relative to the single core.  More generally, if a fraction $t_{p}$ of the
-single-core execution time can use $p$ threads, the program needs
+relative to the single core.\tip{\Cref{eq:l22-perf} is largest at
+$N=2f_{\mathrm{par}}/(1-f_{\mathrm{par}})$: 18 cores for
+$f_{\mathrm{par}}=0.9$, 198 for $0.99$.}  More generally, if a fraction
+$t_{p}$ of the single-core execution time can use $p$ threads, the program needs
 $\sqrt[3]{N}\,\sum_{p} t_{p}/\min(p,N)$ of that time on $N$ cores.
 Beyond some number of cores the loss in frequency outweighs the gain in
 parallelism (\cref{fig:l22-power-perf}).
@@ -402,7 +431,9 @@ laptop processor normally runs its cores at low power, so one core can
 still raise its power about threefold.  The desktop processor, designed for
 better cooling, runs its cores at high power already in normal operation,
 close to what the area of one core can dissipate, and gains little from
-turbo mode.
+turbo mode.\margin{A current part shows the same gap: the Core i9-14900K
+runs its performance cores at \SI{3.2}{GHz} within \SI{125}{W} and reaches
+\SI{6}{GHz} within a \SI{253}{W} turbo power.  Intel ARK.}
 
 \section{SMT, cores and chips}
 \label{sec:l22-os}
@@ -413,7 +444,10 @@ at once: a board carries several chips, each chip several cores, and each
 core runs several threads with SMT.  The operating system sees every
 hardware thread as a \term{logical processor}[論理プロセッサ] on which it
 can run one software thread; two chips with eight cores each and two SMT
-threads per core, for example, appear as 32 logical processors.
+threads per core, for example, appear as 32 logical
+processors.\caution{\texttt{nproc} and \texttt{hardware\_concurrency} count
+logical processors, not cores: on a 2-way SMT machine they return twice the
+number of cores, and that many compute-bound threads run two per core.}
 
 The logical processors are not equivalent, however.  Two threads on the same
 core share its pipeline and caches, and each runs much slower than on a core
@@ -426,7 +460,10 @@ which places two of the threads on one core and leaves the other chip idle
 (\cref{fig:l22-placement}a).  A topology-aware operating system spreads the
 threads first over the chips, then over the cores of each chip, and uses the
 second SMT thread of a core only when every core is busy
-(\cref{fig:l22-placement}b).
+(\cref{fig:l22-placement}b).\margin{Linux publishes the topology in sysfs
+(\texttt{core\_cpus} for the SMT siblings, \texttt{package\_cpus} for the
+chip) and builds its scheduling domains from it; \texttt{lscpu} and
+\texttt{lstopo} print it.}
 
 \begin{figure}[htbp]
   \centering
