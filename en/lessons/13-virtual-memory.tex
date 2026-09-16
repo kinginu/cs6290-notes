@@ -36,7 +36,9 @@ The two views disagree in two respects.
   \item The address space of a single program is much larger than the
     installed memory.  A 32-bit address space is 4~GB, which a machine may or
     may not have; a 64-bit address space is 16~EB (1~EB $= 2^{60}$ bytes),
-    many orders of magnitude more than any machine has.
+    many orders of magnitude more than any machine has.\caution{No processor translates all 64 bits.  x86-64 requires
+    \emph{canonical} addresses, in which bits 63--48 repeat bit~47, so the
+    usable space is 256~TB rather than 16~EB.}
   \item Many programs run at the same time, and each of them uses the same
     addresses, as if it owned the entire address space.
 \end{itemize}
@@ -53,7 +55,11 @@ Programs can thus be written without knowing the size of memory or the other
 programs they will run with, a program cannot access the memory of another
 unless the operating system arranges it, and together the programs can use
 more memory than is installed, the excess being kept on disk
-(\cref{sec:l13-page-faults}).
+(\cref{sec:l13-page-faults}).\sidenote{The idea is
+that old: the Manchester Atlas of 1962 presented its 16K words of core store
+and 96K words of magnetic drum as one address space of 512-word pages, and
+translated addresses through 32 associative \emph{page address registers} ---
+the ancestor of the TLB of \cref{sec:l13-tlb}.}
 
 \section{Physical memory and virtual address spaces}
 \label{sec:l13-views}
@@ -125,7 +131,9 @@ updates it whenever it places one of the program's pages into a frame or
 removes one.  The page table of the running program is found through a
 register set by the operating system and is read to translate the program's
 addresses, usually by the processor itself and in some systems by the
-operating system (\cref{sec:l13-tlb}).  \Cref{fig:l13-mapping} illustrates
+operating system (\cref{sec:l13-tlb}).\margin{That register is CR3 on x86-64 and
+TTBR0/TTBR1 on AArch64; a context switch reloads it, and the whole mapping
+changes at once.}  \Cref{fig:l13-mapping} illustrates
 the resulting mapping for two programs.
 \begin{itemize}
   \item Any page may be placed in any frame.  Pages that are adjacent in a
@@ -186,14 +194,18 @@ steps.
 \end{enumerate}
 
 A disk access takes milliseconds, i.e.\ millions of clock cycles, so a page
-fault is enormously more expensive than a cache miss.  Page faults must be
+fault is enormously more expensive than a cache miss.\margin{At \SI{3}{\giga\hertz} a
+\SI{10}{\milli\second} disk seek is 30 million cycles; even an NVMe SSD read
+of \SI{100}{\micro\second} is 300\,000.}  Page faults must be
 rare, and it pays to let the operating system choose the page to evict with a
 careful algorithm in software.
 
 Not every page fault involves the disk: if the address lies outside every
 region that the program has been allocated, there is nothing to load, and the
 operating system treats the access as an error, usually by terminating the
-program.
+program.\margin{A third case touches no disk: Linux counts a fault that
+only has to allocate a zeroed frame or copy a shared page as a \emph{minor}
+fault, against \emph{major} faults that read from storage.}
 
 \begin{note}
   Physical memory acts as a cache of the pages on disk.  Pages correspond to
@@ -236,7 +248,10 @@ offset (\cref{fig:l13-translation}):
 where $\mathit{VA}$ and $\mathit{PA}$ are the virtual and physical addresses.
 The offset passes through unchanged because a page and its frame have the same
 size and the byte keeps its position within them; in binary, the physical
-address is the PFN bits followed by the offset bits.  The VPN has $k$ bits
+address is the PFN bits followed by the offset bits.\caution{Translation never
+moves a byte out of its page, but an unaligned access can straddle a page
+boundary: its two halves lie in different pages and need two translations,
+into frames that may be far apart.}  The VPN has $k$ bits
 fewer than a virtual address and the PFN $k$ bits fewer than a physical
 address, so the two numbers differ in width whenever virtual and physical
 addresses do.  If the page table holds no PFN for the page, the access causes a
@@ -291,7 +306,9 @@ H\&P §B.4.}
 
 A PTE holds the PFN of its page and a few status bits: a valid bit that is set
 only if the page is in physical memory, and bits that record how the page may
-be accessed (read, write, execute).  A PTE is typically about as large as an
+be accessed (read, write, execute).\margin{An x86-64 PTE is 8 bytes: the PFN plus a
+present bit, read/write, user/supervisor, accessed and dirty bits, and a
+no-execute bit at the top.}  A PTE is typically about as large as an
 address, 4 bytes on a 32-bit processor and 8 bytes on a 64-bit processor, which
 leaves room for the PFN and the status bits.  Since every virtual page has an entry,
 \begin{equation}
@@ -303,7 +320,10 @@ leaves room for the PFN and the status bits.  Since every virtual page has an en
 Two quantities are absent from \cref{eq:l13-flat-size}.  The size of physical
 memory only affects how many bits of an entry the PFN occupies.  The amount of
 memory the program actually uses does not matter at all, because unused pages
-have entries too.  Every running program needs a page table of this size.
+have entries too.  Every running program needs a page table of this size.\tip{Work in
+exponents: with an $n$-bit address space, $2^{k}$-byte pages and $2^{s}$-byte
+entries the table is $2^{\,n-k+s}$ bytes --- subtract the page bits, add the
+entry bits.}
 
 \begin{example}
   \label{ex:l13-flat-size}
@@ -394,7 +414,12 @@ needs an inner table, i.e.\ if at least one page is used in each of the 1024
 ranges of 4~MB.  It then occupies
 $4~\text{KB} + 1024 \times 4~\text{KB} \approx 4.004$~MB, more than the flat
 table by the size of the outer table.  Real programs use a few contiguous
-regions of their address space and need only a few inner tables.
+regions of their address space and need only a few inner tables.\sidenote{A
+different answer to the same problem is the \emph{inverted} page table: one
+entry per frame rather than one per page, located by hashing the VPN.  Its
+size follows physical memory and does not grow with the address space, but
+collisions cost a chain walk and shared pages need extra machinery.  PowerPC
+and UltraSPARC used it (H\&P §B.4).}
 
 \subsection{More levels for 64-bit addresses}
 
@@ -406,7 +431,9 @@ outer index and an outer table of $2^{27} \times 8$~bytes $= 1$~GB for every
 program.  Splitting the 36 bits into four 9-bit fields instead yields a
 four-level page table in which every table fits into one page; x86-64
 processors use this organization.  Each further level makes room for 9 more
-bits of virtual address.
+bits of virtual address.\margin{x86-64 calls the four levels PML4, PDPT, PD
+and PT.  Processors from Ice Lake on offer a fifth (\texttt{CR4.LA57}) for
+57-bit addresses, i.e.\ 128~PB.}
 
 \begin{example}
   \label{ex:l13-four-level}
@@ -449,7 +476,10 @@ frame, must balance the two.
 \end{definition}
 
 A region of arbitrary size leaves on average half a page unused, so internal
-fragmentation grows in proportion to the page size.
+fragmentation grows in proportion to the page size.\caution{Paging removes
+\emph{external} fragmentation, the waste left between allocations of different
+sizes, because any page fits any frame.  What it leaves is the internal kind,
+inside the last page.}
 
 \begin{example}
   \label{ex:l13-page-size}
@@ -479,7 +509,9 @@ fragmentation grows in proportion to the page size.
 
 Pages are much larger than cache blocks (Lesson 12), because every page needs
 its own PTE and every page brought in from disk costs a disk access.  The usual
-page size is 4~KB.  Processors also support much larger pages, such as 2~MB
+page size is 4~KB.\margin{4~KB has been the x86 page size since the 386 of
+1985.  AArch64 instead lets the operating system choose a granule of 4, 16 or
+64~KB.}  Processors also support much larger pages, such as 2~MB
 and 1~GB on x86-64, which the operating system can use for large regions that
 a program fills completely, so that internal fragmentation hardly matters.
 
@@ -503,7 +535,9 @@ a two-level page table, the processor performs a load such as
 \end{enumerate}
 Each PTE read is an ordinary memory access that goes through the caches and may
 hit or miss; if PTEs are not kept in the cache, each costs a full main-memory
-access.  With a page table of $L$ levels, every access of the program turns
+access.\margin{Besides the ordinary caches, x86 processors hold
+upper-level entries in dedicated \emph{paging-structure caches}, so a walk
+usually needs only the last-level read.  Intel SDM vol.~3.}  With a page table of $L$ levels, every access of the program turns
 into $L + 1$ memory accesses.  If PTE reads have the same average memory
 access time (AMAT) as data accesses,
 \begin{equation}
@@ -551,7 +585,10 @@ the data cache, for three reasons.
 \begin{itemize}
   \item It stores only translations, not data; an entry takes a few bytes.
   \item One entry serves a whole page rather than a single cache block, so a
-    few entries cover the memory a program is actively using.
+    few entries cover the memory a program is actively using.\tip{The memory a
+    TLB maps at one time is its \emph{reach}: entries $\times$ page size.
+    64 entries of 4~KB reach 256~KB; the same 64 entries of 2~MB pages reach
+    128~MB.}
   \item It stores the final result of the translation, not the entries of the
     individual levels.  A TLB hit takes a single lookup, however many levels
     the page table has.
@@ -584,7 +621,12 @@ usually finds a valid PTE.}
 The TLB must agree with the page tables: when the operating system changes a
 mapping, e.g.\ by evicting a page, it invalidates the TLB entry of the page,
 and when the processor switches to another program, the entries of the
-previous program are invalidated or tagged with a program identifier.
+previous program are invalidated or tagged with a program identifier.\sidenote{That tag is a PCID on x86 and an ASID on Arm; with it a context
+switch need not flush the TLB.  Invalidating a single mapping is the harder
+case: on a multicore processor every core that may hold the entry must drop
+it, so the operating system sends an interprocessor interrupt and waits for
+the acknowledgements.  This \emph{TLB shootdown} makes unmapping memory far
+more expensive than mapping it.}
 
 \begin{figure}[htbp]
   \centering
@@ -630,7 +672,9 @@ The organization of a TLB follows from its role.\source{Lesson 13, videos
   \item[Size] The TLB should hit about as often as the cache, so it must cover
     the pages of the data the cache holds (\cref{ex:l13-tlb-size}); this takes
     about 64 to 512 entries.  Consulted on every access, it must also be about
-    as fast as an L1 cache hit, which keeps it from growing larger.
+    as fast as an L1 cache hit, which keeps it from growing larger.\margin{Skylake, per Intel's optimization manual: 64 first-level data TLB
+    entries for 4~KB pages, 128 for instructions, and a 1536-entry 12-way
+    second-level TLB behind both.}
   \item[Levels] If that does not cover enough memory, a larger and slower
     second-level TLB with hundreds to thousands of entries is placed behind the
     first, as caches are organized in levels (Lesson 14).  It is looked up only
@@ -646,7 +690,9 @@ The organization of a TLB follows from its role.\source{Lesson 13, videos
   of $4 \times 4 = 16$ cycles, so an access takes on average
   $1 + 0.01 \times 16 + 4 = 5.16$ cycles instead of 20.  Translation now costs
   1.16 cycles instead of 16, mostly for the lookup, which Lesson 14 overlaps
-  with the cache lookup.
+  with the cache lookup.\margin{This has the form of \cref{eq:l12-amat}:
+  lookup time $+$ miss rate $\times$ penalty, with the walk as the penalty.
+  A TLB is a cache and is evaluated as one.}
 \end{example}
 
 \begin{keypoint}[Lesson summary]
