@@ -55,13 +55,17 @@ the five-stage model captures every issue that matters here.}
     operation and read the source operands from the register file.
   \item[EX] \emph{execute}: perform the ALU operation, or compute the
     memory address for a load/store, or evaluate a branch condition.
-  \item[MEM] \emph{memory}: access data memory for loads and stores.
+  \item[MEM] \emph{memory}: access data memory for loads and
+    stores.\margin{Each stage is assumed to take exactly one cycle, the
+    memory access included---an assumption Lessons 12--15 undo.}
   \item[WB] \emph{write back}: write the result into the register file.
 \end{description}
 
 \Cref{fig:timing} shows five independent instructions flowing through the
 pipeline.  After the first four cycles fill the pipeline, one instruction
-completes per cycle.
+completes per cycle.\caution{Separate instruction and data memory ports are
+assumed here; a single port would add \emph{structural} hazards (H\&P
+App.~C).}
 
 \begin{figure}[htbp]
   \centering
@@ -120,7 +124,11 @@ instruction could have completed.
 A \term{control dependence}[制御依存] exists when whether an instruction
 executes at all depends on the outcome of an earlier branch.\source{Lesson
 3, videos 9--10; H\&P §C.2.}  In the five-stage pipeline the branch
-condition and target are known only at the end of EX.  By then the two
+condition and target are known only at the end of EX.\sidenote{Early RISC
+pipelines exposed the wasted slots instead of flushing them: in MIPS and
+SPARC the instruction after a branch (the \emph{delay slot}) always
+executes, and the compiler fills it.  With many instructions in flight one
+slot buys little, and MIPS Release~6 (2014) dropped it.}  By then the two
 following instructions have already been fetched (\cref{fig:flush}); if the
 branch is taken they must be flushed and the fetch restarted at the target.
 
@@ -131,7 +139,10 @@ branch is taken they must be flushed and the fetch restarted at the target.
   \label{fig:flush}
 \end{figure}
 
-The cost of this on the CPI depends on how often it happens.  Typical
+The cost of this on the CPI depends on how often it
+happens.\margin{The \SI{20}{\percent}/\SI{60}{\percent} below are round
+lecture numbers; integer code really does branch about every fifth
+instruction (H\&P ch.~3).}  Typical
 figures used in the lecture are that \SI{20}{\percent} of instructions are
 branches and \SI{60}{\percent} of branches are taken; with the simple
 policy of always fetching the fall-through instruction (\enquote{predict
@@ -151,7 +162,8 @@ not taken}), only taken branches cause a flush:
 
 \tip{Cycles lost to control dependences $=$ (fraction of instructions that
 are branches) $\times$ (fraction mispredicted) $\times$ (instructions
-flushed per misprediction).}
+flushed per misprediction).  The last factor is (stage in which the branch
+resolves) $-$ 1.}
 
 \section{Data dependences}
 
@@ -234,7 +246,9 @@ videos 15--16; H\&P §C.2.}
   \item \textbf{Fix} the value by \term{forwarding}[フォワーディング]
     (bypassing): route the result directly from the stage that produced it
     to the stage that needs it, without waiting for it to reach the
-    register file (\cref{fig:forwarding}).
+    register file (\cref{fig:forwarding}).\margin{Lesson 9 adds
+    store-to-load forwarding: a pending store hands its value to a later
+    load inside the load-store queue.}
 \end{enumerate}
 
 \begin{figure}[htbp]
@@ -246,7 +260,9 @@ videos 15--16; H\&P §C.2.}
 \end{figure}
 
 Forwarding removes most RAW stalls but not all of them: a value cannot be
-forwarded \emph{backwards in time}.  The result of a load is only available
+forwarded \emph{backwards in time}.\tip{Stall cycles $=$ (cycle the value
+is ready) $-$ (cycle it is needed); $\le 0$ means forwarding alone
+suffices.}  The result of a load is only available
 at the end of MEM, whereas the next instruction needs it at the start of
 its own EX, which is the same cycle.  One stall cycle is therefore
 unavoidable for a \emph{load-use} pair even with full forwarding.
@@ -257,7 +273,9 @@ unavoidable for a \emph{load-use} pair even with full forwarding.
   ADD R3, R1, R4     ; needs R1 at start of EX (cycle 4): stall 1 cycle
   \end{lstlisting}
   With forwarding but no stall the \texttt{ADD} would use a stale R1;
-  without forwarding it would stall two cycles.
+  without forwarding it would stall two cycles.\margin{On a Skylake core an
+  L1 hit takes 4 cycles, so a load-use pair there costs about 3 stall
+  cycles, not 1 (Intel optimization manual).}
 \end{example}
 
 \section{How many stages?}
@@ -268,11 +286,14 @@ Three effects pull in different directions as the depth increases:
 \begin{itemize}
   \item \textbf{Clock period decreases} (less logic per stage), which
     lowers $T_{\mathrm{clk}}$ in the iron law---the intended benefit.  But
-    the latch overhead per stage does not shrink, so the gain flattens out.
+    the latch overhead per stage does not shrink, so the gain flattens
+    out.\caution{A deeper pipeline is not automatically faster: only the
+    product CPI $\times T_{\mathrm{clk}}$ decides (Lesson 2).}
   \item \textbf{CPI increases}: more stages means more instructions in
     flight between a branch and its resolution, hence more instructions
     flushed per misprediction, and more distance over which RAW hazards
-    need stalls.
+    need stalls.\margin{A mispredicted branch costs about 16--20 cycles on
+    Skylake-class cores (Agner Fog, microarchitecture manual).}
   \item \textbf{Power increases}: more latches switch every cycle and the
     higher frequency raises dynamic power (\cref{eq:active-power}).
 \end{itemize}
@@ -280,7 +301,11 @@ Three effects pull in different directions as the depth increases:
 Considering performance alone (the product CPI $\times T_{\mathrm{clk}}$),
 the optimum is deep---on the order of 30--40 stages.  Once power is
 included, the optimum moves to roughly 10--15 stages, which is where
-current designs sit.
+current designs sit.\sidenote{The deepest pipeline ever shipped in an x86
+was the Pentium~4 \enquote{Prescott} of 2004: 31 stages, up to
+\SI{3.8}{\giga\hertz}, with power stopping it there.  Its successor, the
+Core microarchitecture of 2006, went back to 14 stages, and depths have
+stayed near 15--20 since.}
 
 \begin{keypoint}[Lesson summary]
   Pipelining raises throughput, not latency; ideal CPI is 1 and every stall
