@@ -58,7 +58,9 @@ drives the bit lines, whereas a DRAM cell only holds a small charge that has to
 be sensed, written back and refreshed.  DRAM packs more bits into the same area
 and is cheaper per bit, but slower.  Caches, which must be fast
 and can be small, are built from SRAM; main memory, which must be large and
-cheap, is built from DRAM.
+cheap, is built from DRAM.\margin{The division is not absolute: IBM's POWER7
+(2010) built its 32~MB L3 cache from DRAM cells---trench eDRAM---on the
+processor die.}
 
 \section{The SRAM cell}
 \label{sec:l15-sram}
@@ -124,7 +126,9 @@ could be decided reliably.  The pair helps writes as well,
 since the value and its complement act on both sides of the loop at once.  The
 resulting cell has six transistors, two in each inverter and two access
 transistors, and it needs a word line, two bit lines and the supply
-connections of its inverters.
+connections of its inverters.\margin{Every cache array of Lessons 12--14 is
+built from these cells: the data of a 32~KB L1 cache alone is \num{262144}
+bits, some 1.6~million transistors.}
 
 \section{The DRAM cell}
 \label{sec:l15-dram}
@@ -138,7 +142,10 @@ line is activated, so that the capacitor charges or discharges through the
 transistor.  When the word line is deactivated, the transistor turns off and
 isolates the charge.
 
-A transistor that is off is not a perfect switch, however.  A small current
+A transistor that is off is not a perfect switch, however.\caution{The
+\enquote{static} of SRAM is about retention, not power: SRAM cells leak as
+well, and the caches are among the largest contributors to a processor's
+static power.}  A small current
 still flows through it---the same imperfection that causes static power
 (Lesson 1)---and the charge of a stored~1 gradually leaks away until the cell
 can no longer be distinguished from a~0.  This is what makes DRAM dynamic: a
@@ -255,7 +262,10 @@ read of one bit of a DRAM chip proceeds in four steps.
 A write uses the same path.  The row is read into the latch as above, the bit
 selected by the column address is replaced in the latch by the value to be
 written, and the write-back then stores the modified row.  In a DRAM chip a
-write is thus a read whose latch is changed before it is written back.
+write is thus a read whose latch is changed before it is written
+back.\margin{Real devices are 4, 8 or 16 bits wide rather than one: an
+8-bit-wide DDR4 chip holds 1~KB in a row, and the eight chips of a rank open
+their rows together (JEDEC DDR4).}
 
 \begin{note}
   \label{note:l15-model}
@@ -271,7 +281,9 @@ The two parts of the address take very different amounts of time.  Selecting a
 row involves decoding, driving a long word line and waiting for the sense
 amplifiers to detect tiny charges on long bit lines.  Selecting a column only
 switches a multiplexer between bits that are already in the latch.
-\Cref{sec:l15-ras-cas,sec:l15-fpm} exploit this difference.
+\Cref{sec:l15-ras-cas,sec:l15-fpm} exploit this difference.\margin{Datasheets
+call the latched row the row buffer, and an access that finds its row already
+open a \enquote{page hit} (\cref{sec:l15-fpm}).}
 
 \begin{note}
   An SRAM chip is organized in the same way, with a row decoder, sense
@@ -285,7 +297,10 @@ switches a multiplexer between bits that are already in the latch.
 Every row of a DRAM chip has to be refreshed at least once in every
 interval~$T$, typically a few tens of milliseconds.\source{Lesson 15, videos
 8--9; H\&P §2.2.}  A refresh uses the normal read path: it is a read
-(\cref{sec:l15-chip}) whose latch is written back without using the output.
+(\cref{sec:l15-chip}) whose latch is written back without using the
+output.\margin{JEDEC DDR4 fits \num{8192} refresh commands into a
+\SI{64}{\milli\second} window, one every \SI{7.8}{\micro\second}, and halves
+the interval above \SI{85}{\celsius}.}
 
 A read by the program refreshes the row it touches, but such reads cannot be
 relied upon, because some rows are not read for long periods or not at all.
@@ -303,7 +318,9 @@ interval of length
 
 While a row is being refreshed, the chip cannot serve a read or a write, and an
 access that arrives in the meantime has to wait.  Refresh is thus one more
-reason why DRAM is slow, and its cost grows with the number of rows.
+reason why DRAM is slow, and its cost grows with the number of rows.\tip{The
+refresh overhead is $t/(T/R) = Rt/T$, with $t$ the time one row refresh
+occupies the chip; how the refreshes are spread over $T$ does not matter.}
 
 \begin{example}
   \label{ex:l15-refresh}
@@ -386,7 +403,12 @@ only a new column address.
 
 Fast page mode pays for the expensive steps---selecting and sensing the row,
 and writing it back---once for a whole group of accesses, and for each access
-only the quick selection of a column.  Accesses to nearby addresses, which
+only the quick selection of a column.\sidenote{Fast page mode was the first of
+a line of improvements: extended data out (EDO) kept the data valid while the
+next column address was applied, synchronous DRAM (SDRAM, first shipped in
+1992) replaced the strobes with a clock and a command protocol, and DDR added
+a transfer on both clock edges.  Inside the chip the row-and-column structure
+is unchanged.}  Accesses to nearby addresses, which
 spatial locality (Lesson 12) makes common, usually differ only in the lower
 bits of the address and therefore share a row.  The controller that drives RAS and CAS decides
 how long a row stays open.  It can keep the row open as long as the following
@@ -405,7 +427,9 @@ consecutive accesses share a row.
   mode, rows are opened and closed three times, and the table adds up to
   \SI{145}{\nano\second}.  Had the access to row~22 come last, the four
   accesses to row~7 would have shared a single opening, for a total of
-  \SI{105}{\nano\second}.
+  \SI{105}{\nano\second}.\caution{Module timings such as 22-22-22 are bus
+  clocks, not nanoseconds: on DDR4-3200 opening a row, reading a column and
+  closing a row each take \SI{13.75}{\nano\second}.  JEDEC speed bins.}
 \end{example}
 
 \begin{table}[htbp]
@@ -452,7 +476,9 @@ cache miss therefore travels from the processor over the FSB to the
 northbridge and from there over the memory bus to the DRAM chips, and the data
 returns the same way.  Each of these steps adds latency, and the FSB carries
 all other traffic between the processor and the devices behind the northbridge
-as well.
+as well.\margin{For scale: a 1333~MT/s front-side bus 64 bits wide carries
+about 10.7~GB/s for all traffic together, while one DDR4-3200 channel delivers
+25.6~GB/s.}
 
 \begin{figure}[htbp]
   \centering
@@ -465,7 +491,14 @@ as well.
 \end{figure}
 
 Newer processors integrate the memory controller on the processor chip and
-attach the memory bus to the processor directly (\cref{fig:l15-connection}b).
+attach the memory bus to the processor directly
+(\cref{fig:l15-connection}b).\sidenote{AMD's Athlon~64 (2003) was the first
+mainstream x86 processor with the memory controller on the processor die, and
+Intel followed with Nehalem in 2008.  The rest of the northbridge---the
+graphics and PCI~Express links---moved onto the processor as well, leaving a
+single chipset for the slow devices.  Each processor chip now has its own
+memory, and an access to the memory of another chip crosses the interconnect:
+the NUMA machines of Lesson 18.}
 The FSB and the northbridge then disappear from the path to memory, which
 lowers the latency of every access to main memory.  Even so, a DRAM access
 remains far slower than the processor, for the reasons collected in this
