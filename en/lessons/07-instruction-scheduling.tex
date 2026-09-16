@@ -1,0 +1,652 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Instruction Scheduling}
+\lessoninfo{
+  video={Lesson 7, videos 1--30},
+  textbook={H\&P \cite{hennessy2017} §3.4--3.5; \cite{tomasulo1967}},
+  keywords={out-of-order execution, Tomasulo's algorithm, instruction queue, reservation station, register alias table, tag, common data bus, issue, dispatch, write result, stale result, oldest first},
+}
+
+Lesson 6 showed that programs contain far more instruction-level parallelism
+than an in-order processor can use, and that approaching it requires a
+processor that renames registers and executes instructions out of order.
+This lesson describes how such a processor decides, cycle by cycle, which
+instructions to execute.  The method is Tomasulo's algorithm, which combines
+register renaming with the detection of instructions whose operands are
+available and is still the basis of today's out-of-order processors.  We
+follow an instruction through its three steps, examine the choices that arise
+when several instructions or results compete for the same hardware, trace a
+complete example, and derive a shortcut for computing when each instruction
+executes.
+
+\section{Improving IPC}
+\label{sec:l07-ipc}
+
+Since the ILP of real programs is well above~1, a processor whose IPC is to
+come close to it must deal with four kinds of dependences between
+instructions.\source{Lesson 7, videos 1--2; H\&P §3.1.}  Each has its own
+remedy:
+\begin{description}
+  \item[Control dependences] The instructions that follow a branch can enter
+    the pipeline before the branch executes only if its outcome is guessed.
+    Branch prediction (Lesson~4), and predication for hard-to-predict branches
+    (Lesson~5), take care of them.
+  \item[False data dependences] WAW and WAR dependences exist only because
+    instructions reuse register names.  Register renaming (Lesson~6) removes
+    them.
+  \item[True data dependences] RAW dependences cannot be removed: an
+    instruction has to wait until the values it reads have been computed.
+    What can be avoided is that instructions which do not depend on it wait as
+    well.
+  \item[Structural dependences] Instructions also compete for hardware:
+    reservation stations, execution units and the bus introduced below.  The
+    remedy is a wider processor (Lesson~6) with more of these resources, so
+    that more instructions can be issued and executed in the same cycle.
+\end{description}
+
+\begin{definition}[Out-of-order execution]
+  \label{def:l07-ooo}
+  Executing each instruction as soon as the values it reads are available,
+  even while instructions that precede it in program order are still waiting,
+  is called \term{out-of-order execution}[アウトオブオーダ実行].
+\end{definition}
+
+Out-of-order execution is combined with renaming: without it, an instruction
+could overtake only earlier instructions with which it has no WAW or WAR
+dependence, and much of the ILP would be lost.  What remains is the
+scheduling problem: in every cycle the processor must determine which
+instructions have all their operands, and decide which of them to execute.
+
+\section{Tomasulo's algorithm}
+\label{sec:l07-tomasulo}
+
+The scheduling method used in out-of-order processors was introduced in the
+IBM System/360 Model~91.\source{Lesson 7, video 3; H\&P §3.4;
+\cite{tomasulo1967}.}
+
+\begin{definition}[Tomasulo's algorithm]
+  \label{def:l07-tomasulo}
+  The hardware algorithm published by Tomasulo in 1967, which renames
+  registers and determines which instructions have their operands available
+  so that each instruction executes as soon as its operands have been
+  computed, is called \term{Tomasulo's algorithm}[Tomasulo のアルゴリズム].
+\end{definition}
+
+Current processors schedule instructions in essentially the same way.  The
+differences are listed in \cref{tab:l07-modern}.  The first two concern only
+the scope of the algorithm; the third changes its mechanism.  Tomasulo's
+algorithm has no provision for exceptions: once instructions have executed
+out of order, the registers need not correspond to any point in the program
+at which an exception could be taken.  Supporting exceptions requires an
+additional structure, the subject of Lesson~8.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Tomasulo's algorithm and modern out-of-order processors.}
+  \label{tab:l07-modern}
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    & Tomasulo's algorithm & Modern processors \\
+    \midrule
+    Instructions scheduled         & floating-point operations & all instructions \\
+    Instructions in flight at once & a few                     & hundreds \\
+    Exceptions                     & not supported             & supported (Lesson 8) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Organization}
+\label{sec:l07-organization}
+
+\Cref{fig:l07-tomasulo} shows the hardware that carries out Tomasulo's
+algorithm.\source{Lesson 7, video 4; H\&P §3.4.}  The fetch stage appends
+each fetched instruction to the \term{instruction queue}[命令キュー], a
+first-in first-out buffer that keeps the fetched instructions in program
+order until they can be moved on to the reservation stations.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l07-tomasulo}
+  \caption{Organization of a processor with Tomasulo's algorithm.  Issue moves
+    the instruction at the head of the queue into a reservation station, using
+    the RAT and the register file; dispatch sends a ready instruction to its
+    execution unit; results return over the common data bus to the
+    reservation stations, the RAT, the register file and the store buffers.
+    Loads and stores take the path through the address adder and the load
+    and store buffers.}
+  \label{fig:l07-tomasulo}
+\end{figure}
+
+\begin{definition}[Reservation station]
+  \label{def:l07-rs}
+  A \term{reservation station}[リザベーションステーション]%
+  \index{RS|see{reservation station}} (RS) holds one instruction from the
+  moment it leaves the instruction queue until its result has been
+  broadcast.  It records whether it is busy; the operation; for each operand
+  either its value or, if the value has not been computed yet, the tag of the
+  value; and whether the instruction has already been dispatched.
+\end{definition}
+
+Reservation stations are grouped by the execution unit that serves them.  The
+examples of this lesson use three stations AD1, AD2 and AD3 for additions and
+subtractions, served by one adder, and two stations ML1 and ML2 for
+multiplications and divisions, served by one multiplier.  The name of a
+station is the \emph{tag} under which the result of its instruction will be
+broadcast.
+
+The register alias table of Lesson~6 has one entry per register.  An empty
+entry means that the register file holds the current value of the register;
+otherwise the entry holds the tag of the station whose instruction will
+produce that value.  Tags thus play the role of the physical registers of
+Lesson~6: every result receives a new name, and an instruction that reads a
+register refers to the result of its closest preceding writer.
+
+\begin{definition}[Common data bus]
+  \label{def:l07-cdb}
+  The \term{common data bus}[共通データバス]%
+  \index{CDB|see{common data bus}} (CDB) carries each result computed by an
+  execution unit, together with its tag, to all reservation stations, to the
+  RAT and to the register file.
+\end{definition}
+
+Loads and stores use a separate path.  An adder computes the memory address;
+a load then waits in a load buffer, which holds the address, and a store in a
+store buffer, which holds the address and the value to be stored, possibly
+received from the CDB.  The value read by a load is placed on the CDB like any
+other result (\cref{sec:l07-load-store}).
+
+Every instruction passes through three steps, marked in
+\cref{fig:l07-tomasulo}:
+\begin{description}
+  \item[Issue] The instruction at the head of the instruction queue is placed
+    in a free reservation station, with its operands and its destination
+    resolved through the RAT.  This step is called
+    \term{issue}[発行].
+  \item[Dispatch] An instruction whose operands are all available is sent
+    from its reservation station to an execution unit; this is its
+    \term{dispatch}[ディスパッチ].
+  \item[Write result] The result is placed on the CDB, from which it reaches
+    the waiting reservation stations, the RAT and the register file.  This
+    step is called \term{write result}[結果書き込み], or
+    broadcast.\index{broadcast|see{write result}}
+\end{description}
+
+\section{Issue}
+\label{sec:l07-issue}
+
+Issue takes the instruction at the head of the instruction queue and performs
+the following steps.\source{Lesson 7, videos 5--7; H\&P §3.5.}  In the
+examples of this lesson one instruction is issued per cycle; a wider
+processor issues several per cycle, still in program order.
+\begin{enumerate}
+  \item Take the next instruction, in program order, from the head of the
+    queue.
+  \item Determine where each operand comes from.  If the RAT entry of the
+    operand register is empty, the value is in the register file; otherwise
+    the entry names the tag of the value.
+  \item Find a free reservation station for the operation.  If every station
+    of that kind is busy, the instruction is not issued in this cycle; it
+    stays at the head of the queue, and the instructions behind it wait as
+    well.
+  \item Place the instruction in the station: the operation, and for each
+    operand the value from the register file or the tag from the RAT.
+  \item Set the RAT entry of the destination register to the name of the
+    station.
+\end{enumerate}
+
+Instructions are issued strictly in program order.  The RAT then describes the
+register values seen at the position of the instruction being issued, so that
+each operand refers to its closest preceding writer.  As in renaming, the
+operands are looked up before the destination entry is
+overwritten.\caution{Issue never waits for operands, only for a free
+reservation station.}
+
+\begin{example}
+  \label{ex:l07-program}
+  The following program is the running example of this lesson:
+  \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+I1:  MUL R1, R2, R3     ; R1 <- R2 * R3
+I2:  ADD R4, R1, R5     ; R4 <- R1 + R5
+I3:  SUB R6, R2, R5     ; R6 <- R2 - R5
+I4:  ADD R1, R5, R3     ; R1 <- R5 + R3
+I5:  DIV R2, R6, R3     ; R2 <- R6 / R3
+I6:  MUL R3, R4, R1     ; R3 <- R4 * R1
+I7:  SUB R5, R3, R2     ; R5 <- R3 - R2
+\end{lstlisting}
+  Initially the RAT is empty and the register file holds R1 $=1$,
+  R2 $=14$, R3 $=4$, R4 $=3$, R5 $=6$ and R6 $=7$.  In cycle~1, I1 is issued
+  into ML1 with the operand values 14 and 4, and the RAT entry of R1 becomes
+  ML1.  In cycle~2, I2 is issued into AD1 (\cref{fig:l07-issue}).  The RAT
+  entry of R1 holds ML1, so the first operand is the tag ML1; the entry of R5
+  is empty, so the second operand is the value~6.  The RAT entry of R4 becomes
+  AD1.  I3 and I4 follow in cycles 3 and~4.  I4 writes R1 again and replaces
+  ML1 with AD3 in the entry of R1: every instruction issued from now on that
+  reads R1 uses the result of I4, not that of I1.
+\end{example}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l07-issue}
+  \caption{Issue of I2 in cycle~2 of \cref{ex:l07-program}.  The RAT entry of
+    R1 yields the tag ML1 (tags in italics), the empty entry of R5 lets the
+    value~6 be taken from the register file, and the entry of R4 is set to
+    AD1.  Shaded cells are written in this step.}
+  \label{fig:l07-issue}
+\end{figure}
+
+\section{Dispatch}
+\label{sec:l07-dispatch}
+
+An instruction waits in its reservation station until all its operands are
+values.\source{Lesson 7, video 8; H\&P §3.5.}  Whenever a result appears
+on the CDB, every reservation station compares the tags of its operands with
+the tag on the bus and, where they match, replaces the tag with the value
+from the bus; this is called \emph{capturing} the value.  A station whose
+operands are all values holds a \emph{ready} instruction.  When the execution
+unit that serves the station is free, a ready instruction is dispatched: its
+operation and operand values are sent to the unit, which starts executing it.
+The station remains busy while the instruction executes, because its name is
+the tag under which the result will be broadcast.
+
+\subsection{More than one ready instruction}
+
+Several instructions may be ready when an execution unit becomes free, and
+one of them must be chosen.\source{Lesson 7, videos 9--10.}  Every choice is
+correct, since a ready instruction has all the values it needs; the choice
+affects only performance and hardware cost.
+\begin{description}
+  \item[Oldest first]\index{oldest first} Dispatch the instruction that was
+    issued first.  Other things being equal, more of the instructions in
+    flight were issued after an older instruction and may be waiting for its
+    result, so this approximates the next policy while requiring only that
+    the order of issue be recorded.
+  \item[Most dependents first] Dispatch the instruction whose result is
+    needed by the largest number of waiting instructions, so that as many
+    instructions as possible become ready soon.  This promises the best performance, but
+    finding that instruction means comparing the tag of every candidate with
+    the operands of all reservation stations, which is too slow and costly.
+  \item[Random] The simplest selection logic.  It may keep an instruction on
+    which many others depend waiting behind unimportant ones, so performance
+    suffers.
+\end{description}
+Oldest first is a good compromise between the two others and is the rule used
+in the examples of this lesson.  In the running example, both I2 and I4 are ready when the adder becomes free in cycle~7
+(\cref{sec:l07-example}); oldest first dispatches I2, although I4 has been
+ready two cycles longer.
+
+\section{Write result}
+\label{sec:l07-write}
+
+When an execution unit has finished an instruction, the write-result step
+broadcasts its result.\source{Lesson 7, video 11; H\&P §3.5.}
+\begin{enumerate}
+  \item The result and the tag of the instruction's reservation station are
+    placed on the CDB.
+  \item Every operand that holds this tag captures the value
+    (\cref{sec:l07-dispatch}).
+  \item If the RAT entry of a register holds the tag, the value is written
+    into that register in the register file and the RAT entry is cleared, so
+    that instructions issued later read the value from the register file.
+  \item The reservation station is freed.
+\end{enumerate}
+The station need not record the destination register, because the RAT entry
+that holds the tag identifies it.  \Cref{fig:l07-broadcast} shows the
+broadcast of the result of I2 in the running example.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l07-broadcast}
+  \caption{Write result of I2 in cycle~9 of the running example.  ML1 (I6)
+    captures 62 in place of the tag AD1; the RAT entry of R4 holds AD1, so
+    R4 becomes 62 and the entry is cleared; AD1 is freed.  No other operand
+    or RAT entry holds AD1.}
+  \label{fig:l07-broadcast}
+\end{figure}
+
+\subsection{More than one result in a cycle}
+\label{sec:l07-cdb-conflict}
+
+Two execution units may finish in the same cycle, but one bus carries one
+result at a time.\source{Lesson 7, video 12.}  One solution is a separate
+bus for each unit.  Every operand of every reservation station must then
+compare its tag with each bus and select the value from the matching one, and
+the register file needs a write port per bus; the comparison logic, which is
+already large, grows in proportion to the number of buses.  The alternative
+keeps a single bus and lets one result wait for the next cycle.  The rule
+used here gives priority to the result of the \emph{slower} unit: its
+instruction was dispatched longer ago, so it tends to be the older
+instruction, and more instructions are likely to be waiting for its result.
+In the examples we assume that a unit whose result is waiting for the bus
+cannot start another instruction.
+
+\subsection{Stale results}
+\label{sec:l07-stale}
+
+By the time a result is broadcast, a later instruction that writes the same
+register may already have been issued.\source{Lesson 7, video 13; H\&P §3.5.}
+The RAT entry of the register then holds the tag of the later instruction,
+not the tag on the bus, and step~3 has no effect: neither the register file
+nor the RAT changes.  The result is \emph{stale}\index{stale result} only for
+the register, and ignoring
+it there is correct.  After both instructions the register must hold the later
+result, which arrives when the later instruction broadcasts.  The earlier
+result is still needed, but only by the instructions issued between the two
+writers; they hold its tag and capture the value in step~2.  Instructions
+issued after the later writer refer to the later tag.
+
+\begin{example}
+  \label{ex:l07-stale}
+  In the running example, I1 and I4 both write R1.  When I1 broadcasts 56
+  under the tag ML1 in cycle~6, the RAT entry of R1 already holds AD3, because
+  I4 was issued in cycle~4.  R1 in the register file keeps its old value~1
+  and the entry keeps AD3, while AD1, which holds I2, captures~56.  R1 becomes
+  10 only in cycle~11, when I4 broadcasts under AD3.
+\end{example}
+
+\begin{keypoint}
+  A broadcast delivers its value to every operand that waits for its tag, but
+  it updates the register file and the RAT only if the RAT entry of the
+  destination still holds that tag.
+\end{keypoint}
+
+\section{The steps in one cycle}
+\label{sec:l07-cycle}
+
+For a single instruction, Tomasulo's algorithm is a sequence: issue, waiting
+and capturing in a reservation station, dispatch, execution, write
+result.\source{Lesson 7, videos 14--19; H\&P §3.5.}  For the processor as a
+whole, all steps take place in every cycle, each for different instructions:
+in the same cycle one instruction may be issued, several stations may capture
+a broadcast value, ready instructions may be dispatched to free units, and one
+result is broadcast.
+
+Whether two steps of the \emph{same} instruction can take place in the same
+cycle is a matter of circuit design.  In the simplest design every step
+examines the structures as they are at the start of the cycle, and all
+updates take effect at its end.  Then:
+\begin{itemize}
+  \item An instruction issued in cycle $C$ is in its reservation station only
+    from cycle $C+1$, so it can be dispatched in $C+1$ at the earliest.
+  \item An instruction that captures its last missing operand in cycle $C$ is
+    ready from cycle $C+1$ and can be dispatched in $C+1$ at the earliest.
+  \item A station freed by a broadcast in cycle $C$ can receive a new
+    instruction in cycle $C+1$.
+\end{itemize}
+The delay between capture and dispatch can be removed with additional logic,
+a dispatch that also considers operands arriving on the bus in the current
+cycle, and a station freed by a broadcast could similarly be reused in the
+same cycle.  The additional logic lies in the same cycle as the step it
+extends and therefore lengthens the clock cycle.  An instruction, however, is
+not dispatched in the cycle in which it is issued: while issue writes it into
+its station, dispatch does not yet see it there.
+
+Two interactions between issue and write result in the same cycle need care.
+\begin{itemize}
+  \item Both can change the RAT entry of the same register: the broadcast of
+    an older writer clears it, and the issue of a newer writer sets it to a
+    new tag.  The issue must prevail, because it belongs to the later
+    instruction in program order; equivalently, the write result is applied
+    first and the issue second.  Otherwise later instructions would read the
+    register file and miss the result of the newly issued instruction.
+  \item An instruction may be issued in the cycle in which one of its operands
+    is broadcast.  In the simplest design it finds the tag in the RAT, since
+    the entry is cleared only at the end of the cycle, but enters its station
+    after the value has passed on the bus; issue must then compare operand
+    tags with the bus and take the value directly, or the instruction would
+    wait for a broadcast that never comes.  If the updates of the broadcast
+    are visible to the issue in the same cycle, the issue simply reads the
+    new value from the register file.
+\end{itemize}
+
+\begin{keypoint}
+  In the simplest design an instruction advances by at most one step per
+  cycle: issued in cycle $C$, it is dispatched in $C+1$ at the earliest, and a
+  result broadcast in cycle $W$ lets the instructions waiting for it be
+  dispatched in $W+1$ at the earliest.
+\end{keypoint}
+
+\section{Load and store instructions}
+\label{sec:l07-load-store}
+
+Loads and stores create dependences through memory that are analogous to the
+dependences through registers.\source{Lesson 7, video 20; H\&P §3.5.}
+\begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
+SW  R1, 0(R2)      ; MEM[R2] <- R1
+LW  R3, 8(R4)      ; R3 <- MEM[R4 + 8]
+\end{lstlisting}
+If R4${}+8$ equals R2, the load reads the value just stored, a RAW
+dependence through memory.  Two stores to the same address have a WAW
+dependence, and a store to an address that an earlier load reads has a WAR
+dependence.  The RAT cannot remove the false ones, because it renames
+registers, not memory locations, and whether two memory accesses conflict is
+known only once both addresses have been computed.
+
+Tomasulo's algorithm therefore performs loads and stores in program order.
+They are issued like other instructions, with their operands resolved through
+the RAT, and the address adder computes the address.  A load then waits in a
+load buffer and a store in a store buffer (\cref{fig:l07-tomasulo}); a store
+whose value has not been computed yet captures it from the CDB.  The memory
+accesses are made from these buffers in the order in which the loads and
+stores were issued.  A load broadcasts the value it reads on the CDB under its
+own tag, exactly like an arithmetic result.  Modern processors also execute
+loads and stores out of order, which requires the processor to detect and
+handle the memory dependences; Lesson~9 covers this.
+
+\section{A complete example}
+\label{sec:l07-example}
+
+We now execute the program of \cref{ex:l07-program} to the
+end.\source{Lesson 7, videos 21--26; H\&P §3.5.}  The assumptions are those of
+the simplest design of \cref{sec:l07-cycle}, together with the following:
+\begin{itemize}
+  \item At most one instruction is issued per cycle, into the free station of
+    the required kind with the lowest number.
+  \item The adder executes ADD and SUB in 2 cycles; the multiplier executes
+    MUL and DIV in 4 cycles.  An instruction dispatched in cycle $D$ with an
+    execution time of $k$ cycles executes in cycles $D$ to $D+k-1$ and
+    broadcasts in cycle $D+k$, in which its unit can already accept the next
+    instruction.
+  \item There is one CDB, and the multiplier has priority over the adder
+    (\cref{sec:l07-cdb-conflict}); a unit whose result waits for the bus
+    accepts no new instruction.  Ready instructions are dispatched oldest
+    first.
+\end{itemize}
+\Cref{tab:l07-trace} lists what happens in each cycle, and
+\cref{tab:l07-state} shows the reservation stations and the RAT after cycles
+5, 6 and~7.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Events in each cycle of the complete example.  Captures are listed
+    with the broadcast that causes them.}
+  \label{tab:l07-trace}
+  \begin{tabular}{@{}c>{\raggedright\arraybackslash}p{0.14\linewidth}>{\raggedright\arraybackslash}p{0.12\linewidth}>{\raggedright\arraybackslash}p{0.55\linewidth}@{}}
+    \toprule
+    Cycle & Issue & Dispatch & Write result and remarks \\
+    \midrule
+    1     & I1 $\to$ ML1 &    & \\
+    2     & I2 $\to$ AD1 & I1 & \\
+    3     & I3 $\to$ AD2 &    & I2 waits for ML1 \\
+    4     & I4 $\to$ AD3 & I3 & RAT entry of R1 becomes AD3 \\
+    5     & I5 $\to$ ML2 &    & all stations busy; I4 ready, adder busy \\
+    6     &              &    & I1: ML1 $=56$, stale for R1; AD1 captures;
+                                I3 finished, waits for the bus;
+                                no free station for I6 \\
+    7     & I6 $\to$ ML1 & I2 & I3: AD2 $=8$, R6 $\leftarrow 8$; ML2 captures;
+                                I2 and I4 ready, I2 older \\
+    8     & I7 $\to$ AD2 & I5 & \\
+    9     &              & I4 & I2: AD1 $=62$, R4 $\leftarrow 62$; ML1 captures \\
+    10    &              &    & \\
+    11    &              &    & I4: AD3 $=10$, R1 $\leftarrow 10$; ML1 captures \\
+    12    &              & I6 & I5: ML2 $=2$, R2 $\leftarrow 2$; AD2 captures \\
+    13--15 &             &    & I6 executes \\
+    16    &              &    & I6: ML1 $=620$, R3 $\leftarrow 620$; AD2 captures \\
+    17    &              & I7 & \\
+    18    &              &    & \\
+    19    &              &    & I7: AD2 $=618$, R5 $\leftarrow 618$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Reservation stations and RAT at the end of cycles 5, 6 and~7.
+    Tags are in italics; \enquote{exec} marks an instruction that has been
+    dispatched.  An empty RAT entry is shown with the register-file value.}
+  \label{tab:l07-state}
+  \begin{tabular}{@{}llll@{}}
+    \toprule
+    & After cycle 5 & After cycle 6 & After cycle 7 \\
+    \midrule
+    AD1 & I2: \textit{ML1}, 6    & I2: 56, 6              & I2: 56, 6 (exec) \\
+    AD2 & I3: 14, 6 (exec)       & I3: 14, 6 (exec)       & free \\
+    AD3 & I4: 6, 4               & I4: 6, 4               & I4: 6, 4 \\
+    ML1 & I1: 14, 4 (exec)       & free                   & I6: \textit{AD1}, \textit{AD3} \\
+    ML2 & I5: \textit{AD2}, 4    & I5: \textit{AD2}, 4    & I5: 8, 4 \\
+    \midrule
+    R1  & \textit{AD3} & \textit{AD3} & \textit{AD3} \\
+    R2  & \textit{ML2} & \textit{ML2} & \textit{ML2} \\
+    R3  & 4            & 4            & \textit{ML1} \\
+    R4  & \textit{AD1} & \textit{AD1} & \textit{AD1} \\
+    R5  & 6            & 6            & 6 \\
+    R6  & \textit{AD2} & \textit{AD2} & 8 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Cycles 1--5.}  One instruction is issued per cycle.  I1 and I3
+have all their operands at issue and are dispatched in the next cycle, I1 to
+the multiplier and I3 to the adder.  I4 is ready from cycle~5, but the adder
+is busy with I3.  I2 waits for the tag ML1 and I5 for AD2.  After cycle~5
+every station is busy.
+
+\paragraph{Cycle 6.}  Both units finished in cycle~5.  The bus takes the
+result of the slower multiplier, 56 under ML1, which is stale for R1
+(\cref{ex:l07-stale}); AD1 captures it and ML1 is freed.  The result of I3
+waits in the adder.  I6 is not issued, because at the start of the cycle
+both multiplier stations are busy.
+
+\paragraph{Cycle 7.}  I3 broadcasts 8 under AD2.  The RAT entry of R6 holds
+AD2, so R6 becomes~8 and the entry is cleared; ML2 captures the value for I5,
+and AD2 is freed.  The adder can take a new instruction, and both I2 and I4
+are ready; oldest first dispatches I2.  I6 is issued into ML1, freed in the
+previous cycle, and receives two tags, AD1 and AD3.
+
+\paragraph{Cycles 8--19.}  I7 is issued into AD2 and waits for ML1 and ML2.
+I5 starts on the multiplier in cycle~8, and I4 on the adder in cycle~9, when I2
+releases it.  I6 needs the results of I2 (cycle~9) and I4 (cycle~11) and the
+multiplier, which I5 releases in cycle~12; I7 needs the result of I6,
+broadcast in cycle~16.  After the last broadcast, in cycle~19, the register
+file holds R1 $=10$, R2 $=2$, R3 $=620$, R4 $=62$, R5 $=618$ and R6 $=8$,
+exactly the values produced by executing the program in order.
+
+\begin{keypoint}
+  The instructions of the example broadcast in the order I1, I3, I2, I4, I5,
+  I6, I7, and each executes as soon as its operands, a free station and a free
+  unit allow.  Because every operand is resolved through a tag at issue and
+  stale results never reach the register file, the final register values are
+  those of sequential execution.
+\end{keypoint}
+
+\section{Timing without tracing the structures}
+\label{sec:l07-timing}
+
+Tracing every structure cycle by cycle is laborious.  When only the timing
+matters, it suffices to determine the cycles of issue, dispatch and write
+result of each instruction.\source{Lesson 7, videos 27--29; H\&P §3.5.}  Let
+$I_n$, $D_n$ and $W_n$ denote these cycles for instruction $n$, and $k_n$ its
+execution time.  Under the assumptions of \cref{sec:l07-example}:
+\begin{description}
+  \item[Issue] $I_n$ is the first cycle after $I_{n-1}$ in which a station
+    of the required kind is free.  A station freed by the write result of
+    instruction $m$ is free from cycle $W_m+1$.
+  \item[Dispatch] $D_n$ is the first cycle that satisfies
+    \begin{equation}
+      D_n \;\ge\; 1 + \max\Bigl(I_n,\; \max_{p \in P(n)} W_p\Bigr) ,
+      \label{eq:l07-dispatch}
+    \end{equation}
+    where $P(n)$ is the set of instructions that produce the operands of $n$
+    (its closest preceding writers), and in which the execution unit is
+    free:\tip{$P(n)$: for each register $n$ reads, its closest preceding
+    writer (Lesson~6).}
+    not held by another instruction $m$, which holds it in cycles $D_m$ to
+    $W_m - 1$, and not taken by an older instruction that is also ready.
+  \item[Write result] $W_n = D_n + k_n$, or later if the bus is taken in that
+    cycle by a result with priority.
+\end{description}
+A unit or the bus may be taken by a \emph{later} instruction that became ready
+earlier, so the rows cannot simply be completed in program order.  Units and
+the bus are assigned in cycle order across all instructions: in each cycle a
+free unit takes the oldest of the instructions ready in that cycle, and the
+bus the result with priority.  A unit never stays idle for an older
+instruction that is not yet ready.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l07-timing}
+  \caption{Timing of the running example.  Out-of-order execution lets I3
+    run while I2 waits and I5 start while I4 waits; the delays of I3 (bus),
+    I4 (adder) and I6 (reservation station) are those derived in
+    \cref{ex:l07-timing}.}
+  \label{fig:l07-timing}
+\end{figure}
+
+\begin{example}
+  \label{ex:l07-timing}
+  \Cref{tab:l07-timing} applies these rules to the running example, and
+  \cref{fig:l07-timing} draws the result.  I3, I4 and I6 show every rule.
+  I3 is dispatched in cycle~4, one cycle after its issue, and finishes
+  executing in cycle~5; its write result would be cycle~6, but the bus then
+  carries the result of I1, so $W_3 = 7$.  Whether the adder is free for I2 in
+  cycle~7 thus depends on the row of the later I3.  I4 is ready from cycle~5,
+  but the adder is occupied by I3, whose result waits for the bus, until its
+  write result in cycle~7, and then by the older I2 until cycle~9, so
+  $D_4 = 9$ and $W_4 = 11$.  I6 finds both multiplier
+  stations busy until ML1 is freed by $W_1 = 6$, so $I_6 = 7$; its operands
+  come from I2 and I4, and \cref{eq:l07-dispatch} gives
+  $D_6 \ge 1 + \max(7, 9, 11) = 12$, which is also the cycle in which the
+  multiplier is released by I5, so $D_6 = 12$ and $W_6 = 16$.  The table
+  agrees with the full trace of \cref{tab:l07-trace}.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Issue, dispatch and write-result cycles of the running example.}
+  \label{tab:l07-timing}
+  \begin{tabular}{@{}llccc>{\raggedright\arraybackslash}p{0.44\linewidth}@{}}
+    \toprule
+    & Instruction & $I_n$ & $D_n$ & $W_n$ & What determines the timing \\
+    \midrule
+    I1 & \texttt{MUL R1, R2, R3} & 1 & 2  & 6  & ready at issue \\
+    I2 & \texttt{ADD R4, R1, R5} & 2 & 7  & 9  & $W_1 = 6$; adder busy with I3 until $W_3 = 7$ \\
+    I3 & \texttt{SUB R6, R2, R5} & 3 & 4  & 7  & ready at issue; bus taken in 6 \\
+    I4 & \texttt{ADD R1, R5, R3} & 4 & 9  & 11 & adder: I3, then the older I2 \\
+    I5 & \texttt{DIV R2, R6, R3} & 5 & 8  & 12 & $W_3 = 7$ \\
+    I6 & \texttt{MUL R3, R4, R1} & 7 & 12 & 16 & no station until $W_1 = 6$;
+                                               $W_4 = 11$; multiplier until $W_5 = 12$ \\
+    I7 & \texttt{SUB R5, R3, R2} & 8 & 17 & 19 & $W_6 = 16$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{keypoint}[Lesson summary]
+  Tomasulo's algorithm combines register renaming with out-of-order
+  execution, in which each instruction executes as soon as its operands are
+  available.  Issue moves instructions in program order from the
+  instruction queue into reservation stations, taking each operand either as
+  a value from the register file or as a tag from the RAT, and points the RAT
+  entry of the destination to the station.  A station captures values from
+  the common data bus until its instruction is ready; dispatch then sends it
+  to a free execution unit, choosing the oldest when several are ready.
+  Write result broadcasts the value and tag, frees the station, and updates
+  the register file and the RAT only if the result is not stale.  One bus
+  serves one result per cycle, the slower unit having priority.  Loads and
+  stores are performed in program order.  With one step per cycle, the issue,
+  dispatch and write-result cycles of every instruction follow from its
+  operands, the available stations and units, and the bus.  Tomasulo's
+  algorithm does not support exceptions; the reorder buffer of the next lesson
+  adds this.
+\end{keypoint}
+
+\end{document}

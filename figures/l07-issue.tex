@@ -1,0 +1,52 @@
+% Issuing I2 (ADD R4, R1, R5) in cycle 2 of the running example: the RAT
+% entry of R1 holds the tag ML1, the entry of R5 is empty so the value comes
+% from the register file, and the RAT entry of R4 is set to AD1.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  cl/.style={draw, fill=white, minimum width=0.9cm, minimum height=0.45cm, inner sep=0pt},
+  nm/.style={cl, fill=ln-box, minimum width=0.8cm},
+  new/.style={cl, fill=ln-accent!15},
+  tg/.style={font=\footnotesize\itshape\sffamily},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted},
+  arr/.style={->, thick, ln-accent}]
+  % ---- register file and RAT, one column per register
+  \node[anchor=west] at (-0.8,1.05) {I2:\enskip\texttt{ADD R4, R1, R5}};
+  \foreach \r/\x in {1/1.45,2/2.35,3/3.25,4/4.15,5/5.05,6/5.95} {
+    \node[lab] at (\x,0.4) {R\r};
+  }
+  \node[lab] at (1.45,0.66) {src$_1$};
+  \node[lab] at (4.15,0.66) {dst};
+  \node[lab] at (5.05,0.66) {src$_2$};
+  \node[lab, anchor=east] at (0.95,0) {\iflangja{レジスタファイル}{register file}};
+  \node[lab, anchor=east] at (0.95,-0.45) {RAT};
+  \foreach \v/\x in {1/1.45,14/2.35,4/3.25,3/4.15,6/5.05,7/5.95} {
+    \node[cl] at (\x,0) {\v};
+  }
+  \node[cl, tg] (r1) at (1.45,-0.45) {ML1};
+  \foreach \x in {2.35,3.25,5.05,5.95} { \node[cl] at (\x,-0.45) {}; }
+  \node[new, tg] (r4) at (4.15,-0.45) {AD1};
+  \node[cl, draw=none, fill=none] (r5) at (5.05,-0.45) {};
+  % ---- reservation stations: adder group left, multiplier group right
+  \foreach \n/\y in {1/-1.6,2/-2.05,3/-2.5} {
+    \node[nm] (ad\n) at (0.4,\y) {AD\n};
+    \node[cl, minimum width=0.8cm] (ado\n) at (1.2,\y) {};
+    \node[cl] (ada\n) at (2.05,\y) {};
+    \node[cl] (adb\n) at (2.95,\y) {};
+  }
+  \foreach \n/\y in {1/-1.6,2/-2.05} {
+    \node[nm] (ml\n) at (4.4,\y) {ML\n};
+    \node[cl, minimum width=0.8cm] (mlo\n) at (5.2,\y) {};
+    \node[cl] (mla\n) at (6.05,\y) {};
+    \node[cl] (mlb\n) at (6.95,\y) {};
+  }
+  \node[new, minimum width=0.8cm] at (1.2,-1.6) {ADD};
+  \node[new, tg] (opa) at (2.05,-1.6) {ML1};
+  \node[new] (opb) at (2.95,-1.6) {6};
+  \node at (5.2,-1.6) {MUL};
+  \node at (6.05,-1.6) {14};
+  \node at (6.95,-1.6) {4};
+  \node[lab] at (1.7,-2.95) {\iflangja{加減算用}{for the adder}};
+  \node[lab] at (5.7,-2.5) {\iflangja{乗除算用}{for the multiplier}};
+  % ---- operand lookups
+  \draw[arr] (r1.south) -- (opa.north);
+  \draw[arr] (5.05,-0.225) -- (r5.south) -- (opb.north);
+\end{tikzpicture}

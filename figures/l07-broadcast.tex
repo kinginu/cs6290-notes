@@ -1,0 +1,58 @@
+% Write result of I2 in cycle 9 of the running example: tag AD1 and value 62
+% on the CDB.  ML1 captures the value, the RAT entry of R4 matches, so R4 is
+% written and its entry cleared, and AD1 is freed.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  cl/.style={draw, fill=white, minimum width=0.9cm, minimum height=0.45cm, inner sep=0pt},
+  nm/.style={cl, fill=ln-box, minimum width=0.8cm},
+  new/.style={cl, fill=ln-accent!15},
+  tg/.style={font=\footnotesize\itshape\sffamily},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted},
+  arr/.style={->, thick, ln-accent}]
+  % ---- register file and RAT
+  \foreach \r/\x in {1/1.45,2/2.35,3/3.25,4/4.15,5/5.05,6/5.95} {
+    \node[lab] at (\x,0.4) {R\r};
+  }
+  \node[lab, anchor=east] at (0.95,0) {\iflangja{レジスタファイル}{register file}};
+  \node[lab, anchor=east] at (0.95,-0.45) {RAT};
+  \foreach \v/\x in {1/1.45,14/2.35,4/3.25,6/5.05,8/5.95} {
+    \node[cl] at (\x,0) {\v};
+  }
+  \node[new] (g4) at (4.15,0) {62};
+  \foreach \t/\x in {AD3/1.45,ML2/2.35,ML1/3.25,AD2/5.05} {
+    \node[cl, tg] at (\x,-0.45) {\t};
+  }
+  \node[cl] at (5.95,-0.45) {};
+  \node[new] (r4) at (4.15,-0.45) {};
+  % ---- common data bus
+  \draw[line width=1.6pt, ln-accent] (-0.1,-1.05) -- (7.5,-1.05);
+  \node[anchor=west, font=\scriptsize\bfseries\sffamily, text=ln-accent, align=left]
+    at (7.55,-1.05) {CDB\\\iflangja{タグ}{tag} \textit{AD1}, \iflangja{値}{value} 62};
+  % ---- reservation stations
+  \foreach \n/\y in {1/-1.6,2/-2.05,3/-2.5} {
+    \node[nm] (ad\n) at (0.4,\y) {AD\n};
+    \node[cl, minimum width=0.8cm] at (1.2,\y) {};
+    \node[cl] at (2.05,\y) {};
+    \node[cl] at (2.95,\y) {};
+  }
+  \foreach \n/\y in {1/-1.6,2/-2.05} {
+    \node[nm] (ml\n) at (4.4,\y) {ML\n};
+    \node[cl, minimum width=0.8cm] at (5.2,\y) {};
+    \node[cl] at (6.05,\y) {};
+    \node[cl] at (6.95,\y) {};
+  }
+  % AD1 (I2) is freed
+  \node[lab] at (2.05,-1.6) {\iflangja{解放}{freed}};
+  % AD2 (I7), AD3 (I4), ML2 (I5): no operand waits for AD1
+  \node at (1.2,-2.05) {SUB};  \node[tg] at (2.05,-2.05) {ML1}; \node[tg] at (2.95,-2.05) {ML2};
+  \node at (1.2,-2.5) {ADD};   \node at (2.05,-2.5) {6};         \node at (2.95,-2.5) {4};
+  \node at (5.2,-2.05) {DIV};  \node at (6.05,-2.05) {8};         \node at (6.95,-2.05) {4};
+  % ML1 (I6) captures the value in its first operand
+  \node at (5.2,-1.6) {MUL};
+  \node[new] (cap) at (6.05,-1.6) {62};
+  \node[tg] at (6.95,-1.6) {AD3};
+  % ---- effects of the broadcast
+  \draw[arr] (4.15,-1.05) -- (g4.south);
+  \draw[arr] (6.05,-1.05) -- (cap.north);
+  \fill[ln-accent] (4.15,-1.05) circle (1.5pt) (6.05,-1.05) circle (1.5pt);
+  \node[lab, anchor=west] at (4.2,-0.83) {\iflangja{一致}{match}};
+\end{tikzpicture}
