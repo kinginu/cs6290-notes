@@ -1,0 +1,31 @@
+% Fault -> error -> failure.  An error that leaves a module is a failure of
+% that module and, at the same time, a fault of the enclosing system; an error
+% that reaches the system's delivered service is a failure of the system.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  st/.style={draw, rounded corners=2pt, fill=white, minimum height=0.65cm,
+    minimum width=1.2cm, inner sep=2pt},
+  lab/.style={font=\scriptsize, text=ln-muted, align=center}]
+  % boundaries
+  \draw[ln-rule, fill=ln-box] (0,0) rectangle (9.0,3.2);
+  \node[anchor=north west, font=\scriptsize\sffamily\bfseries, text=ln-accent]
+    at (0.05,3.15) {\iflangja{システム}{System}};
+  \draw[ln-rule, fill=ln-accent!10] (0.25,1.05) rectangle (4.8,2.75);
+  \node[anchor=north west, font=\scriptsize\sffamily\bfseries, text=ln-accent]
+    at (0.3,2.7) {\iflangja{モジュール}{Module}};
+  % chain
+  \node[st] (f)  at (1.1,1.75) {\iflangja{フォールト}{fault}};
+  \node[st] (e1) at (3.85,1.75) {\iflangja{エラー}{error}};
+  \node[st] (e2) at (7.0,1.75) {\iflangja{エラー}{error}};
+  \node[st, draw=ln-caution, text=ln-caution] (fl) at (10.6,1.75) {\iflangja{故障}{failure}};
+  \draw[->] (f) -- node[lab, above=1pt] {\iflangja{活性化}{activated}} (e1);
+  \draw[->] (e1) -- node[lab, above=1pt, pos=0.55] {\iflangja{伝播}{propagates}} (e2);
+  \draw[->] (e2) -- node[lab, above=1pt, pos=0.28] {\iflangja{伝播}{propagates}} (fl);
+  % boundary crossings
+  \fill[ln-accent] (4.8,1.75) circle (1.6pt);
+  \fill[ln-caution] (9.0,1.75) circle (1.6pt);
+  \node[lab, anchor=north] at (4.8,0.95)
+    {\iflangja{モジュールの故障＝\\システムのフォールト}{module failure =\\fault of the system}};
+  \node[lab, anchor=north] at (10.6,1.3)
+    {\iflangja{提供サービスが\\仕様から逸脱}{delivered service\\deviates from\\specified service}};
+  \node[lab, anchor=north] at (1.1,1.38) {\iflangja{（潜在）}{(latent)}};
+\end{tikzpicture}

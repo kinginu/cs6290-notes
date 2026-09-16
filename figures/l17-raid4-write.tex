@@ -1,0 +1,47 @@
+% (a) RAID 4 with three data disks and a parity disk; rows are stripes A-D.
+% (b) A small write to block B1: two reads, an XOR, two writes.
+% The Japanese labels are wider than the English ones, so the picture is
+% scaled down to the text width in the Japanese edition only.
+\iflangja{\resizebox{\linewidth}{!}}{}{%
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  blk/.style={draw, fill=white, minimum width=1.25cm, minimum height=0.5cm, inner sep=1pt},
+  lab/.style={font=\scriptsize, text=ln-muted, align=center}]
+  \def\blkw{0.8}\def\blkh{0.45}\def\blkgap{0.9}
+  % ---------------- (a) layout
+  \node[anchor=west, font=\footnotesize\bfseries] at (-0.9,0.95) {(a) \iflangja{配置}{Layout}};
+  \node[font=\scriptsize, text=ln-muted, anchor=east] at (-0.05,0.3) {\iflangja{ディスク}{Disk}};
+  \foreach \d in {0,1,2,3} {
+    \node[font=\scriptsize, text=ln-muted] at ({\d*\blkgap+\blkw/2},0.3) {\d};
+  }
+  \foreach \S [count=\r from 0] in {A,B,C,D} {
+    \node[font=\scriptsize, text=ln-muted, anchor=east] at (-0.05,{-\r*\blkh-\blkh/2}) {\S};
+    \foreach \d in {0,1,2} {
+      \draw[fill=white] ({\d*\blkgap},{-\r*\blkh}) rectangle ++(\blkw,-\blkh);
+      \node at ({\d*\blkgap+\blkw/2},{-\r*\blkh-\blkh/2}) {$\S_\d$};
+    }
+    \draw[fill=ln-accent!15] ({3*\blkgap},{-\r*\blkh}) rectangle ++(\blkw,-\blkh);
+    \node at ({3*\blkgap+\blkw/2},{-\r*\blkh-\blkh/2}) {$P_\S$};
+  }
+  \draw[ln-caution, very thick] ({1*\blkgap},{-\blkh}) rectangle ++(\blkw,-\blkh);
+  \draw[ln-caution, very thick] ({3*\blkgap},{-\blkh}) rectangle ++(\blkw,-\blkh);
+  \node[lab] at ({1*\blkgap+\blkw/2},{-4*\blkh-0.3}) {\iflangja{データ}{data}};
+  \node[lab] at ({3*\blkgap+\blkw/2},{-4*\blkh-0.3}) {\iflangja{パリティ}{parity}};
+  % ---------------- (b) small write
+  \begin{scope}[xshift=5.4cm]
+  \node[anchor=west, font=\footnotesize\bfseries] at (-0.4,0.95) {(b) \iflangja{$B_1$ への書き込み}{Write to $B_1$}};
+  \node[blk] (nd) at (1.6,0.1)  {\iflangja{新 $B_1'$}{new $B_1'$}};
+  \node[blk] (od) at (1.6,-0.7) {\iflangja{旧 $B_1$}{old $B_1$}};
+  \node[blk] (op) at (1.6,-1.5) {\iflangja{旧 $P_B$}{old $P_B$}};
+  \node[lab, anchor=east] at (0.9,0.1)  {\iflangja{ディスク 1 に\\書く}{written\\to disk 1}};
+  \node[lab, anchor=east] at (0.9,-0.7) {\iflangja{ディスク 1 から\\読む}{read from\\disk 1}};
+  \node[lab, anchor=east] at (0.9,-1.5) {\iflangja{ディスク 3 から\\読む}{read from\\disk 3}};
+  \node[draw, circle, fill=ln-accent!15, inner sep=0pt, minimum size=0.55cm] (x) at (3.3,-0.7) {$\oplus$};
+  \draw[->] (nd.east) -- (x);
+  \draw[->] (od.east) -- (x);
+  \draw[->] (op.east) -- (x);
+  \node[blk, fill=ln-accent!15] (np) at (5.1,-0.7) {\iflangja{新 $P_B'$}{new $P_B'$}};
+  \draw[->] (x) -- (np);
+  \node[lab, anchor=north] at (5.1,-1.0) {\iflangja{ディスク 3 に\\書く}{written\\to disk 3}};
+  \end{scope}
+\end{tikzpicture}%
+}

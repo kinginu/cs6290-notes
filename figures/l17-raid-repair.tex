@@ -1,0 +1,16 @@
+% States of an array that tolerates one disk failure (RAID 1 with N = 2,
+% RAID 4/5 with N disks) when failed disks are replaced.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  st/.style={draw, rounded corners=3pt, minimum height=0.9cm, text width=2.2cm,
+    align=center, inner sep=3pt},
+  lab/.style={font=\scriptsize, align=center}]
+  \node[st, fill=ln-accent!15] (ok) at (0,0) {\iflangja{$N$ 台すべて動作}{all $N$ disks\\working}};
+  \node[st, fill=ln-box] (rep) at (5.4,0) {\iflangja{1 台が故障\\（修復中）}{one disk failed\\(under repair)}};
+  \node[st, fill=ln-caution!15] (lost) at (5.4,-2.6) {\iflangja{データ喪失}{data lost}};
+  \draw[->] (ok) to[bend left=18] node[lab, above]
+    {\iflangja{$N$ 台のいずれかが故障\\（平均 $\mathrm{MTTF}_1/N$ 後）}{one of the $N$ disks fails\\(after $\mathrm{MTTF}_1/N$ on average)}} (rep);
+  \draw[->] (rep) to[bend left=18] node[lab, below]
+    {\iflangja{修復完了\\（$\mathrm{MTTR}_1$ 後）}{repair completes\\(after $\mathrm{MTTR}_1$)}} (ok);
+  \draw[->, ln-caution] (rep) -- node[lab, right, text=black]
+    {\iflangja{修復完了前に残り $N-1$ 台の\\いずれかが故障（確率\\$\approx (N-1)\,\mathrm{MTTR}_1/\mathrm{MTTF}_1$）}{one of the other $N-1$ disks\\fails before the repair completes\\(probability $\approx (N-1)\,\mathrm{MTTR}_1/\mathrm{MTTF}_1$)}} (lost);
+\end{tikzpicture}
