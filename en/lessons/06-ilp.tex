@@ -77,7 +77,9 @@ one instruction would complete per cycle and the CPI would remain~1.
 \end{figure}
 
 Executing instructions ahead of an earlier one breaks the write-after-write
-dependence between I2 and I5.  Both write R5, and in program order I5 writes
+dependence between I2 and I5.\tip{The second word of the name is what the
+\emph{earlier} instruction does: in write-after-read the earlier instruction
+reads.}  Both write R5, and in program order I5 writes
 last, so after these instructions R5 must hold the result of I5; every later
 instruction that reads R5 expects that value.  In \cref{fig:l06-dependences},
 however, I5 writes R5 in cycle~5 and the delayed I2 overwrites it in
@@ -103,7 +105,9 @@ reader execute before the writer.\index{read-after-write dependence}  WAW and
 WAR dependences\index{write-after-write dependence}%
 \index{write-after-read dependence} are false
 dependences\index{false dependences}: no value
-passes between the two instructions.  They exist only because the program
+passes between the two instructions.\caution{H\&P calls these \emph{name
+dependences}: WAR is an \emph{antidependence}, WAW an \emph{output
+dependence}.}  They exist only because the program
 stores different values in the same register, a consequence of the limited
 number of registers and of the fact that an instruction executed
 repeatedly, for example in every iteration of a loop, always writes the
@@ -188,14 +192,20 @@ renaming is combined with out-of-order execution in real designs.}
 The physical registers are exactly the versions of \cref{sec:l06-false}.
 Every write creates a new version, and the RAT records which version is
 current in program order, so a reader automatically uses the version
-produced by its closest preceding writer.
+produced by its closest preceding writer.\sidenote{Renaming can even replace
+an instruction: Intel cores since Ivy Bridge execute most register-to-register
+moves in the RAT alone, pointing the destination entry at the source's
+physical register.  The move then uses no execution unit and has no latency
+(Agner Fog, microarchitecture manual).}
 
 \begin{example}
   \label{ex:l06-rename}
   We rename the running example.  Before I1, the RAT maps R1 to R7, the
   registers the example uses, to P1 to P7, and the other architectural
   registers to physical registers that the example does not use; P8, P9, \ldots\ are free and are
-  allocated in increasing order.  \Cref{tab:l06-rename} lists each renamed instruction
+  allocated in increasing order.\margin{Real sizes: Skylake has 180 integer
+  and 168 vector physical registers for 16 architectural ones of each kind
+  (Agner Fog, microarchitecture manual).}  \Cref{tab:l06-rename} lists each renamed instruction
   and the RAT entries after it.  I2 reads P8, the result of I1, because I1
   has already updated the entry of R3.  I3 reads P4, the old R4, before I4
   maps R4 to P11.  The two writes to R5 go to P9 and P12, and at the end the
@@ -323,7 +333,11 @@ I8:  ADD R5, R3, R8
   in cycle~1.  I2 and I4 depend on instructions of cycle~1 and execute in
   cycle~2.  I5 and I7 each depend on an instruction of cycle~2 and execute
   in cycle~3 (\cref{fig:l06-ilp-graph}).  Hence $C=3$ and
-  $\text{ILP} = 8/3 \approx 2.67$.  Two pitfalls are visible.  R1 is written
+  $\text{ILP} = 8/3 \approx 2.67$.\sidenote{Real programs offer little more.
+  Wall simulated benchmarks under models ranging from realistic to impossibly
+  good---perfect branch prediction, unlimited renaming, perfect alias
+  analysis---and found the average parallelism rarely above~7, with about~5
+  more common \cite{wall1991}.}  Two pitfalls are visible.  R1 is written
   by both I1 and I4, and I5 reads the value of I4; taking I1 as its producer
   would wrongly place I5 in cycle~2.  And I3 reads R2 and R7, which I6 and I7
   write only later; these are WAR dependences, removed by renaming, and they
@@ -345,7 +359,9 @@ I8:  ADD R5, R3, R8
 Structural dependences, in which an instruction waits for hardware that
 another instruction is using, do not arise on the ideal processor, which
 has enough hardware for every instruction that is ready.\source{Lesson 6,
-video 16; H\&P §3.1.}  Branches, however, add control dependences: whether
+video 16; H\&P §3.1.}\caution{H\&P calls this a structural \emph{hazard}: it
+comes from the hardware, not from the program, so it is not really a
+dependence.}  Branches, however, add control dependences: whether
 the instructions after a branch are executed depends on its outcome.  The
 ideal processor that defines the ILP is also assumed to predict every
 branch perfectly.  It therefore knows from the start which instructions are
@@ -353,7 +369,8 @@ executed, and the instructions after a branch do not wait for the branch to
 execute.  The branch itself is an instruction like any other: it counts
 towards~$N$ and executes one cycle after the instructions that produce its
 operands.  Instructions skipped because of the branch outcome are not
-executed and do not count.
+executed and do not count.\margin{Predication (Lesson 5) removes the control
+dependence instead, at the price of executing both paths.}
 
 \begin{example}
   \label{ex:l06-control}
@@ -385,7 +402,8 @@ H\&P ch.~3.}
   \term{instructions per cycle}[サイクル当たり命令数]%
   \index{IPC|see{instructions per cycle}} (IPC).  It is the reciprocal of
   the CPI of the iron law (\cref{eq:iron-law}): $\text{IPC} =
-  1/\text{CPI}$.
+  1/\text{CPI}$.\caution{The IPC of a whole program is total instructions over
+  total cycles, not the average of the IPCs of its phases.}
 \end{definition}
 
 For every processor and program, $\text{IPC} \le \text{ILP}$, because the
@@ -394,7 +412,9 @@ A real processor falls short of the ideal for several reasons.
 \begin{description}
   \item[Width] It can execute only a limited number $w$ of instructions per
     cycle.  A \emph{narrow} processor executes one or two, a \emph{wide} one
-    four or more.  Whatever the program, $\text{IPC} \le w$.
+    four or more.  Whatever the program, $\text{IPC} \le w$.\margin{Real
+    widths: Skylake is designed for 4 instructions per clock, Ice Lake
+    for~5 (Agner Fog, microarchitecture manual).}
   \item[Execution units] It has a limited number of adders, multipliers and
     other execution units, and operations such as multiplication may take
     several cycles.  An instruction whose kind of unit is busy waits even
@@ -487,7 +507,9 @@ out-of-order execution pays off fully only in a wide processor.
   length of the longest RAW chain; it is a property of the program and bounds
   the IPC of every processor.  Real processors fall below it, limited by
   their width, their execution units and in-order execution; approaching the ILP takes a wide
-  out-of-order processor.  The next lesson presents Tomasulo's
+  out-of-order processor.\margin{Both kinds ship in the same phone: Arm's
+  Cortex-A55 is 2 wide and in-order, the Cortex-A78 4 wide and out-of-order.}
+  The next lesson presents Tomasulo's
   algorithm, which executes instructions out of order with renaming.
 \end{keypoint}
 
