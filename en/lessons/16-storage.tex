@@ -38,7 +38,10 @@ the amount of data or the number of requests handled per second, and
 latency, the time a single access takes.  Storage throughput improves over
 time, but more slowly than processor speed; storage latency improves even
 more slowly, more slowly than the latency of DRAM, so the gap between the
-processor and storage is wider still than the memory wall of Lesson 1.  Its
+processor and storage is wider still than the memory wall of Lesson 1.\margin{Read
+latency: DRAM 60--\SI{90}{\nano\second}, a flash SSD about
+\SI{100}{\micro\second}, a disk about \SI{10}{\milli\second} (7-cpu.com;
+vendor data sheets).}  Its
 \emph{reliability} matters at least as much: storage is where data is
 expected to be safe, and a lost file is often worse than a crashed program.
 Reliability is the subject of Lesson 17.
@@ -110,7 +113,9 @@ average.}
   \num{2000} sectors per track, and \num{4096} bytes per sector.  By
   \cref{eq:l16-capacity} it holds $2\times 2\times \num{100000}\times
   \num{2000} = \num{8e8}$ sectors, or $\num{8e8}\times \num{4096} \approx
-  \num{3.3e12}$ bytes, i.e.\ about 3.3~TB.
+  \num{3.3e12}$ bytes, i.e.\ about 3.3~TB.\caution{Disk capacities are
+  decimal: 1~TB is $10^{12}$ bytes, not $2^{40}$, so a 4~TB drive holds only
+  3.64~TiB.}
 \end{example}
 
 \section{Disk access time}
@@ -177,7 +182,9 @@ revolution:
   = \SI{9}{\milli\second}$ (\cref{fig:l16-access-time}).  Had the 100
   sectors been scattered over the disk, each would have needed its own seek
   and rotational latency, and the request would have taken more than
-  \SI{700}{\milli\second}.
+  \SI{700}{\milli\second}.\margin{A drive serves one access at a time:
+  \SI{9}{\milli\second} is about 110 requests per second.  Vendors quote
+  this as IOPS; a flash SSD reaches \num{100000} and more.}
 \end{example}
 
 \begin{figure}[htbp]
@@ -188,6 +195,10 @@ revolution:
     \SI{9}{\milli\second}.}
   \label{fig:l16-access-time}
 \end{figure}
+
+\tip{Read \SI{1}{\milli\second} as one million cycles per gigahertz: the
+\SI{9}{\milli\second} above is 27 million cycles on a \SI{3}{\giga\hertz}
+processor.}
 
 \begin{keypoint}
   A disk access is dominated by mechanical movement: moving the head
@@ -206,7 +217,10 @@ rates.\source{Lesson 16, video 6; H\&P §D.2.}
     For many years it doubled roughly every one to two years; this growth
     has slowed considerably since about 2010.
   \item[Seek time] is typically \SIrange{5}{10}{\milli\second} and improves
-    only very slowly.  What improvement there is comes mainly from smaller
+    only very slowly.\caution{A quoted seek time is an average over random
+    seeks; a track-to-track seek takes under \SI{1}{\milli\second}, a
+    full-stroke seek about twice the average.}  What improvement there is
+    comes mainly from smaller
     platter diameters, which shorten the distance the heads travel.
   \item[Rotation speed] rose slowly, from about \num{5000}~RPM to
     \num{10000}--\num{15000}~RPM for the fastest drives; most drives spin at
@@ -219,7 +233,13 @@ rates.\source{Lesson 16, video 6; H\&P §D.2.}
 The latency of a disk access is therefore set by mechanics and materials
 rather than by the progress of transistor technology that Moore's law
 describes (Lesson 1).  It improves far more slowly than processor speed, even
-though capacity grew quickly for many years.  Higher recording density does
+though capacity grew quickly for many years.\sidenote{The magnetic disk is
+the oldest
+component of a computer still in use.  IBM's 350 disk storage unit (1956)
+held about 5~MB on fifty 24-inch platters turning at \num{1200}~RPM, and its
+single head needed some \SI{0.6}{\second} to reach a track.  Capacity has
+since grown by six orders of magnitude, the access time by less than two.}
+Higher recording density does
 shorten the data read time of a given amount of data, since more bytes pass
 under the head in each revolution, but it does not affect the seek time or
 the rotational latency.
@@ -240,7 +260,9 @@ single spiral track.}
 
 Portability has a price.  A disk written in one drive must be readable in
 every other drive, so the recording format has to be fixed by an industry
-standard: CD, then DVD, then Blu-ray.  A denser recording technology becomes
+standard: CD, then DVD, then Blu-ray.\margin{CD (1982) holds 700~MB, DVD
+(1996) 4.7~GB and Blu-ray (2006) 25~GB per layer: roughly a decade and a
+factor of six apart.}  A denser recording technology becomes
 useful only after a new standard has been agreed on and drives, media and
 content for it have become widespread, which takes years.  Optical disks
 therefore improve in large, infrequent steps.  The platters of a magnetic
@@ -272,7 +294,9 @@ time still depends on the seek distance, so a disk provides random access
 (Lesson 15) only approximately, but far more closely than a tape.  Sequential
 access suits one use particularly well: \emph{backup}, where large amounts of
 data are written in one pass and read back rarely, and then usually in one
-pass as well.  It is unsuitable for virtual memory, whose page faults read
+pass as well.\margin{An LTO-9 cartridge (2021) holds 18~TB and streams at
+400~MB/s, so reading it end to end takes about 12 hours (LTO consortium).}
+It is unsuitable for virtual memory, whose page faults read
 pages from arbitrary locations.  Tape is therefore used as backup storage
 rather than as the storage from which programs and files are used.
 
@@ -327,7 +351,9 @@ An SSD can be built from either of two kinds of memory.
 flush (Lesson 3).}
 
 A flash SSD is slower than DRAM but still much faster than a magnetic disk,
-needs little power, and retains its data without a battery.  Its cost per
+needs little power, and retains its data without a battery.\margin{Flash
+cannot be overwritten in place: a block of several MB must be erased first,
+and survives only some thousand erases.}  Its cost per
 gigabyte lies between those of DRAM and disk, so for the same price it
 offers much less capacity than a disk: for a long time, typical flash SSDs
 held gigabytes where disks held terabytes.
@@ -382,14 +408,18 @@ miss penalty is the difference between the two times.
   data in flash, the average access time is $0.9 + 0.05 \times 8.1 \approx
   \SI{1.3}{\milli\second}$, about 7 times shorter than with the disk alone,
   although the flash holds only a small part of the data.  The controller and
-  the I/O bus now account for most of the time of a hit.
+  the I/O bus now account for most of the time of a hit.\tip{The hit time is
+  a floor: however high the hit rate, this disk cannot beat $9/0.9 = 10$
+  times the disk alone (Amdahl's law, Lesson 2).}
 \end{example}
 
 \Cref{tab:l16-compare} summarizes the technologies of this and the previous
 section.  Which one is preferable depends on the requirement that dominates:
 the lowest cost for a large amount of data favors a magnetic disk, speed,
 low power and robustness favor flash, and a hybrid disk approaches both for
-workloads whose accesses concentrate on a small part of the data.
+workloads whose accesses concentrate on a small part of the data.\caution{The
+flash is a cache, not extra capacity: a 2~TB hybrid disk with 8~GB of flash
+is sold, and behaves, as a 2~TB drive.}
 
 \begin{table}[htbp]
   \centering\small
@@ -435,7 +465,10 @@ price is a limited rate of improvement.  A new version of a standard has to
 be agreed on by many companies, and devices built for the older version
 should keep working, so a bus cannot adopt a faster technology as soon as it
 becomes available.  The more devices depend on a standard, the more slowly
-it changes.
+it changes.\sidenote{PCI Express doubles its per-lane rate each
+generation: \num{2.5}~GT/s in 2003, then 5, 8, 16 (a seven-year wait), 32
+and 64~GT/s in 2022.  Compatibility runs both ways: a new card works in an
+old slot, at the old rate.}
 
 I/O devices also differ enormously in the throughput they need: a graphics
 adapter moves huge amounts of data, a disk much less, a keyboard almost none.
@@ -451,7 +484,10 @@ are therefore arranged in a hierarchy (\cref{fig:l16-io-buses}).
 \end{definition}
 
 A SATA or SCSI controller on the mezzanine bus provides a SATA (or SCSI) bus
-for disks and optical drives, and a USB host controller provides a USB bus,
+for disks and optical drives, and a USB host controller provides a USB
+bus,\margin{SATA~3 carries 6~Gb/s (600~MB/s), USB 3.2 Gen~2 10~Gb/s and a
+16-lane PCIe~5.0 slot some 63~GB/s; a keyboard needs a few hundred bytes per
+second.}
 extended by hubs, for external devices such as keyboards and flash drives.
 These buses serve naturally slower devices, for which a stable standard
 matters more than speed; they are slower than the mezzanine bus and change
