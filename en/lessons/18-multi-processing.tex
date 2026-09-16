@@ -87,7 +87,10 @@ videos 3--4; H\&P §1.1, §1.5.}  Both have run out of room.
     instructions to fill even more slots, so additional width yields
     diminishing returns (Lesson 6).
   \item \textbf{Faster.}  A higher clock frequency requires a higher supply
-    voltage.  Since dynamic power is proportional to $V^{2}f$
+    voltage.\margin{Clock rates stopped rising instead: the Pentium~4
+    reached \SI{3.8}{\giga\hertz} in 2004, and the fastest desktop parts
+    today reach about \SI{6}{\giga\hertz}.  H\&P §1.5.}  Since dynamic
+    power is proportional to $V^{2}f$
     (\cref{eq:active-power}), raising $f$ and $V$ together makes power grow
     roughly with $f^{3}$, and processors already dissipate as much power as
     can be removed at reasonable cost.
@@ -99,7 +102,9 @@ complex single core, the transistors can be used to replicate the core.  A
 \term{multicore processor}[マルチコアプロセッサ] is a single chip that
 contains two or more complete processors, called \emph{cores}.  Doubling
 the number of cores in every generation can double the performance in every
-generation---provided that the software uses all the cores.
+generation---provided that the software uses all the cores.\caution{Moore's
+own figure was one year in 1965 \cite{moore1965} and two years in his 1975
+revision; \enquote{18 months} is a later popularization.}
 
 \begin{example}
   \label{ex:l18-power}
@@ -150,7 +155,9 @@ speedup is at most
   \label{eq:l18-amdahl-cores}
 \end{equation}
 Coordinating the threads costs additional time on top of this, so real
-programs stay below these curves.
+programs stay below these curves.\tip{Half the ideal speedup, $S(N)=N/2$,
+needs $f_{\mathrm{par}}=(N-2)/(N-1)$: \SI{86}{\percent} on 8 cores,
+\SI{98}{\percent} on 64.}
 
 \begin{example}
   In a program, \SI{95}{\percent} of the time is spent in a loop whose
@@ -247,7 +254,9 @@ supercomputers are built this way.  The reason is not that the network is
 fast---it is much slower than a memory bus---but that no memory or bus is
 shared by all cores, and that the programmer, who has to request every
 remote access explicitly, is forced to think about communication and
-therefore keeps it to a minimum.
+therefore keeps it to a minimum.\margin{Roughly: \SI{80}{\nano\second} to
+local DRAM, \SI{130}{\nano\second} to the memory of the other socket,
+1--\SI{2}{\micro\second} to another node over InfiniBand.}
 
 Since a remote access costs far more than a local one, placement of data
 decides the performance of a NUMA machine.  The operating system should
@@ -256,7 +265,8 @@ private data of a thread, such as its stack, on the node where the thread
 runs---and keep the thread on that node, so that most memory accesses stay
 local.  A page that several cores use, however, cannot be local to all of
 them.\tip{On a NUMA machine, keep each thread on the node that holds the
-data it uses most.}
+data it uses most.  Linux places a page on the node whose thread first
+touches it; \texttt{numactl} overrides the choice.}
 
 \begin{note}[Terminology]
   Following the lecture, \enquote{distributed shared memory} is used here
@@ -328,7 +338,10 @@ if (myPID == 0) {
 
 \subsection{A shared-memory program}
 
-With shared memory the whole array is visible to every thread, so nothing
+With shared memory the whole array is visible to every thread,\margin{In
+practice these are libraries: MPI for message passing---%
+\texttt{MPI\_Reduce} is exactly this sum---and OpenMP or pthreads for
+shared memory.} so nothing
 has to be distributed: each thread computes the range of indices it is
 responsible for and adds its partial sum to a shared total
 (\cref{ex:l18-sm}).  Variables declared \texttt{shared} exist once for all
@@ -336,7 +349,9 @@ threads; all other variables are private to each thread.
 
 \begin{example}[Shared memory]
   \label{ex:l18-sm}
-  Every thread executes the following code on the shared array:
+  Every thread executes the following code on the shared array:\caution{%
+  \texttt{shared} is notation, not C\@.  With pthreads, globals and the
+  heap are shared and the stack is private.}
   \begin{lstlisting}[language=C, numbers=none, morekeywords={shared}]
 #define N 4096
 #define P 8
@@ -359,7 +374,9 @@ if (myPID == 0)           /* see text              */
 The lock is essential.  The statement \texttt{allSum += mySum} reads
 \texttt{allSum}, adds, and writes the result back; if two threads both read
 the old value before either writes, one of the two partial sums is lost.
-The lock admits one thread at a time to the update.  The program is also
+The lock admits one thread at a time to the update.\tip{Combining $P$
+partial sums one after another takes $P-1$ steps; in a tree it takes
+$\log_{2}P$.}  The program is also
 still incomplete: thread 0 must wait until all other threads have added
 their sums before it prints the total.  Locks and this kind of waiting are
 the subject of Lesson 20.
@@ -377,7 +394,9 @@ synchronization (Lesson 20).  The two models also require explicit code in
 different places: message passing needs code to distribute the data, but a
 receive already waits until the data has arrived, whereas shared memory
 needs no distribution code but explicit synchronization wherever a thread
-must wait for the others.
+must wait for the others.\caution{That a receive waits is also a trap: if
+two processes each send to the other before receiving, both can block for
+ever.}
 
 \begin{table}[htbp]
   \centering\small
@@ -492,7 +511,13 @@ not it holds the core.
     about \SI{5}{\percent} of the cost of a core.  The empty slots within a
     cycle, however, stay empty.
   \item[SMT] One core mixes instructions of both threads in the same cycle
-    and fills many of the slots that a single thread would leave empty.  The
+    and fills many of the slots that a single thread would leave
+    empty.\sidenote{SMT was proposed in 1995 \cite{tullsen1995}.  Intel
+    shipped it as Hyper-Threading in the Pentium~4 in 2002, with two threads
+    per core---still the usual x86 number---while IBM's POWER8 and POWER9
+    run up to eight threads on one core.  Intel then dropped SMT again from
+    the Lion Cove cores of its 2024 client chips, judging the area better
+    spent on more cores.}  The
     throughput rises above that of fine-grained multithreading, though it
     stays below that of two cores, because the threads share a single set of
     resources.  SMT needs more additional hardware than fine-grained
@@ -559,7 +584,9 @@ changes (\cref{fig:l18-smt-hw}).\source{Lesson 18, video 18; H\&P ch.~3;
     The ROB is a large structure, however, so duplicating it is expensive.
     More often in practice, the instructions of both threads are interleaved
     in a single shared ROB, each entry recording the thread of its
-    instruction.  The small price is that a completed instruction of one
+    instruction.\margin{The Pentium~4 partitioned rather than shared: while
+    both threads ran, each got half of the 126 ROB entries
+    \cite{marr2002}.}  The small price is that a completed instruction of one
     thread may have to wait for older instructions of the other thread to
     commit.
   \item[Commit] Each thread needs its own architectural register file (ARF),
@@ -569,7 +596,9 @@ changes (\cref{fig:l18-smt-hw}).\source{Lesson 18, video 18; H\&P ch.~3;
 With a shared ROB, the duplicated structures---PC, RAT and ARF---are small;
 the expensive parts of the core---ROB, reservation stations, execution
 units, caches and branch predictors---are shared.  This is why SMT adds
-only about \SI{10}{\percent} to the cost of a core.
+only about \SI{10}{\percent} to the cost of a core.\margin{Intel put
+Hyper-Threading on the Pentium~4 at about \SI{5}{\percent} more die area for
+\SI{15}{\percent}--\SI{30}{\percent} more throughput \cite{marr2002}.}
 
 \section{SMT, the data cache and the TLB}
 \label{sec:l18-smt-tlb}
@@ -593,7 +622,10 @@ two.
   \item The \term*{TLB} must therefore be thread-aware: each entry records the
     thread it belongs to, the thread identifier of the access is passed into
     the lookup, and a hit requires both the thread and the virtual page
-    number to match (\cref{fig:l18-smt-tlb}).
+    number to match (\cref{fig:l18-smt-tlb}).\caution{What must differ is the
+    address space, not the thread: two threads of one process share their
+    translations.  Real TLBs therefore tag entries with an address-space
+    identifier---PCID on x86-64, ASID on Arm.}
 \end{itemize}
 
 \begin{figure}[htbp]
@@ -641,7 +673,9 @@ alone exceeds the cache without SMT partners: it would evict their blocks
 without gaining anything itself.
 
 \begin{example}
-  A core has a \SI{64}{KB} L1 data cache.  Threads A, B and C have working
+  A core has a \SI{64}{KB} L1 data cache.\margin{Real L1 data caches
+  are smaller: 32~KB on AMD's Zen~4, 48~KB on Intel's Golden Cove, with
+  1--2~MB of L2 per core behind them.}  Threads A, B and C have working
   sets of \SI{40}{KB}, \SI{36}{KB} and \SI{28}{KB}; each fits into the cache
   alone.  A and B work on common data, \SI{20}{KB} of which appears in both
   working sets, so running them together with SMT needs
