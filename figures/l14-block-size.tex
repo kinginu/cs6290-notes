@@ -1,0 +1,25 @@
+% Miss rate as a function of the block size for a 4 KB and a 256 KB cache
+% (shape only, no data).  The best block sizes follow the lecture: about
+% 64 bytes for the small and about 256 bytes for the large cache.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]}]
+  \draw[->] (0,0) -- (7.6,0);
+  \node[font=\footnotesize\sffamily] at (3.8,-0.75) {\iflangja{ブロックサイズ（バイト）}{block size (bytes)}};
+  \draw[->] (0,0) -- (0,4.4) node[above, inner sep=2pt] {\iflangja{ミス率}{miss rate}};
+  \foreach \x/\l in {0.8/16,2.0/32,3.2/64,4.4/128,5.6/256,6.8/512} {
+    \draw (\x,0) -- (\x,-0.08) node[below, font=\scriptsize\sffamily] {\l};
+  }
+  \draw[thick, ln-accent] plot[smooth, tension=0.7] coordinates
+    {(0.5,3.95) (0.8,3.6) (2.0,3.0) (3.2,2.82) (4.4,3.1) (5.6,3.65) (6.8,4.2)};
+  \draw[thick, ln-tip] plot[smooth, tension=0.7] coordinates
+    {(0.5,2.25) (0.8,1.95) (2.0,1.35) (3.2,1.0) (4.4,0.82) (5.6,0.74) (6.8,0.9) (7.2,1.02)};
+  \fill[ln-accent] (3.2,2.82) circle (1.6pt);
+  \fill[ln-tip] (5.6,0.74) circle (1.6pt);
+  \node[anchor=west, text=ln-accent] at (7.0,4.2) {\iflangja{4~KB キャッシュ}{4~KB cache}};
+  \node[anchor=west, text=ln-tip] at (7.3,1.02) {\iflangja{256~KB キャッシュ}{256~KB cache}};
+  \node[font=\scriptsize\sffamily, text=ln-muted, align=center] at (1.9,2.3)
+    {\iflangja{近傍へのアクセスが\\ヒットする}{accesses to neighbours\\now hit}};
+  \node[font=\scriptsize\sffamily, text=ln-muted, align=center] at (5.3,2.3)
+    {\iflangja{使われないデータが\\ラインを占める}{unused data\\occupies lines}};
+  \draw[->, ln-muted, >={Stealth[length=1.4mm]}] (1.4,1.87) -- (2.9,1.87);
+  \draw[->, ln-muted, >={Stealth[length=1.4mm]}] (4.6,1.87) -- (6.2,1.87);
+\end{tikzpicture}

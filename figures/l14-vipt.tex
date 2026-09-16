@@ -1,0 +1,63 @@
+% Lookup in a VIPT cache: 32-bit addresses, 4 KB pages, 64-byte blocks,
+% 64 sets of 2 lines (8 KB).  The index comes from the page offset of the
+% virtual address; the TLB translates the VPN in parallel, and the frame
+% number is compared with the (physical) tags of the set; a line hits only if
+% its valid bit is set.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]}]
+  % --- virtual address fields
+  \draw[fill=ln-accent!15] (0.6,0) rectangle (4.6,0.55);
+  \node at (2.6,0.275) {VPN\ (31\,\dots\,12)};
+  \draw[fill=ln-box] (4.6,0) rectangle (7.0,0.55);
+  \node at (5.8,0.275) {\iflangja{インデックス}{index}\ (11\,\dots\,6)};
+  \draw[fill=white] (7.0,0) rectangle (9.4,0.55);
+  \node at (8.2,0.275) {\iflangja{オフセット}{offset}\ (5\,\dots\,0)};
+  \node[anchor=south west, font=\sffamily\scriptsize, text=ln-muted, inner sep=1pt] at (0.6,0.6) {\iflangja{仮想アドレス}{virtual address}};
+  % page offset bracket
+  \draw[ln-muted] (4.62,0.62) -- (4.62,0.78) -- (9.38,0.78) -- (9.38,0.62);
+  \node[anchor=south, font=\sffamily\scriptsize, text=ln-muted] at (7.0,0.78)
+    {\iflangja{ページオフセット (11\,\dots\,0)}{page offset (11\,\dots\,0)}};
+  % --- TLB
+  \node[draw, fill=ln-box, minimum width=1.3cm, minimum height=0.6cm] (tlb) at (1.3,-1.3) {TLB};
+  \draw[->] (1.3,0) -- (tlb.north);
+  % --- two ways, four drawn sets
+  \foreach \x in {2.4,6.6} {
+    \fill[ln-accent!15] (\x,-1.55) rectangle (\x+3.4,-2.0);
+    \node[font=\sffamily\scriptsize, text=ln-muted, anchor=south] at (\x+0.2,-1.1) {V};
+    \node[font=\sffamily\scriptsize, text=ln-muted, anchor=south] at (\x+1.1,-1.1) {\iflangja{タグ}{tag}};
+    \node[font=\sffamily\scriptsize, text=ln-muted, anchor=south] at (\x+2.6,-1.1) {\iflangja{データ}{data}};
+    \foreach \i in {0,...,3} {
+      \draw (\x,-1.1-0.45*\i) rectangle (\x+0.4,-1.55-0.45*\i);
+      \draw (\x+0.4,-1.1-0.45*\i) rectangle (\x+1.8,-1.55-0.45*\i);
+      \draw (\x+1.8,-1.1-0.45*\i) rectangle (\x+3.4,-1.55-0.45*\i);
+    }
+  }
+  \node[font=\sffamily\scriptsize, text=ln-muted, anchor=north] at (5.0,-2.95) {\iflangja{ウェイ 0}{way 0}};
+  \node[font=\sffamily\scriptsize, text=ln-muted, anchor=north] at (9.2,-2.95) {\iflangja{ウェイ 1}{way 1}};
+  \foreach \i/\s in {0/0,1/1,2/{\dots},3/63} {
+    \node[font=\sffamily\scriptsize, text=ln-muted, anchor=west] at (10.05,-1.325-0.45*\i) {\s};
+  }
+  \node[font=\sffamily\scriptsize, text=ln-muted, anchor=south west] at (10.0,-1.1) {\iflangja{セット}{set}};
+  % --- index selects a set in both ways
+  \draw (6.2,0) -- (6.2,-1.775);
+  \fill (6.2,-1.775) circle (1.2pt);
+  \draw[->] (6.2,-1.775) -- (5.8,-1.775);
+  \draw[->] (6.2,-1.775) -- (6.6,-1.775);
+  % --- comparators against the frame number from the TLB
+  \node[draw, circle, fill=white, inner sep=1pt, minimum size=0.5cm] (c0) at (3.5,-3.7) {$=$};
+  \node[draw, circle, fill=white, inner sep=1pt, minimum size=0.5cm] (c1) at (7.7,-3.7) {$=$};
+  \draw[->] (3.5,-2.9) -- (c0.north);
+  \draw[->] (7.7,-2.9) -- (c1.north);
+  % valid bits enable the comparators
+  \draw[->] (2.6,-2.9) -- (c0.north west);
+  \draw[->] (6.8,-2.9) -- (c1.north west);
+  \draw (tlb.south) -- (1.3,-4.9) -- (7.7,-4.9);
+  \draw[->] (7.7,-4.9) -- (c1.south);
+  \fill (1.3,-3.7) circle (1.2pt);
+  \draw[->] (1.3,-3.7) -- (c0.west);
+  \node[anchor=east, align=right, font=\sffamily\scriptsize, text=ln-muted] at (1.2,-2.7)
+    {\iflangja{物理\\フレーム\\番号}{physical\\frame\\number}};
+  \node[draw, fill=ln-box, minimum width=0.7cm, minimum height=0.5cm, inner sep=1pt, font=\sffamily\scriptsize] (or) at (5.6,-3.7) {OR};
+  \draw[->] (c0.east) -- (or.west);
+  \draw[->] (c1.west) -- (or.east);
+  \draw[->] (or.south) -- (5.6,-4.3) node[below] {\iflangja{ヒット}{hit}};
+\end{tikzpicture}

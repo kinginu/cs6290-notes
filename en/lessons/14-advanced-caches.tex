@@ -1,0 +1,1000 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Advanced Caches}
+\lessoninfo{
+  video={Lesson 14, videos 1--40},
+  textbook={H\&P \cite{hennessy2017} §2.3, §B.1, §B.3},
+  keywords={pipelined cache, VIPT cache, aliasing, way prediction, NMRU, pseudo-LRU, conflict miss, prefetching, loop interchange, miss-under-miss support, MSHR, cache hierarchy, global miss rate, inclusion property},
+}
+
+Lesson 12 described the basic cache and measured it by the average memory
+access time, and Lesson 13 added the address translation that every memory
+access needs in a system with virtual memory.  This lesson collects the
+techniques that make real caches fast.  They are organized by the term of the
+average memory access time that they reduce: the hit time (pipelined caches,
+the placement of the cache relative to the TLB, way prediction and cheap
+replacement policies), the miss rate (larger blocks, prefetching and loop
+interchange) and the miss penalty (servicing overlapping misses and, above
+all, multilevel cache hierarchies).
+
+\section{Improving cache performance}
+\label{sec:l14-improving}
+
+The quantity to be improved is the average memory access time (AMAT) of
+Lesson~12:\source{Lesson 14, videos 1--2; H\&P §2.3.}
+\begin{equation}
+  \text{AMAT} = \text{hit time} + \text{miss rate} \times \text{miss penalty} .
+  \label{eq:l14-amat}
+\end{equation}
+Each of the three terms offers its own line of attack, and
+\cref{tab:l14-techniques} lists the techniques of this lesson by the term
+they target.  Few of them are free.  A technique that lowers one term often
+raises another---a smaller cache has a shorter hit time but a higher miss
+rate---and it is worthwhile only if AMAT as a whole decreases.
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Techniques of this lesson, grouped by the term of
+    \cref{eq:l14-amat} they reduce.}
+  \label{tab:l14-techniques}
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    Term & Techniques & Sections \\
+    \midrule
+    Hit time     & pipelined caches, VIPT caches,               & \labelcref{sec:l14-pipelined}--\labelcref{sec:l14-replacement} \\
+                 & way prediction, NMRU and PLRU replacement    & \\
+    Miss rate    & larger blocks, prefetching, loop interchange & \labelcref{sec:l14-three-cs}--\labelcref{sec:l14-loop-interchange} \\
+    Miss penalty & miss-under-miss support, cache hierarchies   & \labelcref{sec:l14-overlap}--\labelcref{sec:l14-inclusion} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Pipelined caches}
+\label{sec:l14-pipelined}
+
+The most direct way to lower the hit time is to keep the cache small and
+simple, for example direct-mapped: fewer lines have to be decoded and fewer
+tags compared.\source{Lesson 14, videos 3--4; H\&P §2.3.}  A small cache,
+however, misses more often, and a direct-mapped cache suffers more conflicts,
+so the time saved on hits is easily lost again on misses.  The techniques of
+this and the next four sections reduce the hit time, or its cost, without
+giving up the miss rate.
+
+Lesson 12 noted that an L1 hit takes one to three clock cycles.  If a lookup
+that needs several cycles occupied the cache until it completed, each memory
+access would have to wait for the previous one: the hit time seen by an
+access would be its own lookup time plus this wait, and consecutive loads and
+stores would stall the processor.  A cache whose lookup fits into one cycle
+has no such problem.  An L1 cache that takes two or three cycles is usually
+pipelined.
+
+\begin{definition}[Pipelined cache]
+  A \term{pipelined cache}[パイプライン化キャッシュ] divides a lookup into
+  stages separated by latches, so that a lookup takes several clock cycles but
+  a new lookup can start in every cycle.
+\end{definition}
+
+For a set-associative cache the lookup divides naturally into three steps,
+each of which can become a stage (\cref{fig:l14-pipelined}):
+\begin{enumerate}
+  \item the index selects the set, and the valid bits and tags of its lines
+    are read;
+  \item the tags are compared with the tag of the address, which decides
+    between hit and miss and identifies the matching way, and the read of the
+    data begins;
+  \item the data read completes, the data of the matching way is selected,
+    and the block offset picks the requested bytes out of the block, which are
+    delivered.
+\end{enumerate}
+A miss is known at the end of the second stage.  Pipelining does not reduce
+the number of cycles one lookup takes.  It prevents that number from limiting
+the rate of accesses: while one access compares its tags, the next one already
+reads its set, exactly as instructions overlap in the pipeline of Lesson 3,
+and the clock period needs to accommodate only the slowest stage instead of
+the whole lookup.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l14-pipelined}
+  \caption{Three consecutive accesses to a cache whose lookup is split into
+    three stages.  Each access takes three cycles, but a new one starts in
+    every cycle.}
+  \label{fig:l14-pipelined}
+\end{figure}
+
+\begin{example}
+  \label{ex:l14-pipelined}
+  The lookup logic of an L1 cache has a delay of \SI{0.75}{\nano\second},
+  and the other stages of the processor allow a clock period of
+  \SI{0.3}{\nano\second}.  Without pipelining, either the clock period grows
+  to \SI{0.75}{\nano\second} or more for the whole processor, or each access
+  occupies the cache for three cycles and memory accesses can start only in
+  every third cycle.  Split into three stages of about
+  \SI{0.25}{\nano\second} each, which leaves room for the latch overhead, the
+  lookup fits the \SI{0.3}{\nano\second} clock: the data arrives three cycles
+  after the access starts, and an access can start in every cycle.
+\end{example}
+
+\section{Address translation and the hit time}
+\label{sec:l14-translation}
+
+With virtual memory (Lesson 13) the processor issues virtual addresses,
+whereas data in main memory is located by physical
+addresses.\source{Lesson 14, videos 5--7; H\&P §B.3.}  The cache can be
+looked up after the translation, before it, or partly in parallel with it
+(\cref{fig:l14-translation}), and the choice affects the hit time.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l14-translation}
+  \caption{Three ways to combine the TLB with the cache lookup.  In~(b)
+    translation is needed only on a miss, so the TLB is not in the path of a
+    hit (it is still consulted for the permissions); in~(c) it translates the
+    virtual page number while the index already selects the set.}
+  \label{fig:l14-translation}
+\end{figure}
+
+\subsection{Physically accessed caches}
+
+A cache that is looked up with the physical address is a
+\term{physically accessed cache}[物理アドレスキャッシュ].  Every access first
+translates its virtual address in the TLB, and only the resulting physical
+address is used for the lookup (\cref{fig:l14-translation}a).  The hit time
+therefore includes the translation:
+\begin{equation}
+  \text{hit time} = \text{TLB lookup time} + \text{cache lookup time} .
+  \label{eq:l14-pa-hit}
+\end{equation}
+The TLB is small and fast, but its delay is paid on every access, hits
+included, and it adds to exactly the quantity we are trying to reduce.
+
+\subsection{Virtually accessed caches}
+
+\begin{definition}[Virtually accessed cache]
+  A \term{virtually accessed cache}[仮想アドレスキャッシュ] takes both the
+  index and the tag from the virtual address.  The address is translated only
+  on a miss, when the block has to be fetched from main memory.
+\end{definition}
+
+On a hit the TLB is not in the path, and the hit time is just the cache
+lookup time (\cref{fig:l14-translation}b).  This advantage comes with
+problems.
+\begin{itemize}
+  \item \textbf{Permissions.}  The TLB entry of a page also records whether
+    the page may be read, written or executed, and the permission has to be
+    checked on every access.  In practice the TLB is therefore consulted on
+    hits as well.
+  \item \textbf{Context switches.}  Each process has its own virtual address
+    space, so the same virtual address denotes different data in different
+    processes.  When the operating system switches the processor from one
+    process to another (a context switch), the blocks in the cache are
+    identified by virtual addresses of the old process and must not be found
+    by the new one.  Either the cache is flushed by clearing all valid bits,
+    or every tag is extended with an identifier of the address space (H\&P
+    §B.3).  Context switches occur many times per second, and with flushing
+    the process that runs next starts each time with an empty cache and a
+    burst of misses.
+  \item \textbf{Aliasing}, the subject of \cref{sec:l14-aliasing}.
+\end{itemize}
+
+\subsection{Virtually indexed, physically tagged caches}
+
+A combination of the two approaches keeps the short hit time and avoids the
+flushes.
+
+\begin{definition}[VIPT cache]
+  A \term{virtually indexed physically tagged cache}[仮想インデックス物理タグキャッシュ]%
+  \index{VIPT|see{virtually indexed physically tagged cache}} (VIPT cache)
+  takes the index from the virtual address and the tag from the physical
+  address.
+\end{definition}
+
+The index bits of the virtual address select the set at once
+(\cref{fig:l14-vipt}).  While the valid bits and tags of the set are being
+read, the TLB translates the virtual page number into the physical frame
+number, and the tags of the set, which are physical, are compared with the
+frame number from the TLB.
+\begin{itemize}
+  \item The hit time is essentially the cache lookup time.  The TLB lookup
+    runs in parallel with the selection of the set and only has to deliver
+    the frame number by the time the tags are compared, which a small TLB
+    usually manages.
+  \item The cache need not be flushed on a context switch.  A tag names the
+    physical memory its block came from, and that remains correct whichever
+    process is running.
+  \item The TLB is consulted on every access anyway, so the permissions are
+    checked at no extra cost.
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l14-vipt}
+  \caption{Lookup in a 2-way VIPT cache with 4~KB pages, 64-byte blocks and
+    64 sets (8~KB).  The index comes from the page offset of the virtual
+    address; the tags are physical frame numbers and are compared with the
+    output of the TLB.  A line hits if its valid bit is set and its tag
+    matches.}
+  \label{fig:l14-vipt}
+\end{figure}
+
+\section{Aliasing}
+\label{sec:l14-aliasing}
+
+Virtual memory allows the same physical memory to appear at more than one
+virtual address.\source{Lesson 14, videos 8--11; H\&P §B.3.}
+
+\begin{definition}[Aliasing]
+  The situation in which two or more virtual addresses, in the same or in
+  different address spaces, are mapped to the same physical address is called
+  \term{aliasing}[エイリアシング].  The virtual addresses are then aliases of
+  each other.
+\end{definition}
+
+Aliasing is common: processes that share memory see the same frames, usually
+at different virtual addresses, and a single process can have one frame
+mapped at two addresses.  In a virtually accessed cache two aliases are
+simply two different addresses.  They generally have different indexes and
+tags, so the cache can hold two copies of the same physical block, one per
+alias, and nothing connects the copies.
+
+\begin{example}
+  \label{ex:l14-alias}
+  The virtual addresses V1 and V2 are aliases of the physical address P, and
+  in a virtually accessed cache they have different indexes.  The memory at P
+  contains the value~5.  \Cref{tab:l14-alias} follows four accesses.  The
+  last one reads~5 through V2, although~7 has been written to the same
+  memory through V1.  With the write-through policy main memory would
+  hold~7, but the stale copy for V2 would still be returned.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{Two aliases in a virtually accessed cache with the write-back
+    policy (\cref{ex:l14-alias}): contents of the two cached copies and of
+    main memory after each access.}
+  \label{tab:l14-alias}
+  \begin{tabular}{@{}clllll@{}}
+    \toprule
+    Step & Access          & Result          & Copy for V1 & Copy for V2 & Memory at P \\
+    \midrule
+    1    & read V1         & miss            & 5           & ---         & 5 \\
+    2    & read V2         & miss            & 5           & 5           & 5 \\
+    3    & write 7 to V1   & hit             & 7           & 5           & 5 \\
+    4    & read V2         & hit, returns 5  & 7           & 5           & 5 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+To be correct, every write would have to find all other cached copies of the
+same physical block and update or invalidate them, and the cache has no
+efficient way of locating them.  Aliasing is thus a further problem of
+virtually accessed caches.
+
+\subsection{Aliasing in VIPT caches}
+
+In a VIPT cache the tag is physical, so two copies of a block would carry the
+same tag.  They can nevertheless end up in different sets, because the index
+is taken from the virtual address.  Whether that is possible depends on where
+the index bits lie.  Translation replaces the virtual page number by the frame
+number and leaves the page offset unchanged; aliases therefore always have the
+same page offset, although their virtual page numbers differ.
+\begin{itemize}
+  \item If the index includes bits of the virtual page number, two aliases can
+    select different sets, the cache can hold two copies, and the problem of
+    \cref{ex:l14-alias} remains.
+  \item If the index consists of page-offset bits only, aliases always select
+    the same set.  There they find a single line with the physical tag of
+    their block, so at most one copy exists and aliasing is harmless.  The
+    index bits of the virtual address are then also those of the physical
+    address, and the cache behaves exactly like a physically accessed cache,
+    only faster.
+\end{itemize}
+
+\subsection{Avoiding aliasing}
+
+A VIPT cache is thus free of aliasing when its block offset and index fit
+into the page offset:
+\begin{equation}
+  \text{offset bits} + \text{index bits} \;\le\; \text{page offset bits} .
+  \label{eq:l14-vipt-bits}
+\end{equation}
+The left side is $\log_2(\text{sets} \times \text{block size})$ and the right
+side $\log_2(\text{page size})$, so the condition reads
+$\text{sets} \times \text{block size} \le \text{page size}$.  Multiplying both
+sides by the associativity~$N$ gives a bound on the cache size:
+\begin{equation}
+  \text{cache size} \;\le\; N \times \text{page size} .
+  \label{eq:l14-vipt-size}
+\end{equation}
+The block size has cancelled out: only the associativity and the page size
+limit a VIPT cache.
+
+\begin{example}
+  \label{ex:l14-vipt-size}
+  With 4~KB pages the page offset has 12 bits.  A VIPT cache with 64-byte
+  blocks (6 offset bits) can use at most 6 index bits, i.e.\ 64 sets.  With 2
+  ways this is the 8~KB cache of \cref{fig:l14-vipt}; with 4 ways it is
+  16~KB.  A 2-way cache of 16~KB would need 128 sets, and its seventh index
+  bit would be bit~12 of the virtual address, the lowest bit of the virtual
+  page number, so aliases could be placed in different sets.
+\end{example}
+
+\subsection{Real VIPT caches}
+
+The page size is fixed by the architecture and the operating system, and is
+typically 4~KB.  By \cref{eq:l14-vipt-size}, an L1 cache that is to be both
+VIPT and free of aliasing can therefore grow only by becoming more
+associative: a direct-mapped cache is limited to 4~KB, a 32~KB cache needs 8
+ways.  The Intel Core~2, Nehalem, Sandy Bridge and Haswell processors all
+have 8-way L1 data caches of 32~KB, exactly at this bound.  Real L1 caches
+are consequently more associative than their hit time alone would justify,
+which makes the techniques of the next two sections important.
+
+\begin{keypoint}
+  A VIPT cache indexes with the virtual address while the TLB translates in
+  parallel, and compares physical tags.  It has nearly the hit time of a
+  virtually accessed cache, needs no flush on a context switch, and is immune
+  to aliasing as long as $\text{cache size} \le N \times \text{page size}$.
+\end{keypoint}
+
+\section{Way prediction}
+\label{sec:l14-way-prediction}
+
+Associativity moves the hit time and the miss rate in opposite
+directions.\source{Lesson 14, videos 12--15; H\&P §2.3.}  More ways per set
+mean fewer conflicts and a lower miss rate---and for a VIPT cache a larger
+permissible size (\cref{eq:l14-vipt-size})---but a lookup has to compare more
+tags and select among more lines, so the hit time grows.  A direct-mapped
+cache has the shortest hit time and the highest miss rate.  The goal is the
+miss rate of a set-associative cache with the hit time of a direct-mapped one.
+
+\begin{definition}[Way prediction]
+  A set-associative cache with \term{way prediction}[ウェイ予測] guesses
+  which line of the selected set holds the requested block and first checks
+  only that line.  If its tag
+  matches, the access completes in the hit time of a direct-mapped cache;
+  otherwise the other lines of the set are checked as in an ordinary
+  set-associative cache.
+\end{definition}
+
+The first check of an $N$-way cache of size~$C$ examines one line per set,
+so it behaves like a direct-mapped cache of size $C/N$ with the same sets,
+and the hit rate of such a cache estimates how often the guess is right.  If
+the guess is the line accessed most recently in the set, the estimate is
+exact: that line holds the block accessed most recently in the set, which is
+precisely the block a direct-mapped cache of size $C/N$ would hold.  A wrong
+guess costs the quick check plus the normal lookup, and a miss is detected
+only after the normal lookup as well.  If $p$ is the fraction of accesses in
+which the predicted line hits, $t_1$ the time to check one line and $t_N$ the
+lookup time of the whole set, the average lookup time is
+\begin{equation}
+  t = p\, t_1 + (1-p)(t_1 + t_N) = t_1 + (1-p)\, t_N .
+  \label{eq:l14-way-prediction}
+\end{equation}
+
+\begin{example}
+  \label{ex:l14-way-prediction}
+  An L1 cache is followed by an L2 cache that gives it a miss penalty of
+  \SI{20}{\nano\second}.  Three L1 designs are compared.  The 4~KB
+  direct-mapped cache is the subset of the 8-way cache that way prediction
+  checks first, so the predicted line hits in $p = \SI{80}{\percent}$ of all
+  accesses, and the remaining \SI{20}{\percent} (hits in other lines and all
+  misses) take $0.8 + 1.5 = \SI{2.3}{\nano\second}$.
+  \begin{center}\small
+    \begin{tabular}{@{}lccl@{}}
+      \toprule
+      L1 cache & Lookup time & Miss rate & AMAT \\
+      \midrule
+      4~KB direct-mapped     & \SI{0.8}{\nano\second} & \SI{20}{\percent} & $0.8 + 0.20\times 20 = \SI{4.8}{\nano\second}$ \\
+      32~KB 8-way            & \SI{1.5}{\nano\second} & \SI{5}{\percent}  & $1.5 + 0.05\times 20 = \SI{2.5}{\nano\second}$ \\
+      32~KB 8-way, predicted & 0.8 or \SI{2.3}{\nano\second} & \SI{5}{\percent} & $1.1 + 0.05\times 20 = \SI{2.1}{\nano\second}$ \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  By \cref{eq:l14-way-prediction} the average lookup time with prediction is
+  $0.8 + 0.2\times 1.5 = \SI{1.1}{\nano\second}$.  Way prediction keeps the
+  miss rate of the 8-way cache and brings its average lookup time close to
+  that of the direct-mapped cache.
+\end{example}
+
+\section{Replacement policy and hit time}
+\label{sec:l14-replacement}
+
+The replacement policy affects the hit time as well as the miss
+rate.\source{Lesson 14, videos 16--19; H\&P §B.1.}  Two of the policies of
+Lesson 12 mark the extremes.
+\begin{description}
+  \item[Random] replacement does nothing on a hit and picks a victim at random
+    on a miss.  It adds nothing to the hit time, but it sometimes evicts a
+    block that is about to be used, so its miss rate is higher.
+  \item[LRU] has a lower miss rate, but it keeps a $\log_2 N$-bit counter in
+    every line, and an access, hit or miss, may change the counters of all
+    $N$ lines of the set.  This activity on every access costs logic, energy
+    and hit time, the more so the higher the associativity.
+\end{description}
+The policies below approach the miss rate of LRU with far less bookkeeping.
+
+\subsection{Not most recently used}
+
+\begin{definition}[NMRU]
+  The \term{not most recently used}[NMRU]%
+  \index{NMRU|see{not most recently used}} (NMRU) policy records for each set
+  only which line was accessed most recently, and on a miss evicts one of the
+  other lines, chosen at random.
+\end{definition}
+
+By temporal locality, the most recently used block is the one most likely to
+be accessed next.  Evicting it is the most harmful choice random replacement
+can make, and NMRU excludes exactly that choice.  The cost is one
+$\log_2 N$-bit pointer per set, and an access changes at most this pointer: an
+8-way cache needs 3 bits per set instead of the $8 \times 3 = 24$ bits of LRU.
+NMRU misses somewhat more often than LRU, because its victim may be a block
+that was used only a little less recently than the most recent one.
+
+\subsection{Pseudo-LRU}
+
+\begin{definition}[PLRU]
+  The \term{pseudo-LRU}[疑似 LRU]\index{PLRU|see{pseudo-LRU}} (PLRU) policy
+  keeps one bit per line, initially~0.  An access sets the bit of its line;
+  if this sets the last bit of the set that was still~0, the bits of all
+  other lines are cleared.  A miss evicts a line whose bit is~0, chosen at
+  random.
+\end{definition}
+
+The bit of a line tells whether the line has been accessed since the last
+reset.  The bit of the most recently used line is always set, so the
+candidates of PLRU are always among those of NMRU, and PLRU is at least as
+good as NMRU.  How closely it approximates LRU depends on how many bits are
+set.  Right after a reset only the most recently used line is excluded, as
+in NMRU.  With $N-1$ bits set, the only candidate is the line whose last
+access lies furthest in the past, which is exactly the choice of LRU.  The
+cost is $N$ bits per set, and an access sets a single bit, except at a reset.
+
+\begin{example}
+  \label{ex:l14-replacement}
+  A 4-way set holds the blocks A, B, C and D in lines 0--3; D was used most
+  recently, and the PLRU bits were last reset by the access to~D.
+  \Cref{tab:l14-replacement} follows the set under the three policies.  At
+  the miss on~E, LRU must evict A, NMRU may evict A, C or D, and PLRU may
+  evict A or C; here all three evict A.  If the next access, to F, also
+  misses, LRU evicts C, NMRU may evict B, C or D, and PLRU, whose only
+  line with bit~0 is line~2, also evicts C.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{State kept by LRU, NMRU and PLRU for one 4-way set
+    (\cref{ex:l14-replacement}): the LRU order from least to most recently
+    used block, the most recently used line recorded by NMRU, and the PLRU
+    bits of lines 0--3.}
+  \label{tab:l14-replacement}
+  \begin{tabular}{@{}llcccc@{}}
+    \toprule
+    Access & Result & Lines 0--3 & LRU order & NMRU & PLRU bits \\
+    \midrule
+    (initial) &      & A B C D & A B C D & 3 & 0 0 0 1 \\
+    B         & hit  & A B C D & A C D B & 1 & 0 1 0 1 \\
+    D         & hit  & A B C D & A C B D & 3 & 0 1 0 1 \\
+    B         & hit  & A B C D & A C D B & 1 & 0 1 0 1 \\
+    E         & miss & E B C D & C D B E & 0 & 1 1 0 1 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{keypoint}
+  Work done on every access lengthens every hit.  Way prediction checks one
+  line before the others, and NMRU and PLRU replace the counters of LRU by one
+  pointer per set (NMRU) or one bit per line (PLRU); each keeps most of the
+  miss-rate benefit of associativity or LRU at a fraction of the hit-time
+  cost.
+\end{keypoint}
+
+\section{Causes of misses}
+\label{sec:l14-three-cs}
+
+Reducing the miss rate starts with knowing why misses
+occur.\source{Lesson 14, video 20; H\&P §B.3; \cite{hill1989}.}  Misses are
+classified into three kinds, often called the three Cs.
+
+\begin{definition}[Compulsory, capacity and conflict misses]
+  A \term{compulsory miss}[初期参照ミス] is a miss on the first access to a
+  block; it occurs in any cache, even an infinitely large one.
+
+  A \term{capacity miss}[容量性ミス] is a miss that would occur even in a
+  fully associative cache of the same size: the cache cannot hold all the
+  blocks the program is using, and the block has been evicted for lack of
+  space.
+
+  A \term{conflict miss}[競合性ミス] is a miss that occurs only because of
+  limited associativity: a fully associative cache of the same size would
+  still hold the block, but in the actual cache it was evicted by another
+  block competing for the same set.
+\end{definition}
+
+The three counts can be measured by simulating the same sequence of accesses
+on three caches.  The misses of an infinite cache are the compulsory misses;
+a fully associative cache of the actual size adds the capacity misses; the
+actual cache adds the conflict misses.
+
+\begin{example}
+  \label{ex:l14-three-cs}
+  For one program, an infinite cache misses \num{1500} times, a fully
+  associative 32~KB cache \num{6000} times, and the actual 4-way 32~KB cache
+  \num{7800} times.  Of the \num{7800} misses, \num{1500} are compulsory,
+  $\num{6000} - \num{1500} = \num{4500}$ are capacity misses and
+  $\num{7800} - \num{6000} = \num{1800}$ are conflict misses.
+\end{example}
+
+The classification points to the remedies.  A larger cache reduces capacity
+misses, and a higher associativity or a better replacement policy reduces
+conflict misses, but all of these lengthen the hit time.  The following
+sections present techniques that reduce the miss rate without lengthening
+hits.
+
+\section{Larger cache blocks}
+\label{sec:l14-block-size}
+
+For a cache of a given size, a larger block size affects the miss rate in two
+opposite ways.\source{Lesson 14, videos 21--22; H\&P §B.3.}
+\begin{itemize}
+  \item Where spatial locality is good, the data around an accessed address
+    is used soon.  A larger block brings more of it into the cache with a
+    single miss, and later accesses to that data, which would otherwise have
+    missed, now hit.
+  \item Where spatial locality is poor, most of a larger block is never used.
+    The cache holds fewer blocks, hence fewer of the blocks that are actually
+    needed, and capacity and conflict misses increase.
+\end{itemize}
+As the block size grows, the miss rate therefore first falls and then rises
+again (\cref{fig:l14-block-size}).  The minimum lies at a larger block size
+for a larger cache, for example at about 64~bytes for a 4~KB cache and at
+about 256~bytes for a 256~KB cache: a large cache has room for many blocks
+even when they are large, so the space wasted on unused data hurts it less.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l14-block-size}
+  \caption{Miss rate as a function of the block size for a 4~KB and a 256~KB
+    cache (shape only).  The dots mark the best block sizes.}
+  \label{fig:l14-block-size}
+\end{figure}
+
+\section{Prefetching}
+\label{sec:l14-prefetching}
+
+A miss can be avoided altogether if the block is brought into the cache
+before the program asks for it.\source{Lesson 14, videos 23--26; H\&P
+§2.3.}
+
+\begin{definition}[Prefetching]
+  Loading a block into the cache before it is accessed, because it is
+  expected to be accessed soon, is called \term{prefetching}[プリフェッチ].
+\end{definition}
+
+Prefetching is a guess, and its effect depends on whether the guess is right.
+\begin{itemize}
+  \item A correct guess turns the first access to the block into a hit.  The
+    fetch from memory still takes place, but earlier, while the processor is
+    doing other work, so the miss penalty is not paid by the access.
+  \item A wrong guess wastes the fetch.  Worse, the prefetched block has taken
+    the place of another block, which may be needed later and then misses: the
+    wrong guess \emph{pollutes} the cache.
+\end{itemize}
+Prefetching pays off only if most guesses are right.
+
+\subsection{Prefetch instructions}
+
+The program often knows which data it will access next.  A
+\term{prefetch instruction}[プリフェッチ命令] is an instruction of the ISA
+that asks the processor to bring the block containing a given address into
+the cache; it changes no data.  The compiler or the programmer places it in
+front of accesses that are known in advance, typically in loops over
+arrays \cite{callahan1991}:
+\begin{lstlisting}[language=C, numbers=none]
+for (i = 0; i < n; i++) {
+  prefetch(&a[i + D]);    /* D iterations ahead */
+  sum = sum + a[i];
+}
+\end{lstlisting}
+The difficulty is the prefetch distance~$D$.
+\begin{itemize}
+  \item If $D$ is too small, the prefetch has not completed when the loop
+    reaches element $i+D$; the access still waits for the block, and little
+    is gained.
+  \item If $D$ is too large, the block arrives long before it is used.  It
+    occupies a line in the meantime and may be evicted again before it is
+    needed.
+\end{itemize}
+The right distance is about the time a fetch takes divided by the time of one
+iteration.  Both depend on the machine, so a program compiled with a
+distance that suits one processor prefetches too late or too early on
+another.\caution{A prefetch distance is tuned for one machine.  A faster
+processor with the same memory needs a larger distance.}
+
+\begin{example}
+  \label{ex:l14-prefetch-distance}
+  A prefetched block is in the cache \SI{50}{\nano\second} after the prefetch
+  instruction, and one iteration of the loop above takes
+  \SI{4}{\nano\second}.  The distance must be at least $50/4 = 12.5$, so a
+  distance of 16 leaves a small margin.  On a processor that executes each
+  iteration in \SI{2}{\nano\second} with the same memory, the loop reaches
+  element $i+16$ only \SI{32}{\nano\second} after its prefetch,
+  \SI{18}{\nano\second} before the block arrives.  The loop then has to wait
+  for memory: roughly every 16th access waits \SI{18}{\nano\second}, so 16
+  iterations take about \SI{50}{\nano\second} instead of
+  \SI{32}{\nano\second}, and the faster processor runs the loop at only about
+  \SI{3.1}{\nano\second} per iteration.  It needs a distance of at least 25.
+\end{example}
+
+\subsection{Hardware prefetching}
+
+In \term{hardware prefetching}[ハードウェアプリフェッチ] the processor itself
+observes the sequence of memory accesses and guesses which blocks will be
+needed.  The program need not be changed, and the guesses adapt to the
+machine the program runs on.  Three designs exploit different access patterns
+(\cref{fig:l14-prefetchers}).
+\begin{description}
+  \item[Stream buffer] A \term{stream buffer}[ストリームバッファ]
+    \cite{jouppi1990} is a sequential prefetcher.  When blocks are accessed
+    in order, it fetches the next few blocks into a small buffer beside the
+    cache, from where an
+    access takes them without a memory access, and it fetches further blocks
+    as the buffer is used up.
+  \item[Stride prefetcher] A \term{stride prefetcher}[ストライドプリフェッチャ]
+    detects accesses that advance by a fixed distance, the \emph{stride}, as
+    when a loop visits every $k$-th element of an array, and prefetches the
+    address one or more strides ahead.
+  \item[Correlating prefetcher] A
+    \term{correlating prefetcher}[相関プリフェッチャ] records, for a block,
+    which block was accessed after it, and when the block is accessed again
+    prefetches the recorded successor.  It handles patterns without a regular
+    spacing, such as a linked list whose nodes are scattered in memory and
+    that is traversed repeatedly.
+\end{description}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l14-prefetchers}
+  \caption{Access patterns exploited by the three hardware prefetchers.
+    After the three accesses shown, the stream buffer fetches the following
+    blocks, the stride prefetcher the block one stride ahead, and the
+    correlating prefetcher block~2 the next time block~8 is accessed.}
+  \label{fig:l14-prefetchers}
+\end{figure}
+
+\section{Loop interchange}
+\label{sec:l14-loop-interchange}
+
+The compiler can also lower the miss rate by changing the order in which a
+program accesses its data.\source{Lesson 14, video 27; H\&P §2.3.}  C stores
+a two-dimensional array row by row: \texttt{m[j][i]} and
+\texttt{m[j][i+1]} are adjacent, whereas \texttt{m[j+1][i]} lies a whole row
+further on.  The following loop nest walks the array column by column:
+\begin{lstlisting}[language=C, numbers=none]
+double m[2000][1000];
+for (i = 0; i < 1000; i++)
+  for (j = 0; j < 2000; j++)
+    m[j][i] = 2 * m[j][i];
+\end{lstlisting}
+Each access of the inner loop jumps \num{1000} elements, \num{8000} bytes,
+beyond the previous one.  There is no spatial locality: every access of the
+inner loop touches a different block, and the 2000 blocks visited by one pass
+of the inner loop are far more than an L1 cache can hold, so nearly every
+access misses.
+
+\begin{definition}[Loop interchange]
+  The compiler transformation that exchanges the order of nested loops, so
+  that the innermost loop runs over the last index of the array and the data
+  is accessed sequentially, is called \term{loop interchange}[ループ交換].
+\end{definition}
+
+After interchange the outer loop runs over \texttt{j} and the inner loop over
+\texttt{i}.  The inner loop now visits adjacent elements, one block serves
+several consecutive accesses, and a sequential or stride prefetcher can
+anticipate the next block.  The compiler may interchange the loops only if it
+can prove that the result is unchanged.  Here each iteration reads and writes
+only its own element, so the iterations can be executed in any order.
+
+\begin{keypoint}
+  Prefetching can avoid even the miss on the first access to a block, but it
+  helps only if its guesses are both correct and timely.  Loop interchange
+  attacks misses from the program side, by making the order of accesses match
+  the layout of the data in memory.
+\end{keypoint}
+
+\section{Overlapping misses}
+\label{sec:l14-overlap}
+
+The miss penalty can be larger than the time needed to fetch a
+block.\source{Lesson 14, videos 28--30.}  An out-of-order processor (Lesson 7)
+has many instructions in progress, and several of its loads and stores may
+access memory within a few cycles.  Fetching a missing block takes many
+cycles, and in the meantime another access may miss as well.
+
+\begin{definition}[Overlap miss]
+  An \term{overlap miss}[オーバーラップミス] is a cache miss that occurs
+  while an earlier miss is still being serviced.
+\end{definition}
+
+After a load misses, an out-of-order processor continues with other
+instructions.  The load cannot commit, however, so the processor eventually
+runs out of ROB entries or reservation stations and stops; a second miss
+issued before that point overlaps the first.  How much it costs depends on
+the cache.
+\begin{itemize}
+  \item A \term{blocking cache}[ブロッキングキャッシュ] does nothing else
+    while a miss is being serviced.  A later access is not even looked up
+    until the earlier miss completes, so an overlapping miss pays the
+    remaining time of the earlier miss in addition to its own penalty
+    (\cref{fig:l14-overlap}a).
+  \item A \term{non-blocking cache}[ノンブロッキングキャッシュ] serves hits
+    while a miss is in progress (\emph{hit-under-miss}) and can also start
+    further misses.  Several requests are then in progress in memory at the
+    same time, which exploits \emph{memory-level parallelism}, provided that
+    memory can service requests in parallel.
+\end{itemize}
+
+\begin{definition}[Miss-under-miss support]
+  A cache with \term{miss-under-miss support}[ミスアンダーミス対応] can
+  service several misses at the same time: it keeps track of each miss in
+  progress and sends their requests to the next level of the memory hierarchy
+  concurrently.
+\end{definition}
+
+Each miss in progress is recorded in a
+\term{miss status handling register}[ミス状態管理レジスタ]%
+\index{MSHR|see{miss status handling register}} (MSHR).  An access that
+misses in the cache first compares its block address with the MSHRs.
+\begin{description}
+  \item[No match] The access is a new miss.  It allocates a free MSHR, which
+    records the block and the instruction to be woken up, and the request is
+    sent to memory.
+  \item[Match] The block is already on its way; this is a
+    \term{half-miss}[ハーフミス].  No second request is sent, and the
+    instruction is only added to the matching MSHR.
+\end{description}
+When the data arrives, it is placed in the cache, all instructions recorded in
+the MSHR are woken up, and the MSHR is released.  Already two MSHRs give a
+large improvement over a blocking cache, four are better still, and because
+memory accesses take so long, even 16 to 32 MSHRs continue to help.
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l14-overlap}
+  \caption{Two misses with a miss penalty of 20 cycles; the second occurs 6
+    cycles after the first (vertical line).  (a)~In a blocking cache the
+    second miss takes 34 cycles instead of 20.  (b)~With miss-under-miss
+    support each miss takes 20 cycles.}
+  \label{fig:l14-overlap}
+\end{figure}
+
+Miss-under-miss support costs additional hardware.  It pays off in
+processors that issue many memory accesses concurrently, above all
+out-of-order processors.
+
+\section{Cache hierarchies}
+\label{sec:l14-hierarchy}
+
+The miss penalty of an L1 cache is dominated by the access time of main
+memory.\source{Lesson 14, videos 31--34; H\&P §B.3.}  It can be reduced with
+the same idea that led to the L1 cache in the first place: place another
+cache between L1 and main memory.  A miss in L1 then looks up the
+\term{L2 cache}[L2 キャッシュ], which is larger and slower than L1 but still
+much faster than main memory, and only misses in L2 go further.
+
+\begin{definition}[Cache hierarchy]
+  A \term{cache hierarchy}[キャッシュ階層] consists of several levels of
+  cache, L1, L2, L3, \ldots, each looked up only when the previous level
+  misses (\cref{fig:l14-hierarchy}).  The level immediately before main
+  memory is the \term{last-level cache}[最終レベルキャッシュ]%
+  \index{LLC|see{last-level cache}} (LLC).
+\end{definition}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l14-hierarchy}
+  \caption{A three-level cache hierarchy.  The miss penalty of each level is
+    the average access time of the levels behind it.}
+  \label{fig:l14-hierarchy}
+\end{figure}
+
+\subsection{AMAT of a cache hierarchy}
+
+The miss penalty of a level is the average time it takes to obtain the block
+from the levels behind it, which is the AMAT of the rest of the hierarchy.
+Applying \cref{eq:l14-amat} level by level gives
+\begin{equation}
+  \begin{aligned}
+    \text{AMAT} &= h_1 + m_1 \times P_1 , \\
+    P_1 &= h_2 + m_2 \times P_2 , \\
+    &\;\;\vdots \\
+    P_{\text{LLC}} &= \text{access time of main memory},
+  \end{aligned}
+  \label{eq:l14-amat-hierarchy}
+\end{equation}
+where $h_i$ is the hit time, $m_i$ the miss rate and $P_i$ the miss penalty
+of level~$i$.  The miss rate $m_i$ is counted over the accesses that reach
+level~$i$ (\cref{sec:l14-local-global}).
+
+\subsection{L1 versus L2}
+
+In \cref{eq:l14-amat-hierarchy} the hit time $h_1$ of L1 is paid by every
+access, whereas the hit time $h_2$ of L2 is paid only by the fraction $m_1$
+of accesses that miss in L1.  L1 is therefore designed for a short hit time,
+with the techniques of the previous sections, while L2 can trade a longer
+hit time for a lower miss rate.
+
+\begin{example}
+  \label{ex:l14-hierarchy}
+  Main memory takes \SI{50}{\nano\second} per access.  A 32~KB cache has a
+  hit time of \SI{1}{\nano\second} and a miss rate of \SI{10}{\percent}; a
+  256~KB cache has a hit time of \SI{5}{\nano\second} and a miss rate of
+  \SI{3}{\percent}.  Assume that in a hierarchy the 256~KB cache misses the
+  same accesses as it would alone, i.e.\ $0.03/0.10 = \SI{30}{\percent}$ of
+  the accesses that reach it.
+  \begin{center}\small
+    \begin{tabular}{@{}ll@{}}
+      \toprule
+      Configuration & AMAT \\
+      \midrule
+      No cache                      & \SI{50}{\nano\second} \\
+      32~KB cache only              & $1 + 0.10\times 50 = \SI{6}{\nano\second}$ \\
+      256~KB cache only             & $5 + 0.03\times 50 = \SI{6.5}{\nano\second}$ \\
+      L1 32~KB, L2 256~KB           & $1 + 0.10\times(5 + 0.30\times 50) = \SI{3}{\nano\second}$ \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  The hierarchy is twice as fast as either cache alone.  It combines the
+  short hit time of the small cache, paid by every access, with the low miss
+  rate of the large one, whose longer hit time is paid by only
+  \SI{10}{\percent} of the accesses.
+\end{example}
+
+\section{Local and global miss rates}
+\label{sec:l14-local-global}
+
+In \cref{ex:l14-hierarchy} the L2 cache misses \SI{30}{\percent} of the
+accesses that reach it, three times the rate of L1.\source{Lesson 14, videos
+35--37; H\&P §B.3.}  This does not make L2 a poor cache.  L2 sees only the
+accesses that L1 has missed, which are the ones with the weakest locality; the
+accesses that are easy to serve never get past L1.  The miss rate of a lower
+level must therefore be stated with its reference.
+
+\begin{definition}[Local and global rates]
+  The \term{local hit rate}[局所ヒット率] of a cache is the number of its hits
+  divided by the number of accesses that reach it, and its
+  \term{local miss rate}[局所ミス率] is $1 - \text{local hit rate}$.
+
+  The \term{global miss rate}[大域ミス率] of a cache is the number of its
+  misses divided by the number of all memory accesses of the processor, and
+  its \term{global hit rate}[大域ヒット率] is $1 - \text{global miss rate}$.
+\end{definition}
+
+For L1 the local and global rates coincide.  For a lower level the accesses
+that reach it are the misses of the level above, so the global miss rate of
+level~$n$ is the product of the local miss rates:
+\begin{equation}
+  \text{global miss rate}_n = \prod_{i=1}^{n} \text{local miss rate}_i .
+  \label{eq:l14-global-miss}
+\end{equation}
+The miss rates in \cref{eq:l14-amat-hierarchy} are local.  The global miss
+rate of a level says what fraction of all accesses has to go beyond it, which
+makes it the right measure for comparing levels and hierarchies.
+
+\begin{definition}[Misses per 1000 instructions]
+  The metric \term{misses per 1000 instructions}[1000 命令当たりミス数]%
+  \index{MPKI|see{misses per 1000 instructions}} (MPKI) counts the misses of
+  a cache per 1000 executed instructions.
+\end{definition}
+
+Like the global miss rate, MPKI counts all misses of a level, but relative to
+the instructions instead of the memory accesses:
+\begin{equation}
+  \text{MPKI} = 1000 \times \text{global miss rate} \times
+  \frac{\text{memory accesses}}{\text{instruction}} .
+  \label{eq:l14-mpki}
+\end{equation}
+It thus states directly how often per instruction a program pays the miss
+penalty of that level.
+
+\begin{example}
+  \label{ex:l14-local-global}
+  A program executes \num{1000000} instructions with \num{1500000} memory
+  accesses.  L1 misses \num{90000} times and L2 \num{27000} times.
+  \begin{itemize}
+    \item L1: local and global miss rate
+      $\num{90000}/\num{1500000} = \SI{6}{\percent}$; MPKI
+      $\num{90000}/1000 = 90$.
+    \item L2: local miss rate $\num{27000}/\num{90000} = \SI{30}{\percent}$
+      (local hit rate \SI{70}{\percent}); global miss rate
+      $\num{27000}/\num{1500000} = \SI{1.8}{\percent} = 0.06\times 0.30$
+      (global hit rate \SI{98.2}{\percent}); MPKI $27$.
+  \end{itemize}
+\end{example}
+
+\begin{keypoint}
+  AMAT is computed with local miss rates.  Levels and hierarchies are compared
+  with global miss rates or MPKI, because a low local hit rate is normal for a
+  level that sees only the misses of the level above.
+\end{keypoint}
+
+\section{The inclusion property}
+\label{sec:l14-inclusion}
+
+A block in L1 may or may not also be present in L2.\source{Lesson 14, videos
+38--40; H\&P §B.3; \cite{baer1988}.}  Three relationships between the
+levels are possible:
+\begin{description}
+  \item[Inclusion] every block in L1 is also in L2.
+  \item[Exclusion] no block in L1 is also in L2.
+  \item[Neither] some blocks in L1 are also in L2 and others are not.
+\end{description}
+
+\begin{definition}[Inclusion property]
+  A cache hierarchy has the \term{inclusion property}[包含性] if every block
+  in a level is also present in the next, larger level.
+\end{definition}
+
+It might seem that a larger L2 with LRU replacement keeps every block of L1
+automatically.  It does not.  Hits in L1 never reach L2, so a block that is
+used often, and therefore stays in L1, looks unused to the LRU counters of L2;
+eventually it becomes the least recently used block of L2 and is evicted
+there, while it remains in L1.
+
+\begin{example}
+  \label{ex:l14-inclusion}
+  L1 holds 2 blocks and L2 holds 3 blocks; both are fully associative with LRU
+  replacement and initially empty, and a block that misses in both levels is
+  loaded into both.  \Cref{tab:l14-inclusion} follows the accesses P, Q, P, R,
+  P, S.  The later accesses to P hit in L1, so L2 last sees P at the first
+  access.  At the miss on S, P is the least recently used block of L2 and is
+  evicted, although it is still in L1.
+\end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{A two-level hierarchy with LRU replacement in both levels
+    (\cref{ex:l14-inclusion}).  Contents are listed from least to most
+    recently used; the last access breaks inclusion.}
+  \label{tab:l14-inclusion}
+  \begin{tabular}{@{}lllll@{}}
+    \toprule
+    Access & L1   & L2   & L1 after & L2 after \\
+    \midrule
+    P      & miss & miss & P        & P \\
+    Q      & miss & miss & P Q      & P Q \\
+    P      & hit  & ---  & Q P      & P Q \\
+    R      & miss & miss & P R      & P Q R \\
+    P      & hit  & ---  & R P      & P Q R \\
+    S      & miss & miss & P S      & Q R S \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Inclusion therefore has to be enforced if it is wanted.  One way is an
+\emph{inclusion bit} in every line of L2, set while the block is also in L1;
+L2 never chooses a line with this bit set as its victim.
+
+This lesson completes the discussion of caches in a single processor
+(Lesson 19 returns to caches in multiprocessors).  Lesson 15 turns to the
+memory technology from which caches and main memory are built.
+
+\needspace{10\baselineskip}
+\begin{keypoint}[Lesson summary]
+  AMAT $=$ hit time $+$ miss rate $\times$ miss penalty, and each term has its
+  own techniques.  The hit time is reduced by pipelining the lookup, by VIPT
+  caches, which index with the virtual address while the TLB translates and
+  avoid aliasing if $\text{cache size} \le N \times \text{page size}$, by way
+  prediction, and by the cheap replacement policies NMRU and PLRU.  Misses
+  are compulsory, capacity or conflict misses; the miss rate is reduced by a
+  suitable block size, by prefetching (prefetch instructions, stream buffers,
+  stride and correlating prefetchers) and by loop interchange.  The miss
+  penalty is reduced by miss-under-miss support, which tracks the misses in
+  progress in MSHRs, and by cache hierarchies, whose AMAT is computed level
+  by level with local miss rates, while global miss rates and MPKI describe
+  how many accesses go past a level.  With LRU
+  in each level, inclusion does not hold automatically.
+\end{keypoint}
+
+\end{document}

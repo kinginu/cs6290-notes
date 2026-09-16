@@ -1,0 +1,27 @@
+% A three-level cache hierarchy: each level is consulted only on a miss in
+% the level before it; the miss penalty of a level is the average access
+% time of everything behind it.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  lvl/.style={draw, fill=ln-accent!15, align=center, inner sep=2pt},
+  lab/.style={font=\scriptsize\sffamily, text=ln-muted}]
+  \node[draw, fill=ln-box, minimum width=1.5cm, minimum height=0.9cm, align=center] (cpu) at (0,0)
+    {\iflangja{プロセッサ}{processor}};
+  \node[lvl, minimum width=1.0cm, minimum height=0.7cm] (l1) at (2.2,0) {L1};
+  \node[lvl, minimum width=1.4cm, minimum height=1.0cm] (l2) at (4.3,0) {L2};
+  \node[lvl, minimum width=1.9cm, minimum height=1.3cm] (l3) at (6.9,0) {L3\\(LLC)};
+  \node[draw, fill=ln-box, minimum width=2.1cm, minimum height=1.6cm, align=center] (mm) at (10.0,0)
+    {\iflangja{主記憶}{main\\memory}};
+  \draw[->] (cpu) -- (l1);
+  \draw[->] (l1) -- node[lab, above] {\iflangja{ミス}{miss}} (l2);
+  \draw[->] (l2) -- node[lab, above] {\iflangja{ミス}{miss}} (l3);
+  \draw[->] (l3) -- node[lab, above] {\iflangja{ミス}{miss}} (mm);
+  % miss penalties
+  \draw[ln-muted] (5.95,-0.9) -- (5.95,-1.05) -- (11.05,-1.05) -- (11.05,-0.9);
+  \node[lab, anchor=north] at (8.5,-1.05) {\iflangja{L2 のミスペナルティ}{miss penalty of L2}};
+  \draw[ln-muted] (3.6,-1.6) -- (3.6,-1.75) -- (11.05,-1.75) -- (11.05,-1.6);
+  \node[lab, anchor=north] at (7.3,-1.75) {\iflangja{L1 のミスペナルティ}{miss penalty of L1}};
+  % size / speed trend
+  \draw[<->, ln-muted] (1.6,1.15) -- (11.0,1.15);
+  \node[lab, anchor=south west] at (1.6,1.18) {\iflangja{小さく高速}{smaller, faster}};
+  \node[lab, anchor=south east] at (11.0,1.18) {\iflangja{大きく低速}{larger, slower}};
+\end{tikzpicture}
