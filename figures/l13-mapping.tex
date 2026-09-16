@@ -1,0 +1,50 @@
+% The virtual address spaces of two programs mapped onto the frames of
+% physical memory; one page of each program is on disk, and the code page
+% is shared.  Page 0 (low addresses) is drawn at the bottom; page numbers
+% are shown at the left inside each page.
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  pg/.style={draw, minimum width=1.5cm, minimum height=0.42cm, inner sep=0pt, font=\scriptsize\sffamily},
+  num/.style={font=\scriptsize\sffamily, text=ln-muted, inner sep=1pt},
+  ttl/.style={font=\scriptsize\sffamily\bfseries, text width=2.6cm, align=center, anchor=south, inner sep=1pt}]
+  \def\h{0.42}
+  \colorlet{lnpone}{ln-accent!15}
+  \colorlet{lnptwo}{ln-tip!22}
+  % ---------------- program 1 (left) and program 2 (right)
+  \foreach \cx/\pcol in {0.75/lnpone, 9.05/lnptwo} {
+    \node[pg, fill=\pcol] at (\cx,0.5*\h) {\iflangja{コード}{code}};
+    \node[pg, fill=\pcol] at (\cx,1.5*\h) {\iflangja{データ}{data}};
+    \node[pg, fill=\pcol] at (\cx,2.5*\h) {\iflangja{ヒープ}{heap}};
+    \node[pg, fill=ln-box, minimum height=1.68cm, text=ln-muted] at (\cx,5*\h) {\iflangja{未使用}{unused}};
+    \node[pg, fill=\pcol] at (\cx,7.5*\h) {\iflangja{スタック}{stack}};
+    \foreach \i/\y in {0/0.5, 1/1.5, 2/2.5, {3--6}/6.5, 7/7.5} {
+      \node[num, anchor=west] at (\cx-0.73,\y*\h) {\i};
+    }
+  }
+  \node[ttl] at (0.75,8*\h+0.08) {\iflangja{プログラム 1 の\\仮想アドレス空間}{program 1:\\virtual address space}};
+  \node[ttl] at (9.05,8*\h+0.08) {\iflangja{プログラム 2 の\\仮想アドレス空間}{program 2:\\virtual address space}};
+  % ---------------- physical memory: frames 0..5 drawn from 2h to 8h
+  \node[ttl] at (4.9,8*\h+0.08) {\iflangja{物理メモリ}{physical memory}};
+  \node[pg, fill=lnpone] (f0) at (4.9,2.5*\h) {\iflangja{P1 データ}{P1 data}};
+  \fill[lnpone] (4.15,3*\h) rectangle (4.9,4*\h);
+  \fill[lnptwo] (4.9,3*\h) rectangle (5.65,4*\h);
+  \node[pg] (f1) at (4.9,3.5*\h) {\iflangja{コード}{code}};
+  \node[pg, fill=lnptwo] (f2) at (4.9,4.5*\h) {\iflangja{P2 データ}{P2 data}};
+  \node[pg, text=ln-muted] (f3) at (4.9,5.5*\h) {\iflangja{空き}{free}};
+  \node[pg, fill=lnpone] (f4) at (4.9,6.5*\h) {\iflangja{P1 スタック}{P1 stack}};
+  \node[pg, fill=lnptwo] (f5) at (4.9,7.5*\h) {\iflangja{P2 ヒープ}{P2 heap}};
+  % ---------------- disk below physical memory
+  \draw[rounded corners=2pt, fill=ln-box] (3.45,-0.72) rectangle (6.35,0.12);
+  \node[pg, fill=lnpone, minimum width=1.25cm] (d1) at (4.2,-0.3) {\iflangja{P1 ヒープ}{P1 heap}};
+  \node[pg, fill=lnptwo, minimum width=1.25cm] (d2) at (5.6,-0.3) {\iflangja{P2 スタック}{P2 stack}};
+  \node[num, anchor=north] at (4.9,-0.74) {\iflangja{ディスク}{disk}};
+  % ---------------- mappings of program 1
+  \draw[->] (1.5,0.5*\h) -- (f1.west);
+  \draw[->] (1.5,1.5*\h) -- (f0.west);
+  \draw[->] (1.5,7.5*\h) -- (f4.west);
+  \draw[->, dashed] (0,2.5*\h) -- (-0.4,2.5*\h) -- (-0.4,-0.3) -- (d1.west);
+  % ---------------- mappings of program 2
+  \draw[->] (8.3,0.5*\h) -- (f1.east);
+  \draw[->] (8.3,1.5*\h) -- (f2.east);
+  \draw[->] (8.3,2.5*\h) -- (f5.east);
+  \draw[->, dashed] (9.8,7.5*\h) -- (10.2,7.5*\h) -- (10.2,-0.3) -- (d2.east);
+\end{tikzpicture}
