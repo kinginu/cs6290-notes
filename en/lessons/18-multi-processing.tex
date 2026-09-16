@@ -4,7 +4,7 @@
 \chapter{Multi-Processing}
 \lessoninfo{
   video={Lesson 18, videos 1--22},
-  textbook={H\&P \cite{hennessy2017} §1.1--1.2, §1.5, §5.1, ch.~3, App.~B},
+  textbook={H\&P \cite{hennessy2017} §1.1--1.2, §1.5, §5.1, ch.~3, Appendix B},
   keywords={Flynn's taxonomy, MIMD, multicore processor, centralized shared memory, UMA, SMP, distributed shared memory, NUMA, message passing, shared memory, chip multiprocessor, fine-grained multithreading, simultaneous multithreading, working set},
 }
 
@@ -605,7 +605,7 @@ Hyper-Threading on the Pentium~4 at about \SI{5}{\percent} more die area for
 
 The threads that share an SMT core may belong to different processes, each
 with its own virtual address space.\source{Lesson 18, video 19; H\&P
-App.~B.}  The same virtual address then refers to different data in each
+Appendix B.}  The same virtual address then refers to different data in each
 thread, and the caches and the TLB of Lessons 13 and 14 must not confuse the
 two.
 \begin{itemize}

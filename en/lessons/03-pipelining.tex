@@ -65,7 +65,7 @@ the five-stage model captures every issue that matters here.}
 pipeline.  After the first four cycles fill the pipeline, one instruction
 completes per cycle.\caution{Separate instruction and data memory ports are
 assumed here; a single port would add \emph{structural} hazards (H\&P
-App.~C).}
+Appendix C).}
 
 \begin{figure}[htbp]
   \centering
@@ -200,8 +200,8 @@ dependence: order does not matter.}
   \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
   I1:  ADD R1, R2, R3     ; R1 <- R2 + R3
   I2:  SUB R4, R1, R5     ; RAW on R1 with I1
-  I3:  MUL R1, R6, R7     ; WAW on R1 with I1, WAR on R1 with I2
-  \end{lstlisting}
+  I3:  MUL R1, R6, R7     ; WAW on R1 with I1, WAR with I2
+\end{lstlisting}
 \end{example}
 
 \section{Dependences and hazards}
@@ -276,8 +276,8 @@ unavoidable for a \emph{load-use} pair even with full forwarding.
 \begin{example}
   \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
   LW  R1, 0(R2)      ; R1 available at end of MEM (cycle 4)
-  ADD R3, R1, R4     ; needs R1 at start of EX (cycle 4): stall 1 cycle
-  \end{lstlisting}
+  ADD R3, R1, R4     ; needs R1 in EX (cycle 4): 1 stall
+\end{lstlisting}
   With forwarding but no stall the \texttt{ADD} would use a stale R1;
   without forwarding it would stall two cycles.\margin{On a Skylake core an
   L1 hit takes 4 cycles, so a load-use pair there costs about 3 stall

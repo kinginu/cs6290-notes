@@ -190,8 +190,8 @@ WAR と WAW は\term[ぎのいぞん]{偽の依存}[false dependence]あるい�
   \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
   I1:  ADD R1, R2, R3     ; R1 <- R2 + R3
   I2:  SUB R4, R1, R5     ; I1 と R1 について RAW
-  I3:  MUL R1, R6, R7     ; I1 と R1 について WAW，I2 と R1 について WAR
-  \end{lstlisting}
+  I3:  MUL R1, R6, R7     ; I1 と R1 について WAW，I2 と WAR
+\end{lstlisting}
 \end{example}
 
 \section{依存とハザード}
@@ -263,8 +263,8 @@ $=$（値が用意できるサイクル）$-$（値が必要なサイクル）�
 \begin{example}
   \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
   LW  R1, 0(R2)      ; R1 は MEM の終わり（サイクル 4）に得られる
-  ADD R3, R1, R4     ; EX の開始（サイクル 4）に R1 が必要: 1 サイクルストール
-  \end{lstlisting}
+  ADD R3, R1, R4     ; EX（サイクル 4）で R1 が必要: 1 ストール
+\end{lstlisting}
   フォワーディングありでストールなしだと \texttt{ADD} は古い R1 を使って
   しまう．フォワーディングなしなら 2 サイクルストールする．
   \margin{Skylake のコアでは L1 ヒットに 4 サイクルかかるため，ロード-使用

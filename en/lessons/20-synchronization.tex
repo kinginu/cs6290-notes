@@ -4,7 +4,7 @@
 \chapter{Synchronization}
 \lessoninfo{
   video={Lesson 20, videos 1--23},
-  textbook={H\&P \cite{hennessy2017} §5.5, §I.4},
+  textbook={H\&P \cite{hennessy2017} §5.5, Appendix I.4},
   keywords={lock, mutual exclusion, critical section, spin lock, Lamport's bakery algorithm, atomic instruction, atomic exchange, test-and-set, load-linked/store-conditional, link register, cache coherence, barrier synchronization},
 }
 
@@ -263,7 +263,7 @@ on success, while the classic test-and-set and x86's \texttt{BTS} return the
 put the value to be stored back into R1 before it retries:
 \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none, deletekeywords={lock}]
 lock:   ADDI R1, R0, 1   ; value to store into the lock var.
-        TSTSW R1, 0(R2)  ; store it if the lock variable is 0
+        TSTSW R1, 0(R2)  ; store if the lock variable is 0
         BEQZ R1, lock    ; did not store: try again
         ...              ; critical section
 unlock: SW   R0, 0(R2)   ; lock variable <- 0
@@ -526,7 +526,7 @@ attempt an \texttt{SC}, so they are not affected.
 \label{sec:l20-barrier}
 
 Locks make threads take turns.\source{Lesson 20, videos 18--22; H\&P
-§I.4.}  A different form of coordination makes threads wait for each
+Appendix I.4.}  A different form of coordination makes threads wait for each
 other.
 
 \begin{definition}[Barrier synchronization]

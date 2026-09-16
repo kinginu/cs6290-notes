@@ -621,26 +621,6 @@ I1$\to$I2$\to$I6$\to$I7 の連鎖に 17 サイクルを要する．}これはプ
   \label{fig:l07-timing}
 \end{figure}
 
-\begin{table}[htbp]
-  \centering\small
-  \caption{実行例の発行，ディスパッチ，結果書き込みのサイクル．}
-  \label{tab:l07-timing}
-  \begin{tabular}{@{}llccc>{\raggedright\arraybackslash}p{0.44\linewidth}@{}}
-    \toprule
-    & 命令 & $I_n$ & $D_n$ & $W_n$ & タイミングを決める要因 \\
-    \midrule
-    I1 & \texttt{MUL R1, R2, R3} & 1 & 2  & 6  & 発行時に準備完了 \\
-    I2 & \texttt{ADD R4, R1, R5} & 2 & 7  & 9  & $W_1 = 6$；$W_3 = 7$ まで加減算器は I3 が使用 \\
-    I3 & \texttt{SUB R6, R2, R5} & 3 & 4  & 7  & 発行時に準備完了；サイクル 6 はバスが使用中 \\
-    I4 & \texttt{ADD R1, R5, R3} & 4 & 9  & 11 & 加減算器を I3，次いでより古い I2 が使用 \\
-    I5 & \texttt{DIV R2, R6, R3} & 5 & 8  & 12 & $W_3 = 7$ \\
-    I6 & \texttt{MUL R3, R4, R1} & 7 & 12 & 16 & $W_1 = 6$ までステーションなし；
-                                               $W_4 = 11$；$W_5 = 12$ まで乗除算器が使用中 \\
-    I7 & \texttt{SUB R5, R3, R2} & 8 & 17 & 19 & $W_6 = 16$ \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
 \begin{example}
   \label{ex:l07-timing}
   \cref{tab:l07-timing} はこれらの規則を実行例に適用したものであり，
@@ -661,6 +641,27 @@ I1$\to$I2$\to$I6$\to$I7 の連鎖に 17 サイクルを要する．}これはプ
   2つの命令が同じサイクルにブロードキャストすることはない．$W_n$ の列に同じ
   値が 2つあれば，バスの競合を見落としている．}
 \end{example}
+
+\begin{table}[htbp]
+  \centering\small
+  \caption{実行例の発行，ディスパッチ，結果書き込みのサイクル．}
+  \label{tab:l07-timing}
+  \begin{tabular}{@{}llccc>{\raggedright\arraybackslash}p{0.44\linewidth}@{}}
+    \toprule
+    & 命令 & $I_n$ & $D_n$ & $W_n$ & タイミングを決める要因 \\
+    \midrule
+    I1 & \texttt{MUL R1, R2, R3} & 1 & 2  & 6  & 発行時に準備完了 \\
+    I2 & \texttt{ADD R4, R1, R5} & 2 & 7  & 9  & $W_1 = 6$；$W_3 = 7$ まで加減算器は I3 が使用 \\
+    I3 & \texttt{SUB R6, R2, R5} & 3 & 4  & 7  & 発行時に準備完了；サイクル 6 はバスが使用中 \\
+    I4 & \texttt{ADD R1, R5, R3} & 4 & 9  & 11 & 加減算器を I3，次いでより古い I2 が使用 \\
+    I5 & \texttt{DIV R2, R6, R3} & 5 & 8  & 12 & $W_3 = 7$ \\
+    I6 & \texttt{MUL R3, R4, R1} & 7 & 12 & 16 & $W_1 = 6$ までステーションなし；
+                                               $W_4 = 11$；$W_5 = 12$ まで乗除算器が使用中 \\
+    I7 & \texttt{SUB R5, R3, R2} & 8 & 17 & 19 & $W_6 = 16$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
 \begin{keypoint}[章のまとめ]
   Tomasulo のアルゴリズムは，レジスタリネーミングと，各命令をオペランドが
   揃い次第実行するアウトオブオーダ実行とを組み合わせる．発行は，命令を
