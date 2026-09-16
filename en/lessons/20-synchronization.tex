@@ -25,7 +25,9 @@ Threads that share memory must coordinate their updates of shared
 data.\source{Lesson 20, videos 1--2; H\&P §5.5.}  As an example, consider a
 program that counts how often each letter occurs in a long document.  Two
 threads each process one half of the document and increment a shared array
-of 26 counters (\cref{ex:l20-count}).
+of 26 counters (\cref{ex:l20-count}).\margin{\texttt{count} is 26 ints, 104
+bytes, and fits in two 64-byte blocks: the threads invalidate each other's copy
+even when they count different letters (false sharing, Lesson 19).}
 
 \begin{example}[Counting letters]
   \label{ex:l20-count}
@@ -52,7 +54,10 @@ SW   R1, 0(R2)
 Each thread has its own registers, but when both threads encounter the same
 letter, their R2 hold the same address.  If both threads load the counter
 before either stores the incremented value, both compute the same new value
-and one increment is lost (\cref{tab:l20-race}).
+and one increment is lost (\cref{tab:l20-race}).\margin{Unsynchronized
+accesses to one location from two threads, at least one of them a write, are a
+\emph{data race} (Lesson 21): C11 and C++11 give such a program no defined
+behaviour.}
 
 \begin{table}[htbp]
   \centering\small
@@ -173,7 +178,10 @@ lock:  LW   R1, 0(R2)    ; R2 = address of lock variable
        SW   R1, 0(R2)    ; lock variable <- 1
 \end{lstlisting}
 If two threads both execute the \texttt{LW} while the lock is free, both read
-0, both leave the loop, both store 1, and both enter the critical section.
+0, both leave the loop, both store 1, and both enter the critical
+section.\margin{Dekker's, Peterson's and Lamport's algorithms are correct only
+if loads and stores become visible in program order; otherwise they need memory
+fences (Lesson 21).}
 This is the lost update of \cref{sec:l20-need} once more: the test and the
 set are a read and an update of a shared variable, so \texttt{lock} would
 itself need a critical section---the very thing it is supposed to provide.
@@ -207,7 +215,9 @@ other thread can still read the old value.
 
 Instruction sets provide more than one instruction that reads and writes a
 memory location as one atomic step.\source{Lesson 20, videos 8--10; H\&P
-§5.5.}  The simplest of them swaps a register with memory.
+§5.5.}  The simplest of them swaps a register with memory.\margin{x86 has no
+LL/SC: it has \texttt{XCHG}, atomic even without the \texttt{lock} prefix, and
+\texttt{lock cmpxchg}, a compare-and-swap.  Intel SDM vol.~2A.}
 
 \begin{definition}[Atomic exchange]
   An \term{atomic exchange}[アトミック交換] \texttt{EXCH R1, 0(R2)}
@@ -247,8 +257,10 @@ writes only when the value it reads passes a test.
 
 \needspace{7\baselineskip}
 The instruction reports in R1 whether it has written, so the lock is taken
-when R1 comes back as~1.  A thread whose attempt failed must put the value
-to be stored back into R1 before it retries:
+when R1 comes back as~1.\caution{Conventions differ: \texttt{TSTSW} returns 1
+on success, while the classic test-and-set and x86's \texttt{BTS} return the
+\emph{old} value, where 0 means success.}  A thread whose attempt failed must
+put the value to be stored back into R1 before it retries:
 \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none, deletekeywords={lock}]
 lock:   ADDI R1, R0, 1   ; value to store into the lock var.
         TSTSW R1, 0(R2)  ; store it if the lock variable is 0
@@ -299,7 +311,9 @@ register.}  A core learns of the writes of other cores through the coherence
 protocol of Lesson 19: the invalidation of the block that holds the linked
 address clears the link register.  Detection therefore works per block, so a
 write to another address in the same block clears the link as well; this
-costs a retry, but never correctness.
+costs a retry, but never correctness.\caution{In Arm, \enquote{link register}
+(X30) is the return-address register; the LL/SC state there is called the
+\emph{exclusive monitor}.}
 
 An \texttt{SC} succeeds only if nobody has written the location since the
 matching \texttt{LL}; in particular, the value that \texttt{LL} read is then
@@ -342,7 +356,9 @@ unlock: SW   R0, 0(R2)   ; lock variable <- 0
   instructions in the order in which they execute.  Both cores find the lock
   free, but only one \texttt{SC} can succeed: its store clears the other
   core's link register.  Core 1 goes back to \texttt{LL}, now reads 1, and
-  waits.
+  waits.\margin{RISC-V guarantees progress only for a \emph{constrained} LR/SC
+  loop: at most 16 instructions, with no loads, stores or backward branches
+  between them.  RISC-V ISA manual.}
 \end{example}
 
 \begin{table}[htbp]
@@ -382,7 +398,10 @@ retry:  LL   R1, 0(R2)   ; R2 = address of count[c]
 \end{lstlisting}
 increments the counter atomically.  If another thread writes the counter
 between the \texttt{LL} and the \texttt{SC}, the \texttt{SC} fails and the
-increment is repeated with the new value, so no update is lost.
+increment is repeated with the new value, so no update is lost.\margin{The common
+read--modify--writes have an atomic instruction of their own, which needs no
+retry: \texttt{amoadd.w} in RISC-V, \texttt{LDADD} in Armv8.1, \texttt{lock
+xadd} on x86.}
 
 \begin{keypoint}
   A lock needs the read and the write of the lock variable to form one
@@ -404,15 +423,20 @@ with coherence.
 \texttt{EXCH} writes the lock variable even when the lock is held; writing 1
 over 1 changes no value, but for the coherence protocol it is a write like
 any other.  Under the MSI protocol the writing core must have the block in
-the modified state, and all other copies are invalidated.  While one core
-holds the lock, each waiting core that executes \texttt{EXCH} takes the
-block away from the core that tried before it.  Almost every attempt thus
+the modified state, and all other copies are invalidated.\margin{Taking the
+block out of another core's cache costs at least an L3 hit---about 44 cycles
+on Skylake.  Intel optimization manual.}  While one core holds the lock, each
+waiting core that executes \texttt{EXCH} takes the block away from the core
+that tried before it.  Almost every attempt thus
 causes a coherence miss, because another waiting core has written the block
 since this core's last attempt, and the block is carried over the bus once
 more (\cref{tab:l20-coherence}, top).  The waiting cores accomplish nothing,
 yet their bus traffic costs energy and slows down the memory accesses of all
 other cores, including the lock holder executing its critical section, which
-also has to fetch the block back when it unlocks.
+also has to fetch the block back when it unlocks.\tip{Spin only while the
+expected wait is shorter than a context switch; for longer waits block instead.
+User-level locks spin briefly, then sleep in the kernel (on Linux through
+\texttt{futex}).}
 
 \needspace{7\baselineskip}
 The remedy is to test the lock variable with an ordinary load first and to
@@ -427,7 +451,9 @@ lock:   LW   R1, 0(R2)   ; ordinary read of lock variable
 Waiting cores now only read the lock variable, so all of them keep the block
 in the shared state and their loads are cache hits: while the lock is held,
 the waiting cores cause no bus traffic at all
-(\cref{tab:l20-coherence}, bottom).  Writes, and with them invalidations,
+(\cref{tab:l20-coherence}, bottom).\margin{The resulting lock is known as
+\emph{test-and-test-and-set}, after the plain test that now precedes the
+atomic one.}  Writes, and with them invalidations,
 happen only around a release: the store of \texttt{unlock}, and the atomic
 attempts of the cores that find the lock free, of which only one succeeds.
 
@@ -522,12 +548,18 @@ Barriers suit parallel programs that proceed in steps, where every thread
 computes its part of one step and the next step needs the results of all
 threads.  The shared-memory sum of Lesson 18 is an example: thread 0 may
 print the total only after all threads have added their partial sums, that
-is, after a barrier.
+is, after a barrier.\margin{The same primitive is
+\texttt{pthread\_barrier\_wait}, the implicit barrier at the end of an OpenMP
+parallel region, and \texttt{MPI\_Barrier}.}
 
 \subsection{A simple implementation}
 
 A barrier uses two shared variables: a counter of the threads that have
-arrived, and a \emph{release flag} on which the waiting threads spin.
+arrived, and a \emph{release flag} on which the waiting threads
+spin.\sidenote{Both variables are shared by all $N$ threads, so every barrier
+serializes $N$ lock acquisitions and $N$ coherence misses on one block.
+Scalable barriers combine the arrivals in a tree and let each thread spin on a
+variable of its own \cite{mellorcrummey1991}.}
 \begin{lstlisting}[language=C, numbers=none, morekeywords={shared}]
 shared int    count = 0, release = 0;
 shared lock_t countLock;
@@ -545,7 +577,9 @@ void barrier(void) {
 }
 \end{lstlisting}
 The counter needs the lock: a lost increment (\cref{tab:l20-race}) would
-keep it below $N$ forever.  The first thread of a round clears the release
+keep it below $N$ forever.\margin{One atomic increment would do: the lock
+around \texttt{++count} can be replaced by the LL/SC sequence of
+\cref{sec:l20-llsc}.}  The first thread of a round clears the release
 flag, so that the threads of this round wait; the last one resets the
 counter for the next round and sets the flag, which ends the waiting loops
 of all the others.
@@ -593,8 +627,11 @@ void barrier(void) {
 
 Because the flag is never reinitialized, the thread that was slow above
 still finds the value that released its round, however late it reads the
-flag, and leaves the barrier.  A thread that reaches the next barrier while
-others are still waiting in this one does no harm: it only increments the
+flag, and leaves the barrier.\caution{The last thread must reset the counter
+\emph{before} its release becomes visible to the others; on a processor that
+reorders stores (Lesson 21) the two writes need a fence between them.}  A
+thread that reaches the next barrier while others are still waiting in this one
+does no harm: it only increments the
 counter, and its own \texttt{localSense} now holds the opposite value, so it
 waits for the next toggle.  Successive rounds alternate between the two
 values, so a thread can never mistake the release of the next round for its
@@ -602,7 +639,8 @@ own.  Numbering the rounds instead of
 toggling a flag is an equivalent generalization: the sense is the parity of
 the round number.  In \cref{fig:l20-barrier}, \texttt{release} becomes 1
 when thread~2 completes the first round and 0 again when thread~0 completes
-the second.
+the second.\margin{The shared state does not grow with $N$: one counter, one
+flag and one lock, plus one private bit in each thread.}
 
 \begin{keypoint}[Lesson summary]
   Threads that update shared data must synchronize, or updates are lost
