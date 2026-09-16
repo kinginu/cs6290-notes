@@ -17,7 +17,8 @@ lesson shows how the compiler improves both: tree height reduction shortens
 the dependence chains that bound the ILP, instruction scheduling places
 independent instructions next to each other, and if-conversion, loop unrolling
 and function call inlining remove the branches, calls and returns that keep
-them apart.
+them apart.\caution{\enquote{Compiler ILP} is not a second kind of ILP: the ILP
+is a property of the program (Lesson 6), and the compiler changes the program.}
 
 \section{How the compiler can raise IPC}
 \label{sec:l10-limits}
@@ -44,7 +45,9 @@ influences both.
 \end{description}
 The compiler sees the whole program rather than a window of it, and it runs
 before the program executes, so it can afford analyses that a processor could
-never carry out within a clock cycle.  \Cref{tab:l10-overview} lists the
+never carry out within a clock cycle.\margin{The compiler's window is a whole
+function, and after inlining the whole call tree; the processor's is its
+reorder buffer (Lesson 8).}  \Cref{tab:l10-overview} lists the
 techniques of this lesson.
 
 \begin{table}[htbp]
@@ -79,7 +82,9 @@ becomes one instruction, and the instruction of a node reads the results of
 the instructions of its children.  The longest chain of RAW dependences among
 these instructions therefore equals the \emph{height} of the tree, the number
 of operations on the longest path from the root to a leaf, and on the ideal
-processor of Lesson 6 each level of the tree takes one cycle.
+processor of Lesson 6 each level of the tree takes one cycle.\margin{One cycle
+per level assumes one-cycle operations.  With a multi-cycle operation each
+level costs its latency, and the height matters even more.}
 
 A straightforward translation follows the order in which the source program
 writes the operands.  For a sum of six variables held in R1 to R6, with the
@@ -118,7 +123,10 @@ ADD R10, R10, R12    ; cycle 3
   sum of the first two pairs follows in cycle~2 and the final addition in
   cycle~3 (\cref{fig:l10-tree-height}b).  There are still five instructions,
   now in three cycles: the ILP rises from 1 to $5/3 \approx 1.67$.  The price
-  is two further registers, R11 and R12, for intermediate results.
+  is two further registers, R11 and R12, for intermediate
+  results.\margin{Registers are the budget for regrouping: x86-64 has 16
+  architectural integer registers, A64 and RISC-V 31; beyond them the compiler
+  spills to the stack.}
 \end{example}
 
 \begin{figure}[htbp]
@@ -135,7 +143,7 @@ For $n$ operands combined by one associative operation, the left-to-right
 translation has height $n-1$, whereas a balanced tree has height $\lceil
 \log_2 n \rceil$.  Addition and multiplication are associative, and so are
 AND, OR and XOR.\caution{Floating-point addition is not associative (rounding);
-compilers regroup it only when permitted.}
+compilers regroup it only when permitted, as by \texttt{-ffast-math}.}
 Subtraction is not, since $(a-b)-c \ne a-(b-c)$, but an
 expression with subtractions can still be regrouped when the signs are
 adjusted.  Because $a - b = a + (-b)$, the terms can be grouped freely as long
@@ -160,7 +168,10 @@ chain, the independent instructions of different statements are separated by
 the rest of the chain.  An out-of-order processor whose window covers both
 chains finds them anyway, but an out-of-order processor with a shorter window
 does not, and neither does an in-order processor, which executes the next
-instructions only up to the first one that must wait.  Three compiler
+instructions only up to the first one that must wait.\caution{Memory holds the
+compiler back as well: a load may be moved ahead of a store only if the two
+addresses can be proved different.  With two pointers of the same type they
+cannot, and the order stands.}  Three compiler
 techniques make independent instructions easier to find: instruction
 scheduling, loop unrolling (\cref{sec:l10-unrolling}) and trace scheduling
 (\cref{sec:l10-other}).
@@ -191,7 +202,9 @@ compiler then either keeps the original order or compensates:
     register, such as an index increment, moves ahead of an instruction that
     uses this register as the base of an address, the displacement of the
     address is reduced by the constant: \texttt{SW R3, 0(R1)} placed after
-    \texttt{ADDI R1, R1, 4} becomes \texttt{SW R3, -4(R1)}.
+    \texttt{ADDI R1, R1, 4} becomes \texttt{SW R3, -4(R1)}.\tip{Moving an
+    instruction past an \texttt{ADDI} of $c$ subtracts $c$ from every
+    displacement on that register; moving it the other way adds $c$.}
 \end{description}
 
 \begin{example}
@@ -238,7 +251,9 @@ for (i = 0; i < n; i++)
 \end{lstlisting}
   adds $x$ to each of the $n$ elements of an integer array.  With R1 pointing
   to the current element, R2 holding $x$, and R5 holding the address just past
-  the last element, it compiles into
+  the last element, it compiles into\margin{The compiled loop has no $i$: the
+  compiler keeps the address as the only induction variable and compares it
+  against the end in R5 (\emph{strength reduction}).}
   \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
 Loop: LW   R3, 0(R1)      ; R3 <- a[i]
       ADD  R3, R3, R2     ; R3 <- a[i] + x
@@ -261,13 +276,18 @@ Loop: LW   R3, 0(R1)
       BNE  R1, R5, Loop
 \end{lstlisting}
   This is the order of the ideal cycles, with the branch kept at the end of
-  the iteration.  The LW and the ADDI now execute together, the ADD follows,
+  the iteration.\caution{The $-4$ is in bytes, not elements: a displacement is
+  corrected by exactly the constant the base register gained, whatever the
+  element size.}  The LW and the ADDI now execute together, the ADD follows,
   and the SW, the BNE and the LW and ADDI of the next iteration fill all four
   places of the next cycle.  Every iteration takes two cycles, a CPI of
   $2/5 = 0.4$.
 \end{example}
 
-Scheduling thus matters for in-order processors, for out-of-order processors
+Scheduling thus matters for in-order processors,\margin{A static schedule fixes
+an assumed latency: the order is right while the loads hit in the cache.  On a
+miss an in-order processor stalls, and only the hardware of Lessons 7--9
+reacts.} for out-of-order processors
 whose window is short compared with the chains in the program, and for
 out-of-order processors whenever more instructions are ready than their width,
 since the order decides which of them execute first (Lesson 6).
@@ -282,7 +302,9 @@ follows the branch is executed on only one of its paths.  Moving it ahead of
 the branch would execute it on the other path as well, and instructions of the
 two paths cannot be placed in the same group, because only one of the paths is
 executed.  The compiler therefore cannot group instructions across a branch,
-even when the instructions before and after it are independent.
+even when the instructions before and after it are independent.\margin{Such a
+stretch is a \emph{basic block}.  With a branch every five instructions or so in
+integer code (Lesson 3), one block alone offers little to schedule.}
 
 If-conversion\index{if-conversion} (Lesson 5) removes this boundary for a small
 if-then-else.  The converted code computes the condition and both parts
@@ -365,7 +387,8 @@ instructions per element, the unrolled loop 8 per two elements, or 4 per
 element: the overhead instructions are executed half as often, and the
 instruction count falls by \SI{20}{\percent}.  With a factor~$k$ the loop
 executes $(3k+2)/k$ instructions per element, which approaches 3, the work
-alone.
+alone.\tip{Read it as $3 + 2/k$: the overhead per element halves with every
+doubling of $k$, so most of the gain lies in the first few steps.}
 
 The ILP rises as well.  On the ideal processor (\cref{eq:l06-cycle}) the
 ADDIs of successive iterations form a chain of one cycle per iteration.  Every
@@ -378,7 +401,9 @@ approaches the number of instructions per iteration: 5 for the original loop,
 8 for the unrolled one.  This relies on iterations that depend on each other
 only through the index: in a loop that accumulates, such as
 \texttt{s = s + a[i]}, the additions to \texttt{s} form a chain of one cycle
-per element in either version.
+per element in either version.\tip{Such a reduction is unrolled with $k$
+separate accumulators, added together after the loop; for floating point this
+needs the reassociation permission of \cref{sec:l10-thr}.}
 
 \subsection{Cycles per instruction}
 \label{sec:l10-unrolling-cpi}
@@ -468,8 +493,11 @@ instructions, an instance of the diminishing returns of Lesson 2.
 
 Larger code occupies more memory, and, as the lessons on caches will show, it
 causes more cache misses when its instructions are fetched, which can cancel
-the gain.  Two further problems concern the number of iterations.  When $n$ is
-not a multiple of $k$, the remaining iterations need additional code.  And
+the gain.\margin{The front end is the first limit: Skylake caches 1536 decoded
+micro-operations and Zen~2 4096, and a loop unrolled past that falls back to
+the decoders.  Intel optimization manual.}  Two further problems concern the
+number of iterations.  When $n$ is not a multiple of $k$, the remaining
+iterations need additional code.  And
 unrolling presumes that the number of remaining iterations is known when an
 iteration of the unrolled loop starts.  A loop whose exit is decided inside
 the body, such as a search that stops at the first zero element, cannot
@@ -499,13 +527,17 @@ if-then-else.\source{Lesson 10, videos 16--18; H\&P Appendix A.}  In addition,
 every call executes instructions that perform none of the function's work: the
 call and the return themselves, the copying of the arguments into the
 registers prescribed by the calling convention and of the result out of them,
-and often the saving and restoring of registers on the stack.
+and often the saving and restoring of registers on the stack.\margin{Real
+conventions pass more in registers: the System~V AMD64 ABI the first six
+integer arguments, AArch64's the first eight.  The rest go on the stack.}
 
 \begin{definition}[Function call inlining]
   \label{def:l10-inlining}
   Replacing a call by a copy of the body of the called function, adapted to
   the operands of the caller, is called \term{function call
-  inlining}[インライン展開].
+  inlining}[インライン展開].\caution{In C and C++ \texttt{inline} is a linkage
+  keyword, not an order: GCC inlines functions not declared \texttt{inline}
+  from \texttt{-O2} on, and only \texttt{always\_inline} forces it.}
 \end{definition}
 
 \begin{example}
@@ -554,7 +586,12 @@ chains, since the body reads the caller's operands directly and delivers its
 result where the caller needs it.  Moreover, the body becomes part of the
 caller's code: the compiler can schedule its instructions together with those
 of the caller and apply tree height reduction across the former call, and the
-processor no longer has to predict the call and the return (Lesson 4).
+processor no longer has to predict the call and the return
+(Lesson 4).\sidenote{Inlining is above all an \emph{enabling} transformation:
+with the body in the caller, the arguments are often known constants there, so
+constant propagation, dead code elimination and the techniques of this lesson
+apply across the former boundary.  Compilers therefore inline early and
+optimize afterwards.}
 
 \subsection{Code bloat from inlining}
 \label{sec:l10-inlining-bloat}
@@ -578,7 +615,9 @@ functions called from many sites the code grows considerably.
 \end{example}
 
 As with loop unrolling, the larger code causes more cache misses and can
-cancel the gain.  Compilers therefore inline small functions, whose call
+cancel the gain.\margin{First-level instruction caches have stayed
+small---32~KB on both Skylake and Zen~3---and every inlined copy competes for
+them.}  Compilers therefore inline small functions, whose call
 overhead is large compared with their body, and functions called from a single
 site, whose one copy replaces the original; large functions called from many
 sites remain calls.
@@ -609,7 +648,12 @@ several branches, schedules this path as one block of code, and adds checks
 that branch to compensation code, which corrects the results, when execution
 leaves the path \cite{fisher1981}.  Carried to its end, scheduling by the
 compiler leads to processors that leave the grouping of operations into
-parallel steps entirely to the compiler: the VLIW processors of Lesson 11.
+parallel steps entirely to the compiler: the VLIW processors of
+Lesson 11.\sidenote{That VLIW supported software pipelining in hardware:
+IA-64's \emph{rotating} registers rename a register by iteration, rotating
+predicates switch the stages of the pipeline on and off, and a dedicated loop
+branch fills and drains it, so one copy of the body does what unrolling needs
+several copies for.}
 
 \begin{keypoint}[Lesson summary]
   The IPC is limited by the ILP of the program and by the independent
