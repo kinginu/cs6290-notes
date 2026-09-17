@@ -2,10 +2,19 @@
 % size; the cache into lines holding one block each, with valid bit and tag.
 \begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]}]
   % --- address fields
-  \draw[fill=ln-accent!15] (1.2,0) rectangle (6.4,0.55);
-  \node at (3.8,0.275) {\iflangja{ブロック番号}{block number}\ (31\,\dots\,7)};
-  \draw[fill=ln-box] (6.4,0) rectangle (9.6,0.55);
-  \node at (8.0,0.275) {\iflangja{ブロックオフセット}{block offset}\ (6\,\dots\,0)};
+  %% The Japanese offset label is wider than its English counterpart and
+  %% filled the box edge to edge, so the Japanese boundary sits further left.
+  \iflangja{%
+    \draw[fill=ln-accent!15] (1.2,0) rectangle (5.8,0.55);
+    \node at (3.5,0.275) {ブロック番号\ (31\,\dots\,7)};
+    \draw[fill=ln-box] (5.8,0) rectangle (9.6,0.55);
+    \node at (7.7,0.275) {ブロックオフセット\ (6\,\dots\,0)};
+  }{%
+    \draw[fill=ln-accent!15] (1.2,0) rectangle (6.4,0.55);
+    \node at (3.8,0.275) {block number\ (31\,\dots\,7)};
+    \draw[fill=ln-box] (6.4,0) rectangle (9.6,0.55);
+    \node at (8.0,0.275) {block offset\ (6\,\dots\,0)};
+  }
   \node[anchor=east] at (1.15,0.275) {\iflangja{アドレス}{address}};
   % --- main memory
   \node[font=\sffamily\scriptsize, text=ln-muted, anchor=south] at (2.3,-1.0) {\iflangja{主記憶}{main memory}};

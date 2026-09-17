@@ -5,10 +5,20 @@
   gate/.style={draw, fill=ln-box, minimum width=0.7cm, minimum height=0.5cm, inner sep=1pt, font=\sffamily\scriptsize},
   cmp/.style={draw, circle, fill=white, inner sep=1pt, minimum size=0.5cm}]
   % --- address fields
-  \draw[fill=ln-accent!15] (0.6,0) rectangle (4.0,0.55);
-  \node at (2.3,0.275) {\iflangja{タグ}{tag}\ (31\,\dots\,6)};
-  \draw[fill=ln-box] (4.0,0) rectangle (6.4,0.55);
-  \node at (5.2,0.275) {\iflangja{インデックス}{index}\ (5\,\dots\,4)};
+  %% The Japanese index label filled its box edge to edge, so the Japanese
+  %% tag/index boundary sits further left (the index line at x=5.4 and the
+  %% tag line at x=1.0 stay inside their boxes).
+  \iflangja{%
+    \draw[fill=ln-accent!15] (0.6,0) rectangle (3.6,0.55);
+    \node at (2.1,0.275) {タグ\ (31\,\dots\,6)};
+    \draw[fill=ln-box] (3.6,0) rectangle (6.4,0.55);
+    \node at (5.0,0.275) {インデックス\ (5\,\dots\,4)};
+  }{%
+    \draw[fill=ln-accent!15] (0.6,0) rectangle (4.0,0.55);
+    \node at (2.3,0.275) {tag\ (31\,\dots\,6)};
+    \draw[fill=ln-box] (4.0,0) rectangle (6.4,0.55);
+    \node at (5.2,0.275) {index\ (5\,\dots\,4)};
+  }
   \draw[fill=white] (6.4,0) rectangle (8.8,0.55);
   \node at (7.6,0.275) {\iflangja{オフセット}{offset}\ (3\,\dots\,0)};
   % --- two ways, four sets; set 0 selected

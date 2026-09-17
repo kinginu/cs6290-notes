@@ -27,7 +27,8 @@
   \node[ttl] at (5.3,-4.55) {\iflangja{(b) 仮想アドレスキャッシュ}{(b) virtually accessed}};
   % ---------------- (c) VIPT
   \node[fld, minimum width=1.3cm] (vpn) at (9.05,0) {VPN};
-  \node[fld, minimum width=1.3cm, anchor=west] (idx) at (vpn.east) {\iflangja{インデックス}{index}};
+  %% The Japanese label fills the 1.3 cm field, so it gets more side padding.
+  \node[fld, minimum width=1.3cm, anchor=west, inner xsep=\iflangja{3pt}{1pt}] (idx) at (vpn.east) {\iflangja{インデックス}{index}};
   \node[lab, anchor=south] at (9.7,0.25) {\iflangja{仮想アドレス}{virtual address}};
   \node[blk, minimum width=1.2cm] (tc) at (9.05,-1.2) {TLB};
   \node[cch, minimum width=2.6cm] (cc) at (9.7,-2.7) {\iflangja{キャッシュ}{cache}};

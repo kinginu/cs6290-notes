@@ -5,17 +5,34 @@
 % its valid bit is set.
 \begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]}]
   % --- virtual address fields
-  \draw[fill=ln-accent!15] (0.6,0) rectangle (4.6,0.55);
-  \node at (2.6,0.275) {VPN\ (31\,\dots\,12)};
-  \draw[fill=ln-box] (4.6,0) rectangle (7.0,0.55);
-  \node at (5.8,0.275) {\iflangja{インデックス}{index}\ (11\,\dots\,6)};
+  %% The Japanese index label is wider than its box in the English layout,
+  %% so in Japanese the VPN/index boundary (and the page-offset bracket that
+  %% starts there) sits further left; the TLB arrow at x=1.3 and the index
+  %% line at x=6.2 stay inside their boxes.
+  \iflangja{%
+    \draw[fill=ln-accent!15] (0.6,0) rectangle (4.0,0.55);
+    \node at (2.3,0.275) {VPN\ (31\,\dots\,12)};
+    \draw[fill=ln-box] (4.0,0) rectangle (7.0,0.55);
+    \node at (5.5,0.275) {インデックス\ (11\,\dots\,6)};
+  }{%
+    \draw[fill=ln-accent!15] (0.6,0) rectangle (4.6,0.55);
+    \node at (2.6,0.275) {VPN\ (31\,\dots\,12)};
+    \draw[fill=ln-box] (4.6,0) rectangle (7.0,0.55);
+    \node at (5.8,0.275) {index\ (11\,\dots\,6)};
+  }
   \draw[fill=white] (7.0,0) rectangle (9.4,0.55);
   \node at (8.2,0.275) {\iflangja{オフセット}{offset}\ (5\,\dots\,0)};
   \node[anchor=south west, font=\sffamily\scriptsize, text=ln-muted, inner sep=1pt] at (0.6,0.6) {\iflangja{仮想アドレス}{virtual address}};
   % page offset bracket
-  \draw[ln-muted] (4.62,0.62) -- (4.62,0.78) -- (9.38,0.78) -- (9.38,0.62);
-  \node[anchor=south, font=\sffamily\scriptsize, text=ln-muted] at (7.0,0.78)
-    {\iflangja{ページオフセット (11\,\dots\,0)}{page offset (11\,\dots\,0)}};
+  \iflangja{%
+    \draw[ln-muted] (4.02,0.62) -- (4.02,0.78) -- (9.38,0.78) -- (9.38,0.62);
+    \node[anchor=south, font=\sffamily\scriptsize, text=ln-muted] at (6.7,0.78)
+      {ページオフセット (11\,\dots\,0)};
+  }{%
+    \draw[ln-muted] (4.62,0.62) -- (4.62,0.78) -- (9.38,0.78) -- (9.38,0.62);
+    \node[anchor=south, font=\sffamily\scriptsize, text=ln-muted] at (7.0,0.78)
+      {page offset (11\,\dots\,0)};
+  }
   % --- TLB
   \node[draw, fill=ln-box, minimum width=1.3cm, minimum height=0.6cm] (tlb) at (1.3,-1.3) {TLB};
   \draw[->] (1.3,0) -- (tlb.north);

@@ -2,10 +2,20 @@
 % addresses: the index selects one line, one comparator checks the tag.
 \begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]}]
   % --- address fields
-  \draw[fill=ln-accent!15] (0,0) rectangle (3.0,0.55);
-  \node at (1.5,0.275) {\iflangja{タグ}{tag}\ (31\,\dots\,16)};
-  \draw[fill=ln-box] (3.0,0) rectangle (5.6,0.55);
-  \node at (4.3,0.275) {\iflangja{インデックス}{index}\ (15\,\dots\,7)};
+  %% The Japanese index label filled its box edge to edge, so the Japanese
+  %% tag/index boundary sits further left (the index arrow at x=3.3 and the
+  %% tag arrow at x=1.5 stay inside their boxes).
+  \iflangja{%
+    \draw[fill=ln-accent!15] (0,0) rectangle (2.6,0.55);
+    \node at (1.3,0.275) {タグ\ (31\,\dots\,16)};
+    \draw[fill=ln-box] (2.6,0) rectangle (5.6,0.55);
+    \node at (4.1,0.275) {インデックス\ (15\,\dots\,7)};
+  }{%
+    \draw[fill=ln-accent!15] (0,0) rectangle (3.0,0.55);
+    \node at (1.5,0.275) {tag\ (31\,\dots\,16)};
+    \draw[fill=ln-box] (3.0,0) rectangle (5.6,0.55);
+    \node at (4.3,0.275) {index\ (15\,\dots\,7)};
+  }
   \draw[fill=white] (5.6,0) rectangle (8.2,0.55);
   \node at (6.9,0.275) {\iflangja{オフセット}{offset}\ (6\,\dots\,0)};
   % --- table: V | tag | data, 6 drawn rows

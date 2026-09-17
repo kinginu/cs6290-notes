@@ -186,7 +186,7 @@ WAR と WAW は\term[ぎのいぞん]{偽の依存}[false dependence]あるい�
 できる．RAW 依存は除去できない．\margin{RAR---同じレジスタの 2 回の
 読み出し---は依存ではない．順序は問題にならない．}
 
-\begin{example}
+\begin{example}\leavevmode % 見出しを独立した行に置き，その下にリストを置く
   \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
   I1:  ADD R1, R2, R3     ; R1 <- R2 + R3
   I2:  SUB R4, R1, R5     ; I1 と R1 について RAW
@@ -260,7 +260,7 @@ $=$（値が用意できるサイクル）$-$（値が必要なサイクル）�
 サイクル---に必要とする．したがって\emph{ロード-使用}の組では，完全な
 フォワーディングがあっても 1 サイクルのストールが避けられない．
 
-\begin{example}
+\begin{example}\leavevmode % 見出しを独立した行に置き，その下にリストを置く
   \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
   LW  R1, 0(R2)      ; R1 は MEM の終わり（サイクル 4）に得られる
   ADD R3, R1, R4     ; EX（サイクル 4）で R1 が必要: 1 ストール

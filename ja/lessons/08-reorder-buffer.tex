@@ -295,9 +295,9 @@ Sandy Bridge（2011 年）以降は，結果は第6章の物理レジスタフ�
 \section{分岐予測ミス回復}
 \label{sec:l08-recovery}
 
-ROB があれば，予測を外した経路の命令は，コミットする前に取り除かれる
-かぎりレジスタファイルを変更できない．\source{Lesson 8，動画 11--12；
-H\&P §3.6．}\cref{sec:l08-mispredictions} のプログラムでは，I2 が R1 を
+ROB があれば，\source{Lesson 8，動画 11--12；H\&P §3.6．}予測を外した経路の
+命令は，コミットする前に取り除かれるかぎりレジスタファイルを変更できない．%
+\cref{sec:l08-mispredictions} のプログラムでは，I2 が R1 を
 待っている間に I3 から I6 が発行され，まだ実行中の I6 を除くすべてが結果を
 自身の ROB エントリに書き込む．I2 がようやく実行され，分岐の予測が外れて
 いたと分かると，予測ミスが I2 の ROB エントリに記録され，その時点では他に
@@ -727,6 +727,8 @@ ILP があっても，長い目で見れば 1 サイクルに高々 2 命令し�
     対する効果を指しており，キュー自体を指すのではない．}
 \end{description}
 
+% 図を章のまとめと同じページに送る（まとめだけのページを避ける）
+\needspace{8\baselineskip}
 \begin{figure}[htbp]
   \centering
   \input{figures/l08-order}
