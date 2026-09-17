@@ -119,12 +119,18 @@
 
 %% ---------------------------------------------------------- vertical rule
 \RequirePackage{eso-pic}
+%% Pages shipped out inside the titlepage environment get no rule.
+\newif\ifln@rulehere \ln@ruleheretrue
 \ifln@rule
   \AddToShipoutPictureBG{%
+    \ifln@rulehere
     \AtTextLowerLeft{%
       \makebox[0pt][l]{%
         \hspace*{\dimexpr\textwidth+0.5\marginparsep\relax}%
-        \color{ln-rule}\rule[-6pt]{0.4pt}{\dimexpr\textheight+12pt\relax}}}}
+        \color{ln-rule}\rule[-6pt]{0.4pt}{\dimexpr\textheight+12pt\relax}}}%
+    \fi}
+  \AddToHook{env/titlepage/begin}{\global\ln@ruleherefalse}
+  \AddToHook{env/titlepage/after}{\global\ln@ruleheretrue}
 \fi
 
 %% --------------------------------------------------------------- headings
@@ -137,7 +143,15 @@
 \clearpairofpagestyles
 \automark[section]{chapter}
 \ihead{\small\sffamily\color{ln-muted}\leftmark}
-\ohead{\small\sffamily\color{ln-muted}\rightmark}
+\ohead{\small\sffamily\color{ln-muted}\ln@rightmark}
+%% Contents, Bibliography and Index set both marks to their title; print it
+%% once (left) instead of on both sides.
+\newcommand*{\ln@rightmark}{%
+  \begingroup
+    \protected@edef\ln@marka{\leftmark}%
+    \protected@edef\ln@markb{\rightmark}%
+    \ifx\ln@marka\ln@markb\else\rightmark\fi
+  \endgroup}
 \ofoot*{\small\sffamily\pagemark}
 \setkomafont{disposition}{\sffamily\bfseries\color{ln-accent}}
 \setkomafont{chapterprefix}{\normalfont\sffamily\normalsize\color{ln-muted}}
@@ -214,7 +228,10 @@
 %% \sidenote{text}  numbered per chapter, number in text and margin
 \newcounter{sidenote}[chapter]
 \renewcommand*{\thesidenote}{\arabic{sidenote}}
+%% ja: \inhibitglue drops the half-em space after a preceding "．" or "，",
+%% so the marker sits right after the punctuation.
 \newcommand{\sidenote}[1]{%
+  \ifln@ja\inhibitglue\fi
   \refstepcounter{sidenote}%
   \textsuperscript{\thesidenote}%
   \ln@margin{\textsuperscript{\thesidenote}\,#1}}
@@ -236,6 +253,7 @@
 %% .latexmkrc, because latexmk -- not imakeidx -- runs the index processor.
 \RequirePackage{imakeidx}
 \makeindex[intoc,columns=2]
+\indexsetup{headers={{\indexname}{\indexname}}}% imakeidx uppercases by default
 %% Cross-references inside the index: \index{BTB|see{branch target buffer}}
 \ifln@ja
   \renewcommand*{\seename}{→}
@@ -332,20 +350,38 @@
   \captionsetup{type=table,font={footnotesize,sf}}\ln@marginfont\centering}%
   {\end{minipage}\end{lrbox}\marginpar{\usebox{\ln@marginbox}}}
 
+%% Float pages: floats stack from the top of the page instead of being
+%% spread over it with large empty bands.  The natural gap is KOMA's, so the
+%% choice of floats for a float page is unchanged.
+\AtBeginDocument{%
+  \setlength{\@fptop}{0pt}%
+  \setlength{\@fpsep}{\dimexpr\@fpsep\relax}%
+  \setlength{\@fpbot}{0pt plus 1fil}}
+
 %% widefigure / widetable: floats spanning body + margin column.
 %% The \fullwidth minipage is wider than the measure on purpose, so the line
 %% holding it is overfull by exactly the gap plus the margin column; \hfuzz is
 %% raised inside the float so that intentional overflow is not reported.
+%% The vertical rule is drawn in the page background, so it would run
+%% through a wide float; \ln@putwide lays a white rectangle, reaching 7pt
+%% beyond the float (past the 6pt overhang of the rule), under the float body.
+%% The rectangle is smashed and has no width, so the layout is unchanged.
 \newlength{\ln@wideslack}
 \setlength{\ln@wideslack}{\dimexpr\marginparsep+\marginparwidth+1pt\relax}
+\newsavebox{\ln@widebox}
+\newcommand*{\ln@putwide}{%
+  \leavevmode\rlap{\smash{\color{white}%
+    \rule[\dimexpr-\dp\ln@widebox-7pt\relax]{\wd\ln@widebox}%
+      {\dimexpr\ht\ln@widebox+\dp\ln@widebox+14pt\relax}}}%
+  \usebox{\ln@widebox}}
 \newenvironment{widefigure}[1][tbp]{%
   \begin{figure}[#1]\ln@inboxtrue\hfuzz\ln@wideslack
-  \begin{minipage}{\fullwidth}\centering}%
-  {\end{minipage}\end{figure}}
+  \begin{lrbox}{\ln@widebox}\begin{minipage}{\fullwidth}\centering}%
+  {\end{minipage}\end{lrbox}\ln@putwide\end{figure}}
 \newenvironment{widetable}[1][tbp]{%
   \begin{table}[#1]\ln@inboxtrue\hfuzz\ln@wideslack
-  \begin{minipage}{\fullwidth}\centering}%
-  {\end{minipage}\end{table}}
+  \begin{lrbox}{\ln@widebox}\begin{minipage}{\fullwidth}\centering}%
+  {\end{minipage}\end{lrbox}\ln@putwide\end{table}}
 
 %% ------------------------------------------------------- code & algorithms
 \RequirePackage{listings}
@@ -361,6 +397,9 @@
   showstringspaces=false,
   aboveskip=0.6\baselineskip, belowskip=0.6\baselineskip,
 }
+%% A listing that opens a theorem-like environment (example, note) would start
+%% on the heading line; set the pending heading as its own line first.
+\AddToHook{env/lstlisting/before}{\if@inlabel\leavevmode\fi}
 \RequirePackage{algorithm}
 \RequirePackage{algpseudocode}
 
@@ -388,12 +427,32 @@
 \AtBeginDocument{\hypersetup{pdflang=\ln@langcode}}
 \RequirePackage[capitalise,noabbrev]{cleveref}
 \ifln@ja
-  \crefformat{chapter}{第#2#1#3章}
-  \Crefformat{chapter}{第#2#1#3章}
-  \crefformat{section}{#2#1#3~節}
-  \Crefformat{section}{#2#1#3~節}
-  \crefformat{subsection}{#2#1#3~節}
-  \Crefformat{subsection}{#2#1#3~節}
+  %% Numbered units read 第3章 / 3.2 節.  Besides the single format, the
+  %% range and list formats are set too; otherwise cleveref falls back to its
+  %% English names there (\cref{sec:a,sec:b,sec:c} gave "Sections 3.1 to 3.3").
+  %% \ln@jacref{type}{prefix}{suffix}
+  \newcommand*{\ln@jacref}[3]{%
+    \crefformat{#1}{#2##2##1##3#3}\Crefformat{#1}{#2##2##1##3#3}%
+    \crefrangeformat{#1}{#2##3##1##4\crefrangeconjunction##5##2##6#3}%
+    \Crefrangeformat{#1}{#2##3##1##4\crefrangeconjunction##5##2##6#3}%
+    \crefmultiformat{#1}{#2##2##1##3}{\crefpairconjunction##2##1##3#3}%
+      {\crefmiddleconjunction##2##1##3}{\creflastconjunction##2##1##3#3}%
+    \Crefmultiformat{#1}{#2##2##1##3}{\crefpairconjunction##2##1##3#3}%
+      {\crefmiddleconjunction##2##1##3}{\creflastconjunction##2##1##3#3}%
+    \crefrangemultiformat{#1}%
+      {#2##3##1##4\crefrangeconjunction##5##2##6}%
+      {\crefpairconjunction##3##1##4\crefrangeconjunction##5##2##6#3}%
+      {\crefmiddleconjunction##3##1##4\crefrangeconjunction##5##2##6}%
+      {\creflastconjunction##3##1##4\crefrangeconjunction##5##2##6#3}%
+    \Crefrangemultiformat{#1}%
+      {#2##3##1##4\crefrangeconjunction##5##2##6}%
+      {\crefpairconjunction##3##1##4\crefrangeconjunction##5##2##6#3}%
+      {\crefmiddleconjunction##3##1##4\crefrangeconjunction##5##2##6}%
+      {\creflastconjunction##3##1##4\crefrangeconjunction##5##2##6#3}}
+  \ln@jacref{chapter}{第}{章}
+  \ln@jacref{section}{}{~節}
+  \ln@jacref{subsection}{}{~節}
+  \ln@jacref{part}{第}{部}
   \crefname{figure}{図}{図}          \Crefname{figure}{図}{図}
   \crefname{table}{表}{表}           \Crefname{table}{表}{表}
   \crefname{equation}{式}{式}        \Crefname{equation}{式}{式}
@@ -405,7 +464,6 @@
   \crefname{note}{注}{注}            \Crefname{note}{注}{注}
   \crefname{sidenote}{注}{注}        \Crefname{sidenote}{注}{注}
   \crefname{page}{ページ}{ページ}    \Crefname{page}{ページ}{ページ}
-  \crefformat{part}{第#2#1#3部}      \Crefformat{part}{第#2#1#3部}
   %% list conjunctions: 図 1.1，表 1.2 / 式 (1.1)〜(1.3)
   %% (cleveref sets its English defaults at \begin{document})
   \AtBeginDocument{%
