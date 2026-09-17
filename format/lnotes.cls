@@ -6,6 +6,8 @@
 %%
 %% Class options
 %%   en | ja        document language (default: en)
+%%   lesson|chapter English chapter label "Lesson 3" (default) or "Chapter 3";
+%%                  the Japanese edition always prints 第3章
 %%   norule         do not draw the vertical rule between body and margin
 %%   <anything else> is passed to scrbook (e.g. fontsize=11pt)
 %%
@@ -13,7 +15,7 @@
 %%   \iflangja{<ja>}{<en>}   \ja{...}  \en{...}
 %%   \sidenote{...}  \margin{...}  \source{...}  \tip{...}  \caution{...}
 %%   \term[<sort key>]{<word>}[<margin gloss>]   \term*  (no index entry)
-%%   \lessoninfo{video=..., textbook=..., keywords=...}
+%%   \lessoninfo{video=..., sources=..., textbook=..., keywords=...}
 %%   \definitionname, \keypointname, ... -- localized strings (renewable)
 %% Environments
 %%   definition  example  note  keypoint
@@ -31,6 +33,9 @@
 \DeclareOption{en}{\ln@jafalse}
 \DeclareOption{ja}{\ln@jatrue}
 \DeclareOption{norule}{\ln@rulefalse}
+\def\ln@unitname{Lesson}
+\DeclareOption{lesson}{\def\ln@unitname{Lesson}}
+\DeclareOption{chapter}{\def\ln@unitname{Chapter}}
 \DeclareOption*{\PassOptionsToClass{\CurrentOption}{scrbook}}
 \ExecuteOptions{en}
 \ProcessOptions\relax
@@ -193,10 +198,11 @@
   \newcommand*{\tipname}{ヒント}
   \newcommand*{\cautionname}{注意}
   \newcommand*{\videoname}{講義動画}
+  \newcommand*{\sourcesname}{資料}
   \newcommand*{\textbookname}{教科書}
   \newcommand*{\keywordsname}{キーワード}
 \else
-  \AtBeginDocument{\renewcommand*{\chaptername}{Lesson}}
+  \AtBeginDocument{\renewcommand*{\chaptername}{\ln@unitname}}
   \newcommand*{\definitionname}{Definition}
   \newcommand*{\examplename}{Example}
   \newcommand*{\notename}{Note}
@@ -205,6 +211,7 @@
   \newcommand*{\tipname}{Tip}
   \newcommand*{\cautionname}{Caution}
   \newcommand*{\videoname}{Lecture}
+  \newcommand*{\sourcesname}{Sources}
   \newcommand*{\textbookname}{Textbook}
   \newcommand*{\keywordsname}{Keywords}
 \fi
@@ -305,19 +312,23 @@
 }
 
 %% ------------------------------------------------------------ lesson info
-%% \lessoninfo{video={...}, textbook={...}, keywords={...}}
+%% \lessoninfo{video={...}, sources={...}, textbook={...}, keywords={...}}
+%% video = lecture recording(s); sources = other primary material
+%% (documentation, tutorial, paper, talk).  Empty keys are not printed.
 %% Keys are parsed with the LaTeX kernel key system (\DeclareKeys/\SetKeys).
 \RequirePackage{enumitem}
 \DeclareKeys[lessoninfo]{
   video    .store = \ln@li@video,
+  sources  .store = \ln@li@sources,
   textbook .store = \ln@li@textbook,
   keywords .store = \ln@li@keywords,
 }
 \newcommand{\lessoninfo}[1]{%
   \begingroup
-  \def\ln@li@video{}\def\ln@li@textbook{}\def\ln@li@keywords{}%
+  \def\ln@li@video{}\def\ln@li@sources{}\def\ln@li@textbook{}\def\ln@li@keywords{}%
   \SetKeys[lessoninfo]{#1}%
   \ifboolexpr{ test {\ifdefempty{\ln@li@video}}
+           and test {\ifdefempty{\ln@li@sources}}
            and test {\ifdefempty{\ln@li@textbook}}
            and test {\ifdefempty{\ln@li@keywords}} }{}{%
     \begin{tcolorbox}[enhanced, sharp corners, colback=white,
@@ -325,6 +336,7 @@
         top=4pt, bottom=4pt, fontupper=\small\sffamily]
       \begin{description}[nosep, leftmargin=7em, labelwidth=6em, font=\bfseries\color{ln-muted}]
         \ifdefempty{\ln@li@video}{}{\item[\videoname] \ln@li@video}%
+        \ifdefempty{\ln@li@sources}{}{\item[\sourcesname] \ln@li@sources}%
         \ifdefempty{\ln@li@textbook}{}{\item[\textbookname] \ln@li@textbook}%
         \ifdefempty{\ln@li@keywords}{}{\item[\keywordsname] \ln@li@keywords}%
       \end{description}
