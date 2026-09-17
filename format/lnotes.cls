@@ -128,7 +128,11 @@
 \fi
 
 %% --------------------------------------------------------------- headings
-\RequirePackage[automark, autooneside=false, headwidth=textwithmarginpar, footwidth=textwithmarginpar]{scrlayer-scrpage}
+%% The foot spans the BODY only: \ofoot puts the page number at the right
+%% edge of the text block, clear of the margin column.  With the foot
+%% spanning body+margin the page number sits underneath the margin column,
+%% where a margin note that overruns the text block prints on top of it.
+\RequirePackage[automark, autooneside=false, headwidth=textwithmarginpar, footwidth=text]{scrlayer-scrpage}
 \pagestyle{scrheadings}
 \clearpairofpagestyles
 \automark[section]{chapter}
@@ -141,6 +145,12 @@
 \RedeclareSectionCommand[beforeskip=0pt, afterskip=1.5\baselineskip]{chapter}
 \setcounter{secnumdepth}{2}
 \setcounter{tocdepth}{1}
+%% Table of contents.  The LaTeX defaults (\@pnumwidth 1.55em) are too narrow
+%% for a three-digit page number set in the bold part-entry font, and the
+%% section number box has to hold a two-digit number such as "13.14".
+\renewcommand*{\@pnumwidth}{2.4em}
+\renewcommand*{\@tocrmarg}{3.4em}
+\RedeclareSectionCommand[tocnumwidth=2.9em]{section}
 
 %% --------------------------------------------------------- localized text
 %% Every string is a macro so a document can \renewcommand it.
@@ -262,8 +272,11 @@
 
 %% keypoint: shaded box for take-aways.  Optional argument = subtitle.
 \RequirePackage[skins,breakable]{tcolorbox}
+%% NOT breakable: a summary split across a page boundary leaves a one-line
+%% shaded fragment (and lets a float slip between the two halves).  The boxes
+%% are short, so moving one whole to the next page is always safe.
 \newtcolorbox{keypoint}[1][]{%
-  enhanced, breakable, sharp corners,
+  enhanced, sharp corners,
   colback=ln-box, colframe=ln-accent, boxrule=0pt, leftrule=2pt,
   left=6pt, right=6pt, top=4pt, bottom=4pt,
   fontupper=\normalfont,
@@ -319,13 +332,18 @@
   \captionsetup{type=table,font={footnotesize,sf}}\ln@marginfont\centering}%
   {\end{minipage}\end{lrbox}\marginpar{\usebox{\ln@marginbox}}}
 
-%% widefigure / widetable: floats spanning body + margin column
+%% widefigure / widetable: floats spanning body + margin column.
+%% The \fullwidth minipage is wider than the measure on purpose, so the line
+%% holding it is overfull by exactly the gap plus the margin column; \hfuzz is
+%% raised inside the float so that intentional overflow is not reported.
+\newlength{\ln@wideslack}
+\setlength{\ln@wideslack}{\dimexpr\marginparsep+\marginparwidth+1pt\relax}
 \newenvironment{widefigure}[1][tbp]{%
-  \begin{figure}[#1]\ln@inboxtrue
+  \begin{figure}[#1]\ln@inboxtrue\hfuzz\ln@wideslack
   \begin{minipage}{\fullwidth}\centering}%
   {\end{minipage}\end{figure}}
 \newenvironment{widetable}[1][tbp]{%
-  \begin{table}[#1]\ln@inboxtrue
+  \begin{table}[#1]\ln@inboxtrue\hfuzz\ln@wideslack
   \begin{minipage}{\fullwidth}\centering}%
   {\end{minipage}\end{table}}
 
