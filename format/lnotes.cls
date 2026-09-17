@@ -425,6 +425,10 @@
 
 %% ------------------------------------------------------------ bibliography
 \RequirePackage[backend=biber,style=numeric,sorting=none]{biblatex}
+%% Long URLs (@online entries) must break, or the entry overflows the body.
+\setcounter{biburlnumpenalty}{9000}
+\setcounter{biburlucpenalty}{9000}
+\setcounter{biburllcpenalty}{9000}
 \ifln@ja
   \DefineBibliographyStrings{english}{bibliography={参考文献}, references={参考文献}}
 \fi
