@@ -608,17 +608,18 @@ $C_n = \max(W_n+1,\; C_{n-1},\; C_{n-2}+1)$.
 
 \Cref{tab:l08-timing} lists the result for the example.  The Execute and
 Write result columns are out of order: I5 writes its result before I1, I3 and
-I4, which precede it.  The Commit column is increasing.  I2 and I5 commit six
+I4, which precede it.  The Commit column is increasing.\margin{A ROB is sized to cover the
+longest stall it should hide: at four instructions per cycle, 224 entries hold
+some 56 cycles---an L3 hit on Skylake takes 42 cycles, a DRAM access about 200
+(7-cpu.com).}
+I2 and I5 commit six
 cycles after writing their results, held up by the slow division at the head
 of the ROB and, after it commits in cycle~9, by the limit of one commit per
 cycle: every later instruction commits exactly one cycle after its
 predecessor.  This waiting delays no computation: I3 and I5 obtained the
 result of I2, and I6 those of I3 and I5, without waiting for any commit.  The
 ROB delays only the moment at which results become part of the architectural
-state.\margin{A ROB is sized to cover the
-longest stall it should hide: at four instructions per cycle, 224 entries hold
-some 56 cycles---an L3 hit on Skylake takes 42 cycles, a DRAM access about 200
-(7-cpu.com).}
+state.
 
 \needspace{4\baselineskip}
 The ROB can nevertheless limit execution when it is too small.  With only four

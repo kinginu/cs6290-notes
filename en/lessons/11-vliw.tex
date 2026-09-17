@@ -152,9 +152,7 @@ advantages.\source{Lesson 11, videos 4--5; H\&P §3.7, Appendix H.}
     unrolling\index{loop unrolling} (Lesson 10) removes the branches between
     iterations, so that their independent operations fill the slots.
 \end{itemize}
-It also has four disadvantages.\tip{The first two are what the compiler cannot
-know: the actual latencies, the actual addresses and the actual branch
-directions.}
+It also has four disadvantages.
 \begin{itemize}
   \item \textbf{Latencies are not known at compile time.}  The compiler
     groups operations as if each completes within its cycle.  If one takes
@@ -164,7 +162,9 @@ directions.}
     the compiler must assume: on Skylake a load takes 4 cycles from L1, 12
     from L2, about 40 from L3 and 200--300 from DRAM (Intel optimization
     manual).}
-  \item \textbf{Irregular code is hard.}  The compiler sees the program, not
+  \item \textbf{Irregular code is hard.}\tip{The first two are what the
+    compiler cannot know: the actual latencies, the actual addresses and the
+    actual branch directions.}  The compiler sees the program, not
     its execution.  When it cannot prove two operations independent---a store
     and a load through pointers that may address the same location, or
     operations on either side of a data-dependent branch---it must place them

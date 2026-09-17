@@ -690,12 +690,12 @@ branch which of them to trust.
   (\cref{fig:l04-tournament}).
 \end{definition}
 
-Both component predictors are trained on every branch as usual.  The
-meta-predictor counter changes only when the components disagree in
-correctness: it moves towards the component that was right.  When both are
-right or both are wrong, it stays unchanged.\margin{The Alpha 21264 combined
-1024 local histories of 10 bits, a 4096-entry global table indexed by 12
-history bits and a 4096-entry chooser: about 29 kilobits (H\&P §3.3).}
+Both component predictors are trained on every branch as usual.\margin{The
+Alpha 21264 combined 1024 local histories of 10 bits, a 4096-entry global
+table indexed by 12 history bits and a 4096-entry chooser: about 29 kilobits
+(H\&P §3.3).}  The meta-predictor counter changes only when the components
+disagree in correctness: it moves towards the component that was right.
+When both are right or both are wrong, it stays unchanged.
 
 \begin{figure}[htbp]
   \centering
@@ -833,6 +833,8 @@ been decoded.  There are two ways to know that the instruction is a return.
     instruction is a return; the entry is set the first time the instruction
     is decoded.  Since the instruction at a given address does not change,
     this prediction is almost always right.
+  % keeps this item with the lesson summary, which alone would fill a page
+  \needspace{9\baselineskip}
   \item \textbf{Predecode it.}  With \term{predecoding}[プリデコード], the
     processor partially decodes each instruction when it is brought from
     main memory into the processor's cache, and stores a few extra bits with

@@ -455,16 +455,17 @@ that was used only a little less recently than the most recent one.
 
 \begin{definition}[PLRU]
   The \term{pseudo-LRU}[疑似 LRU]\index{PLRU|see{pseudo-LRU}} (PLRU) policy
-  keeps one bit per line, initially~0.  An access sets the bit of its line;
+  keeps one bit per line, initially~0.\caution{Elsewhere \enquote{pseudo-LRU} usually names the tree variant:
+  $N-1$ bits per set steer a binary tree to the victim.  The bit per line here
+  is a different approximation.}
+  An access sets the bit of its line;
   if this sets the last bit of the set that was still~0, the bits of all
   other lines are cleared.  A miss evicts a line whose bit is~0, chosen at
   random.
 \end{definition}
 
 The bit of a line tells whether the line has been accessed since the last
-reset.\caution{Elsewhere \enquote{pseudo-LRU} usually names the tree variant:
-$N-1$ bits per set steer a binary tree to the victim.  The bit per line here
-is a different approximation.}  The bit of the most recently used line is always set, so the
+reset.  The bit of the most recently used line is always set, so the
 candidates of PLRU are always among those of NMRU, and PLRU is at least as
 good as NMRU.  How closely it approximates LRU depends on how many bits are
 set.  Right after a reset only the most recently used line is excluded, as
@@ -530,7 +531,9 @@ classified into three kinds, often called the three Cs.
   A \term{conflict miss}[競合性ミス] is a miss that occurs only because of
   limited associativity: a fully associative cache of the same size would
   still hold the block, but in the actual cache it was evicted by another
-  block competing for the same set.
+  block competing for the same set.\margin{A fourth C
+  is added in multiprocessors: coherence misses, caused by another core's write
+  invalidating the block (Lesson 19).}
 \end{definition}
 
 The three counts can be measured by simulating the same sequence of accesses
@@ -549,9 +552,7 @@ actual cache adds the conflict misses.
 
 The classification points to the remedies.  A larger cache reduces capacity
 misses, and a higher associativity or a better replacement policy reduces
-conflict misses, but all of these lengthen the hit time.\margin{A fourth C
-is added in multiprocessors: coherence misses, caused by another core's write
-invalidating the block (Lesson 19).}  The following
+conflict misses, but all of these lengthen the hit time.  The following
 sections present techniques that reduce the miss rate without lengthening
 hits.
 
@@ -1002,6 +1003,7 @@ there, while it remains in L1.
   \end{tabular}
 \end{table}
 
+\needspace{12\baselineskip}
 Inclusion therefore has to be enforced if it is wanted.  One way is an
 \emph{inclusion bit} in every line of L2, set while the block is also in L1;
 L2 never chooses a line with this bit set as its victim.\sidenote{Both

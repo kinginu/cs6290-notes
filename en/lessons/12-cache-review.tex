@@ -484,12 +484,12 @@ lines of the selected set, in parallel, and hits if any valid line matches
   hits.
 \end{example}
 
-Compared with a direct-mapped cache of the same size, an $N$-way
+Compared with a direct-mapped cache of the same size,\margin{Why 32~KB 8-way L1 caches are common: 64
+sets of 64-byte blocks span 4~KB, so index and offset fit in the page offset
+and the lookup can start before translation (Lesson 14).} an $N$-way
 set-associative cache needs $N$ comparators and a selection of the matching
 line's data, which makes the hit time longer, but it suffers fewer conflicts
-and so has a lower miss rate.\margin{Why 32~KB 8-way L1 caches are common: 64
-sets of 64-byte blocks span 4~KB, so index and offset fit in the page offset
-and the lookup can start before translation (Lesson 14).}
+and so has a lower miss rate.
 
 \section{Fully associative caches}
 \label{sec:l12-fa}
@@ -641,14 +641,14 @@ Writes raise two questions that reads do not.\source{Lesson 12, videos
 \end{definition}
 
 Write-through keeps main memory always up to date, but every write then pays
-the access time of main memory, which is what the cache was meant to avoid.
+the access time of main memory, which is what the cache was meant to avoid.\caution{The two choices are independent: write-through or write-back
+says \emph{when} memory is updated, write-allocate or not \emph{what a write
+miss does}.}
 Caches therefore use write-back: many writes to a block while it is in the
 cache cost at most a single write to main memory, at eviction.  A write-back
 cache is normally also write-allocate; otherwise every write to a block that
 is not in the cache would go to main memory, however often the block is
-written.\caution{The two choices are independent: write-through or write-back
-says \emph{when} memory is updated, write-allocate or not \emph{what a write
-miss does}.}
+written.
 
 Writing every evicted block back would, however, also write blocks that were
 only read and are identical to their copies in memory.
@@ -715,7 +715,10 @@ one access.  A hit reads or writes the data and updates the LRU counters.  A
 miss first chooses a victim, writes it back if it is valid and dirty, and
 loads the new block; the access then proceeds as a hit.
 
-\begin{figure}[htbp]
+% [tb], not p: with a float page the lesson ended on a page holding one line
+% and the summary box; Table 12.4 is placed after the closing paragraph for
+% the same reason.
+\begin{figure}[tb]
   \centering
   \input{figures/l12-access-flow}
   \caption{One memory access in a set-associative cache with LRU replacement
@@ -739,7 +742,7 @@ loads the new block; the access then proceeds as a hit.
   \texttt{0x40}, which the third access has written, and writes it back.
 \end{example}
 
-\begin{table}[htbp]
+\begin{table}[tb]
   \centering\small
   \caption{Set~1 of a 2-way set-associative cache with LRU replacement and
     write-back (\cref{ex:l12-summary-trace}): tag, dirty bit and LRU counter
@@ -777,6 +780,11 @@ loads the new block; the access then proceeds as a hit.
   4096 lines of 24 bits, 12~KB or \SI{19}{\percent} of its data.}
 \end{example}
 
+Lesson 13 applies the same ideas---blocks, tags and replacement---to the
+translation of virtual addresses, and Lesson 14 turns to techniques that
+lower the hit time, the miss rate and the miss penalty of the basic cache
+described here.
+
 \begin{table}[htbp]
   \centering\small
   \caption{Address fields and metadata bits per line (valid $+$ dirty $+$
@@ -794,11 +802,6 @@ loads the new block; the access then proceeds as a hit.
     \bottomrule
   \end{tabular}
 \end{table}
-
-Lesson 13 applies the same ideas---blocks, tags and replacement---to the
-translation of virtual addresses, and Lesson 14 turns to techniques that
-lower the hit time, the miss rate and the miss penalty of the basic cache
-described here.
 
 \begin{keypoint}[Lesson summary]
   Programs access memory with temporal and spatial locality, so a small, fast

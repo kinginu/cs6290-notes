@@ -196,7 +196,7 @@ same register name.  They can be removed by renaming (Lesson 6).  A RAW
 dependence cannot.\margin{RAR---two reads of the same register---is not a
 dependence: order does not matter.}
 
-\begin{example}
+\begin{example}\leavevmode % head on its own line, listing below it
   \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
   I1:  ADD R1, R2, R3     ; R1 <- R2 + R3
   I2:  SUB R4, R1, R5     ; RAW on R1 with I1
@@ -273,7 +273,7 @@ at the end of MEM, whereas the next instruction needs it at the start of
 its own EX, which is the same cycle.  One stall cycle is therefore
 unavoidable for a \emph{load-use} pair even with full forwarding.
 
-\begin{example}
+\begin{example}\leavevmode % head on its own line, listing below it
   \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
   LW  R1, 0(R2)      ; R1 available at end of MEM (cycle 4)
   ADD R3, R1, R4     ; needs R1 in EX (cycle 4): 1 stall

@@ -288,7 +288,8 @@ each of which accesses memory only once, like an ordinary load or
 store.\source{Lesson 20, videos 11--13; H\&P §5.5.}
 
 \begin{definition}[Load-linked/store-conditional]
-  The instruction pair \term{load-linked/store-conditional}[LL/SC]%
+  The instruction pair
+  \term[load-linked/store-conditional]{load-linked\slash store-conditional}[LL/SC]%
   \index{LL/SC|see{load-linked/store-conditional}} (LL/SC) consists of two
   instructions:
   \begin{description}
@@ -529,13 +530,6 @@ Locks make threads take turns.\source{Lesson 20, videos 18--22; H\&P
 Appendix I.4.}  A different form of coordination makes threads wait for each
 other.
 
-\begin{definition}[Barrier synchronization]
-  In \term{barrier synchronization}[バリア同期] a group of $N$ threads calls
-  a \emph{barrier} at a common point in the program.  A thread that reaches
-  the barrier waits there; when the last of the $N$ threads arrives, all of
-  them continue (\cref{fig:l20-barrier}).
-\end{definition}
-
 \begin{figure}[htbp]
   \centering
   \input{figures/l20-barrier}
@@ -543,6 +537,13 @@ other.
     round is released when its last thread arrives.}
   \label{fig:l20-barrier}
 \end{figure}
+
+\begin{definition}[Barrier synchronization]
+  In \term{barrier synchronization}[バリア同期] a group of $N$ threads calls
+  a \emph{barrier} at a common point in the program.  A thread that reaches
+  the barrier waits there; when the last of the $N$ threads arrives, all of
+  them continue (\cref{fig:l20-barrier}).
+\end{definition}
 
 Barriers suit parallel programs that proceed in steps, where every thread
 computes its part of one step and the next step needs the results of all
@@ -625,6 +626,7 @@ void barrier(void) {
 }
 \end{lstlisting}
 
+\needspace{8\baselineskip}
 Because the flag is never reinitialized, the thread that was slow above
 still finds the value that released its round, however late it reads the
 flag, and leaves the barrier.\caution{The last thread must reset the counter

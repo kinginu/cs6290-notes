@@ -210,7 +210,8 @@ physical register.  The move then uses no execution unit and has no latency
   has already updated the entry of R3.  I3 reads P4, the old R4, before I4
   maps R4 to P11.  The two writes to R5 go to P9 and P12, and at the end the
   RAT maps R5 to P12, so an instruction that follows reads the result of I5,
-  as program order requires.
+  as program order requires.\margin{Dependences through memory locations are
+  not affected by register renaming; Lesson~9 treats them.}
 \end{example}
 
 \begin{table}[htbp]
@@ -244,8 +245,7 @@ In a renamed program every result is written into its own physical
 register.\source{Lesson 6, video 12; H\&P §3.4.}  No two instructions write
 the same location, and no instruction writes a location that an earlier
 instruction reads, so WAW and WAR dependences between register accesses no
-longer exist.\margin{Dependences through memory locations are not affected
-by register renaming; Lesson~9 treats them.}  Every read,
+longer exist.  Every read,
 on the other hand, still refers to the result of the instruction that
 produced the value in the original program, so every RAW dependence is
 preserved.  In \cref{tab:l06-rename} the only dependence left is that of I2

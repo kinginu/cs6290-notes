@@ -12,5 +12,8 @@
   \node[bad] at (3,-2) {IF};
   \node[anchor=east] at (0.5,-3) {\iflangja{分岐先}{target}};
   \foreach \s/\lab in {0/IF,1/ID,2/EX,3/MEM,4/WB} { \node[st] at (\s+4,-3) {\lab}; }
-  \draw[->,ln-caution] (3,0.35) -- (3,-2.4) node[below,font=\scriptsize] {\iflangja{フラッシュ}{flush}};
+  %% label goes below-LEFT of the arrow tip: centred under it, the (wider)
+  %% Japanese word runs into the first box of the branch-target row at x=4.
+  \draw[->,ln-caution] (3,0.35) -- (3,-2.4)
+    node[below left, inner sep=1pt, font=\scriptsize] {\iflangja{フラッシュ}{flush}};
 \end{tikzpicture}

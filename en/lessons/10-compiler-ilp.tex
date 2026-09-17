@@ -142,9 +142,9 @@ ADD R10, R10, R12    ; cycle 3
 For $n$ operands combined by one associative operation, the left-to-right
 translation has height $n-1$, whereas a balanced tree has height $\lceil
 \log_2 n \rceil$.  Addition and multiplication are associative, and so are
-AND, OR and XOR.\caution{Floating-point addition is not associative (rounding);
-compilers regroup it only when permitted, as by \texttt{-ffast-math}.}
-Subtraction is not, since $(a-b)-c \ne a-(b-c)$, but an
+AND, OR and XOR.  Subtraction is not, since $(a-b)-c \ne
+a-(b-c)$,\caution{Floating-point addition is not associative (rounding);
+compilers regroup it only when permitted, as by \texttt{-ffast-math}.} but an
 expression with subtractions can still be regrouped when the signs are
 adjusted.  Because $a - b = a + (-b)$, the terms can be grouped freely as long
 as each keeps its sign, and the signs inside a group that follows a minus sign

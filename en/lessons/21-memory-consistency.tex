@@ -293,16 +293,16 @@ Two observations make this possible.
     The value it read is correct for that point unless another core has
     written the location in between.
 \end{itemize}
-The core therefore watches the coherence traffic of the other cores for the
+The core therefore watches the coherence traffic of the other cores\margin{Intel's counters call these
+memory-ordering machine clears (\texttt{MACHINE\_CLEARS}); each costs a
+pipeline refill, about 17 cycles on Skylake (Lesson 4).} for the
 locations of all loads that have executed but not yet committed.  Under
 write-invalidate coherence, a write by another core arrives as an
 invalidation of the block that contains the location
 (\cref{sec:l19-write-invalidate}).  If such a write is observed, the load may
 have read a stale value: the load and all instructions after it are cancelled
 and executed again, exactly as after a branch misprediction
-(\cref{sec:l08-recovery}).\margin{Intel's counters call these
-memory-ordering machine clears (\texttt{MACHINE\_CLEARS}); each costs a
-pipeline refill, about 17 cycles on Skylake (Lesson 4).}  This is always
+(\cref{sec:l08-recovery}).  This is always
 possible because the load has not
 committed.  Once the load commits, it has taken effect in program order, and
 its location no longer needs to be watched.
@@ -604,7 +604,9 @@ sequential consistency:
     critical sections of the same lock, but not necessarily those made under
     other locks \cite{iftode1996}.
 \end{description}
-The list is not complete, and new models continue to be proposed.  What they
+% keeps this paragraph with the lesson summary, which alone would fill a page
+\needspace{13\baselineskip}
+\noindent The list is not complete, and new models continue to be proposed.  What they
 share is the arrangement of this lesson: the system may reorder the accesses
 that its model leaves unordered, and a program that needs a particular order
 obtains it through synchronization.
