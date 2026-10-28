@@ -4,12 +4,18 @@
 %% right (Tufte-style sidenotes) separated by a thin vertical rule.
 %% Engine:  LuaLaTeX only (luatexja for Japanese).
 %%
-%% Class options
+%% Class options (key=value)
 %%   en | ja        document language (default: en)
 %%   lesson|chapter English chapter label "Lesson 3" (default) or "Chapter 3";
 %%                  the Japanese edition always prints 第3章
 %%   norule         do not draw the vertical rule between body and margin
-%%   <anything else> is passed to scrbook (e.g. fontsize=11pt)
+%%   print=<size>   a4 (default: screen edition, one-sided) or a compact
+%%                  two-sided print edition: a5, b5, b6, shinsho (新書判)
+%%   scale=<factor> print editions: override the size's scale factor
+%%                  (body font = 10pt x factor; see the size table below)
+%%   fontsize=<dim> body font size (default 10pt, or 10pt x scale in print)
+%%   twoside[=..] | oneside   default: oneside for a4, twoside for print
+%%   <anything else> is passed to scrbook
 %%
 %% Public macros (see README for details)
 %%   \iflangja{<ja>}{<en>}   \ja{...}  \en{...}
@@ -30,20 +36,69 @@
 %% ------------------------------------------------------------------ options
 \newif\ifln@ja
 \newif\ifln@rule \ln@ruletrue
-\DeclareOption{en}{\ln@jafalse}
-\DeclareOption{ja}{\ln@jatrue}
-\DeclareOption{norule}{\ln@rulefalse}
+\newif\ifln@print
 \def\ln@unitname{Lesson}
-\DeclareOption{lesson}{\def\ln@unitname{Lesson}}
-\DeclareOption{chapter}{\def\ln@unitname{Chapter}}
-\DeclareOption*{\PassOptionsToClass{\CurrentOption}{scrbook}}
-\ExecuteOptions{en}
-\ProcessOptions\relax
+\def\ln@print{a4}
+\def\ln@scale{}
+\def\ln@fontsize{}
+\def\ln@twoside{}
+\DeclareKeys[lnotes]{
+  en       .code     = \ln@jafalse,
+  ja       .code     = \ln@jatrue,
+  norule   .code     = \ln@rulefalse,
+  lesson   .code     = \def\ln@unitname{Lesson},
+  chapter  .code     = \def\ln@unitname{Chapter},
+  print    .store    = \ln@print,
+  scale    .store    = \ln@scale,
+  fontsize .store    = \ln@fontsize,
+  twoside  .code     = \def\ln@twoside{#1}%
+                       \ifx\ln@twoside\@empty\def\ln@twoside{true}\fi,
+  oneside  .code     = \def\ln@twoside{false},
+}
+\DeclareUnknownKeyHandler[lnotes]{\PassOptionsToClass{\CurrentOption}{scrbook}}
+\ProcessKeyOptions[lnotes]
 
-\LoadClass[%
+%% Print sizes, in mm:
+%%   {paper w}{paper h}{inner margin}{textwidth}{marginparsep}{marginparwidth}
+%%   {top}{bottom}{scale}
+%% The scale shrinks the A4 design (fonts, skips, figures) to the page; the
+%% body font is 10pt x scale.  \@namedef, not \def: a digit ends a csname.
+\@namedef{ln@sz@a5}{{148}{210}{15}{86}{3.5}{35}{13}{14}{0.7}}
+\@namedef{ln@sz@b5}{{182}{257}{18}{106}{4.5}{43.5}{16}{18}{0.85}}
+\@namedef{ln@sz@b6}{{128}{182}{13}{73}{3}{32}{12}{13}{0.65}}
+\@namedef{ln@sz@shinsho}{{113}{176}{13}{63}{3}{27}{12}{13}{0.65}}
+\def\ln@tmp{a4}
+\ifx\ln@print\ln@tmp \ln@printfalse \else \ln@printtrue \fi
+\ifln@print
+  \ifcsname ln@sz@\ln@print\endcsname\else
+    \ClassError{lnotes}{Unknown print size `\ln@print'}%
+      {Use print=a4, a5, b5, b6 or shinsho.  Using a5.}%
+    \def\ln@print{a5}%
+  \fi
+  \def\ln@getsz#1#2#3#4#5#6#7#8#9{%
+    \def\ln@pw{#1mm}\def\ln@ph{#2mm}\def\ln@in{#3mm}\def\ln@tw{#4mm}%
+    \def\ln@sep{#5mm}\def\ln@mpw{#6mm}\def\ln@top{#7mm}\def\ln@bot{#8mm}%
+    \ifx\ln@scale\@empty \def\ln@scale{#9}\fi}
+  \expandafter\expandafter\expandafter\ln@getsz\csname ln@sz@\ln@print\endcsname
+  \ifx\ln@fontsize\@empty \edef\ln@fontsize{\fpeval{round(10*\ln@scale,2)}pt}\fi
+  \ifx\ln@twoside\@empty \def\ln@twoside{true}\fi
+\else
+  \ifx\ln@scale\@empty\else
+    \ClassWarningNoLine{lnotes}{scale=\ln@scale\space ignored without print=<size>}\fi
+  \def\ln@scale{1}
+  \ifx\ln@fontsize\@empty \def\ln@fontsize{10pt}\fi
+  %% screen edition: the margin column is always on the right
+  \ifx\ln@twoside\@empty \def\ln@twoside{false}\fi
+\fi
+%% \ln@sdim{<number>}{<unit>}: the A4 design length scaled for the edition,
+%% as a plain string ("6pt" at A4).
+\newcommand*{\ln@sdim}[2]{\fpeval{#1*\ln@scale}#2}
+
+%% The option list is expanded first: scrbook must see the values.
+\edef\ln@tmp{\noexpand\LoadClass[%
   paper=a4,
-  fontsize=10pt,
-  oneside,            % margin column is always on the right (screen reading)
+  fontsize=\ln@fontsize,
+  twoside=\ln@twoside,
   open=any,
   numbers=noenddot,
   chapterprefix=true,
@@ -51,7 +106,8 @@
   bibliography=totoc,
   index=totoc,
   listof=totoc,
-]{scrbook}
+]{scrbook}}
+\ln@tmp
 
 \RequirePackage{etoolbox}
 
@@ -106,6 +162,20 @@
 %% ---------------------------------------------------------------- geometry
 %% A4 = 210 x 297 mm.  Body 120 mm, gap 8 mm, margin column 50 mm.
 %% The margin column is ~24% of the page width.
+%% Print editions take the page from the size table; the margin column is on
+%% the outer side (geometry follows the class's twoside setting).
+\ifln@print
+\edef\ln@hsep{\ln@sdim{6}{mm}}
+\edef\ln@fskip{\ln@sdim{10}{mm}}
+\RequirePackage[%
+  paperwidth=\ln@pw, paperheight=\ln@ph,
+  inner=\ln@in, textwidth=\ln@tw, top=\ln@top, bottom=\ln@bot,
+  marginparsep=\ln@sep, marginparwidth=\ln@mpw,
+  headsep=\ln@hsep, footskip=\ln@fskip,
+]{geometry}
+\edef\ln@tmp{\ln@sdim{4}{pt}}
+\setlength{\marginparpush}{\ln@tmp}
+\else
 \RequirePackage[%
   a4paper,
   left=20mm,
@@ -118,6 +188,7 @@
   footskip=12mm,
 ]{geometry}
 \setlength{\marginparpush}{4pt}
+\fi
 %% Full width (body + gap + margin column) for wide floats
 \newlength{\fullwidth}
 \setlength{\fullwidth}{\dimexpr\textwidth+\marginparsep+\marginparwidth\relax}
@@ -125,13 +196,21 @@
 %% ---------------------------------------------------------- vertical rule
 \RequirePackage{eso-pic}
 %% Pages shipped out inside the titlepage environment get no rule.
+%% Two-sided (print): the rule is on the outer side, left of the body on
+%% even pages.
+\newcommand*{\ln@rulepos}{\dimexpr\textwidth+0.5\marginparsep\relax}
+\if@twoside
+  \renewcommand*{\ln@rulepos}{%
+    \ifodd\value{page}\dimexpr\textwidth+0.5\marginparsep\relax
+    \else-0.5\marginparsep\fi}
+\fi
 \newif\ifln@rulehere \ln@ruleheretrue
 \ifln@rule
   \AddToShipoutPictureBG{%
     \ifln@rulehere
     \AtTextLowerLeft{%
       \makebox[0pt][l]{%
-        \hspace*{\dimexpr\textwidth+0.5\marginparsep\relax}%
+        \hspace*{\ln@rulepos}%
         \color{ln-rule}\rule[-6pt]{0.4pt}{\dimexpr\textheight+12pt\relax}}}%
     \fi}
   \AddToHook{env/titlepage/begin}{\global\ln@ruleherefalse}
@@ -219,7 +298,21 @@
 %% ------------------------------------------------------------- margin core
 \RequirePackage{marginnote}
 \RequirePackage{ragged2e}
-\newcommand*{\ln@marginfont}{\footnotesize\sffamily\color{ln-muted}\RaggedRight}
+%% Two-sided: LaTeX decides the side of a \marginpar from the page counter
+%% when the note is processed, so a note on the first line of a page can land
+%% on the previous page's side; mparhack fixes this through the .aux.
+\if@twoside
+  \RequirePackage{mparhack}
+\fi
+%% Print: 0.75 of the body font (A4 \footnotesize is 0.8), against crowding.
+\ifln@print
+  \edef\ln@mfs{\ln@sdim{7.5}{pt}}
+  \edef\ln@mbs{\ln@sdim{9}{pt}}
+  \newcommand*{\ln@marginfont}{%
+    \fontsize{\ln@mfs}{\ln@mbs}\selectfont\sffamily\color{ln-muted}\RaggedRight}
+\else
+  \newcommand*{\ln@marginfont}{\footnotesize\sffamily\color{ln-muted}\RaggedRight}
+\fi
 \renewcommand*{\marginfont}{\ln@marginfont}
 \renewcommand*{\raggedrightmarginnote}{\RaggedRight}
 %% Inside boxes (tcolorbox, minipage, floats) \marginpar is lost, so the
@@ -271,6 +364,47 @@
 %% Japanese (Japanese fonts have no italics).
 \newcommand{\termformat}[1]{\iflangja{\textsf{\textbf{#1}}}{\emph{#1}}}
 
+%% English edition: a Japanese gloss in the fallback font has no line-break
+%% points (luatexja is not loaded), so a long one overflows the margin.  A
+%% pre_linebreak_filter inserts a \exhyphenpenalty between two CJK glyphs
+%% carrying \ln@glossattr, skipping the usual kinsoku pairs.  Print only:
+%% A4 margin glosses are unchanged.
+\newcommand*{\ln@gloss}[1]{#1}
+\ifln@ja\else\ifln@print
+  \newattribute\ln@glossattr
+  \renewcommand*{\ln@gloss}[1]{{\setattribute\ln@glossattr{1}#1}}
+  \directlua{
+    local attr = luatexbase.registernumber("ln@glossattr")
+    local GLYPH = node.id("glyph")
+    local nobefore, noafter = {}, {}
+    for _, c in ipairs({0x3001, 0x3002, 0xFF0C, 0xFF0E, 0x30FB, 0x30FC,
+        0xFF09, 0x300D, 0x300F, 0x3011, 0x3009, 0x300B, 0xFF1F, 0xFF01,
+        0x3041, 0x3043, 0x3045, 0x3047, 0x3049, 0x3063, 0x3083, 0x3085,
+        0x3087, 0x308E, 0x30A1, 0x30A3, 0x30A5, 0x30A7, 0x30A9, 0x30C3,
+        0x30E3, 0x30E5, 0x30E7, 0x30EE, 0x30F5, 0x30F6, 0x3005}) do
+      nobefore[c] = true end
+    for _, c in ipairs({0xFF08, 0x300C, 0x300E, 0x3010, 0x3008, 0x300A}) do
+      noafter[c] = true end
+    local function cjk(c)
+      return (c >= 0x3000 and c <= 0x30FF) or (c >= 0x3400 and c <= 0x9FFF)
+        or (c >= 0xF900 and c <= 0xFAFF) or (c >= 0xFF00 and c <= 0xFFEF)
+    end
+    luatexbase.add_to_callback("pre_linebreak_filter", function(head)
+      for n in node.traverse_id(GLYPH, head) do
+        local nx = n.next
+        if nx and nx.id == GLYPH and node.has_attribute(n, attr)
+            and node.has_attribute(nx, attr) and cjk(n.char) and cjk(nx.char)
+            and not noafter[n.char] and not nobefore[nx.char] then
+          local p = node.new("penalty")
+          p.penalty = tex.exhyphenpenalty
+          node.insert_after(head, n, p)
+        end
+      end
+      return true
+    end, "lnotes.glossbreak")
+  }
+\fi\fi
+
 %% \term[<sort key>]{<word>}[<margin gloss>]
 %%   - typesets <word> with \termformat
 %%   - adds an index entry (sorted by <sort key> when given)
@@ -281,7 +415,7 @@
   \IfBooleanF{#1}{%
     \IfValueTF{#2}{\index{#2@#3}}{\index{#3}}%
   }%
-  \IfValueT{#4}{\ln@margin{\textcolor{ln-accent}{$\triangleright$}\,#4}}%
+  \IfValueT{#4}{\ln@margin{\textcolor{ln-accent}{$\triangleright$}\,\ln@gloss{#4}}}%
 }
 
 %% ------------------------------------------------------------- theorem envs
@@ -303,7 +437,8 @@
 \newtcolorbox{keypoint}[1][]{%
   enhanced, sharp corners,
   colback=ln-box, colframe=ln-accent, boxrule=0pt, leftrule=2pt,
-  left=6pt, right=6pt, top=4pt, bottom=4pt,
+  left=\ln@sdim{6}{pt}, right=\ln@sdim{6}{pt},
+  top=\ln@sdim{4}{pt}, bottom=\ln@sdim{4}{pt},
   fontupper=\normalfont,
   title={\keypointname\notblank{#1}{ --- #1}{}},
   fonttitle=\sffamily\bfseries, coltitle=ln-accent,
@@ -332,8 +467,9 @@
            and test {\ifdefempty{\ln@li@textbook}}
            and test {\ifdefempty{\ln@li@keywords}} }{}{%
     \begin{tcolorbox}[enhanced, sharp corners, colback=white,
-        colframe=ln-rule, boxrule=0.4pt, left=6pt, right=6pt,
-        top=4pt, bottom=4pt, fontupper=\small\sffamily]
+        colframe=ln-rule, boxrule=0.4pt, left=\ln@sdim{6}{pt},
+        right=\ln@sdim{6}{pt}, top=\ln@sdim{4}{pt}, bottom=\ln@sdim{4}{pt},
+        fontupper=\small\sffamily]
       \begin{description}[nosep, leftmargin=7em, labelwidth=6em, font=\bfseries\color{ln-muted}]
         \ifdefempty{\ln@li@video}{}{\item[\videoname] \ln@li@video}%
         \ifdefempty{\ln@li@sources}{}{\item[\sourcesname] \ln@li@sources}%
@@ -347,7 +483,7 @@
 \RequirePackage{graphicx}
 \RequirePackage{booktabs}
 \RequirePackage{caption}
-\captionsetup{font={small,sf}, labelfont={bf,color=ln-accent}, skip=4pt}
+\captionsetup{font={small,sf}, labelfont={bf,color=ln-accent}, skip=\ln@sdim{4}{pt}}
 \newsavebox{\ln@marginbox}
 
 %% marginfigure / margintable: figures/tables placed in the margin column
@@ -378,20 +514,34 @@
 %% through a wide float; \ln@putwide lays a white rectangle, reaching 7pt
 %% beyond the float (past the 6pt overhang of the rule), under the float body.
 %% The rectangle is smashed and has no width, so the layout is unchanged.
+%% Two-sided: on even pages the margin column is on the left, so the float
+%% is shifted left by the gap plus the margin column (changepage, strict:
+%% the page is known only at shipout, hence a second run).
 \newlength{\ln@wideslack}
 \setlength{\ln@wideslack}{\dimexpr\marginparsep+\marginparwidth+1pt\relax}
 \newsavebox{\ln@widebox}
+\newif\ifln@wide
+\if@twoside
+  \RequirePackage[strict]{changepage}
+\fi
+\newcommand*{\ln@wideshift}{\if@twoside\expandafter\ln@wideshift@\fi}
+\newcommand*{\ln@wideshift@}{% two-sided only: changepage is loaded
+  \checkoddpage
+  \ifoddpage\else\kern-\dimexpr\marginparsep+\marginparwidth\relax\fi}
+\edef\ln@widemask{\ln@sdim{7}{pt}}
+\edef\ln@widemaskk{\ln@sdim{14}{pt}}
 \newcommand*{\ln@putwide}{%
-  \leavevmode\rlap{\smash{\color{white}%
-    \rule[\dimexpr-\dp\ln@widebox-7pt\relax]{\wd\ln@widebox}%
-      {\dimexpr\ht\ln@widebox+\dp\ln@widebox+14pt\relax}}}%
+  \leavevmode\ln@wideshift
+  \rlap{\smash{\color{white}%
+    \rule[\dimexpr-\dp\ln@widebox-\ln@widemask\relax]{\wd\ln@widebox}%
+      {\dimexpr\ht\ln@widebox+\dp\ln@widebox+\ln@widemaskk\relax}}}%
   \usebox{\ln@widebox}}
 \newenvironment{widefigure}[1][tbp]{%
-  \begin{figure}[#1]\ln@inboxtrue\hfuzz\ln@wideslack
+  \begin{figure}[#1]\ln@inboxtrue\ln@widetrue\hfuzz\ln@wideslack
   \begin{lrbox}{\ln@widebox}\begin{minipage}{\fullwidth}\centering}%
   {\end{minipage}\end{lrbox}\ln@putwide\end{figure}}
 \newenvironment{widetable}[1][tbp]{%
-  \begin{table}[#1]\ln@inboxtrue\hfuzz\ln@wideslack
+  \begin{table}[#1]\ln@inboxtrue\ln@widetrue\hfuzz\ln@wideslack
   \begin{lrbox}{\ln@widebox}\begin{minipage}{\fullwidth}\centering}%
   {\end{minipage}\end{lrbox}\ln@putwide\end{table}}
 
@@ -409,6 +559,17 @@
   showstringspaces=false,
   aboveskip=0.6\baselineskip, belowskip=0.6\baselineskip,
 }
+%% Print: the listing font fits 60 columns in the body (Libertinus Mono is
+%% 0.5547 em wide: 60 columns = 33.28 em) and is at most 9pt x scale.
+\ifln@print
+  \edef\ln@lfs{\fpeval{min(9*\ln@scale,
+    (\strip@pt\textwidth - 1.2*\strip@pt\dimexpr\ln@fontsize\relax)/33.28)}pt}
+  \edef\ln@lbs{\fpeval{1.2*\strip@pt\dimexpr\ln@lfs\relax}pt}
+  \ClassInfo{lnotes}{listings font \ln@lfs}
+  \edef\ln@tmp{\ln@sdim{6}{pt}}\edef\ln@tmpb{\ln@sdim{0.4}{pt}}
+  \lstset{basicstyle=\fontsize{\ln@lfs}{\ln@lbs}\selectfont\ttfamily,
+    numbersep=\ln@tmp, framerule=\ln@tmpb}
+\fi
 %% A listing that opens a theorem-like environment (example, note) would start
 %% on the heading line; set the pending heading as its own line first.
 \AddToHook{env/lstlisting/before}{\if@inlabel\leavevmode\fi}
@@ -419,6 +580,64 @@
 \RequirePackage{siunitx}
 \RequirePackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,shapes,calc,fit,backgrounds}
+
+%% Print editions: figures and tables are drawn at the A4 design sizes and
+%% scaled down, so chapters need no per-size edits.
+%% - tikzpicture: fonts at the A4 sizes (\ln@designsizes), the picture
+%%   scaled by the edition's scale, then shrunk to \linewidth only if it is
+%%   still wider (logged as "lnotes-fit: ...").
+%% - tabular: shrunk to \linewidth only if wider (logged).  Not inside a
+%%   box environment (\ln@inbox: margin figures, keypoint) except wide
+%%   floats, not inside a tikzpicture, not for a tabular nested in another.
+\newcount\ln@picdepth
+\newcount\ln@tabdepth
+\newif\ifln@tabboxed
+\ifln@print
+  \newsavebox{\ln@picbox}
+  \newsavebox{\ln@tabbox}
+  \newcommand*{\ln@designsizes}{%
+    \def\normalsize{\@setfontsize\normalsize{10}{12}}%
+    \def\small{\@setfontsize\small{9}{11}}%
+    \def\footnotesize{\@setfontsize\footnotesize{8}{9.5}}%
+    \def\scriptsize{\@setfontsize\scriptsize{7}{8}}%
+    \def\tiny{\@setfontsize\tiny{5}{6}}%
+    \def\large{\@setfontsize\large{12}{14}}%
+    \def\Large{\@setfontsize\Large{14.4}{18}}%
+    \fontsize{\fpeval{\f@size/\ln@scale}pt}%
+      {\fpeval{\strip@pt\dimexpr\f@baselineskip\relax/\ln@scale}pt}\selectfont}
+  \newcommand*{\ln@fitlog}[2]{% kind, box
+    \typeout{lnotes-fit: \CurrentFile:\the\inputlineno\space #1
+      \the\wd#2\space -> \the\linewidth}}
+  \AddToHook{env/tikzpicture/before}{%
+    \ifnum\ln@picdepth=0 \begin{lrbox}{\ln@picbox}\ln@designsizes\fi
+    \global\advance\ln@picdepth 1 }
+  \AddToHook{env/tikzpicture/after}{%
+    \global\advance\ln@picdepth -1
+    \ifnum\ln@picdepth=0 \end{lrbox}\ln@fitpic\fi}
+  \newcommand*{\ln@fitpic}{%
+    \sbox{\ln@picbox}{\scalebox{\ln@scale}{\usebox{\ln@picbox}}}%
+    \ifdim\wd\ln@picbox>\linewidth
+      \ln@fitlog{tikzpicture}\ln@picbox
+      \resizebox{\linewidth}{!}{\usebox{\ln@picbox}}%
+    \else\usebox{\ln@picbox}\fi}
+  \AddToHook{env/tabular/before}{%
+    \ifnum\ln@tabdepth=0
+      \global\ln@tabboxedtrue
+      \ifln@inbox\ifln@wide\else\global\ln@tabboxedfalse\fi\fi
+      \ifnum\ln@picdepth>0 \global\ln@tabboxedfalse\fi
+      \ifln@tabboxed\begin{lrbox}{\ln@tabbox}\fi
+    \fi
+    \global\advance\ln@tabdepth 1 }
+  \AddToHook{env/tabular/after}{%
+    \global\advance\ln@tabdepth -1
+    \ifnum\ln@tabdepth=0 \ifln@tabboxed
+      \end{lrbox}%
+      \ifdim\wd\ln@tabbox>\linewidth
+        \ln@fitlog{tabular}\ln@tabbox
+        \resizebox{\linewidth}{!}{\usebox{\ln@tabbox}}%
+      \else\usebox{\ln@tabbox}\fi
+    \fi\fi}
+\fi
 \RequirePackage{csquotes}
 \RequirePackage{needspace}
 \RequirePackage{subfiles}
@@ -441,6 +660,7 @@
   pdfusetitle,
 ]{hyperref}
 \AtBeginDocument{\hypersetup{pdflang=\ln@langcode}}
+\ifln@print\hypersetup{hidelinks}\fi
 \RequirePackage[capitalise,noabbrev]{cleveref}
 \ifln@ja
   %% Numbered units read 第3章 / 3.2 節.  Besides the single format, the

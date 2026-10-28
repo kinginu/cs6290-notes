@@ -4,6 +4,36 @@
 set -eu
 title=$1; repo=$2; sha=$3
 date=$(date -u +%Y-%m-%d)
+
+# Print test samples: dist/notes-<lang>-<size>.pdf, listed when present.
+# Label: language, size and trim in mm, body font (10 pt x the class scale).
+size_label() {
+  case $1 in
+    a5)      echo "A5 148×210 · 7 pt" ;;
+    b5)      echo "B5 182×257 · 8.5 pt" ;;
+    b6)      echo "B6 128×182 · 6.5 pt" ;;
+    shinsho) echo "新書判 113×176 · 6.5 pt" ;;
+    *)       echo "$1" ;;
+  esac
+}
+samples=""
+for size in a5 b6 shinsho b5; do
+  for lang in en ja; do
+    f=notes-$lang-$size.pdf
+    [ -f "dist/$f" ] || continue
+    case $lang in en) name=English ;; ja) name=日本語 ;; esac
+    samples="$samples
+  <li><a class=\"pdf\" href=\"$f\">$name · $(size_label $size)<span>$f</span></a></li>"
+  done
+done
+print_group=""
+if [ -n "$samples" ]; then
+  print_group="<h2>Print test samples</h2>
+<p class=\"sub\">Two-sided compact editions of the same text, for test prints.</p>
+<ul>$samples
+</ul>"
+fi
+
 cat > dist/index.html <<HTML
 <!doctype html>
 <html lang="en">
@@ -13,6 +43,7 @@ cat > dist/index.html <<HTML
 <style>
   body{font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto;padding:0 1.5rem;line-height:1.6;color:#222}
   h1{font-size:1.6rem;margin-bottom:.25rem}
+  h2{font-size:1.15rem;margin:2rem 0 .25rem}
   .sub{color:#666;margin-top:0}
   ul{list-style:none;padding:0}
   li{margin:.6rem 0}
@@ -26,6 +57,7 @@ cat > dist/index.html <<HTML
   <li><a class="pdf" href="notes-en.pdf">English edition<span>notes-en.pdf</span></a></li>
   <li><a class="pdf" href="notes-ja.pdf">日本語版<span>notes-ja.pdf</span></a></li>
 </ul>
+${print_group}
 <footer>Built ${date} from <a href="${repo}/commit/${sha}">${sha}</a> · <a href="${repo}">source</a></footer>
 </html>
 HTML

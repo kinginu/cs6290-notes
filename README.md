@@ -13,6 +13,11 @@ textbook-style summary of what the lectures cover.  Built with
   [English](https://kinginu.github.io/cs6290-notes/notes-en.pdf) ·
   [日本語](https://kinginu.github.io/cs6290-notes/notes-ja.pdf)
 - Local build: `make docker-all` → `en/build/main.pdf`, `ja/build/main.pdf`.
+- Print editions: compact two-sided books scaled from the A4 layout
+  (class option `print=`, no chapter changes): `make docker-print-a5`
+  (also `b6`, `shinsho` = 新書判, `b5`) → `dist/notes-<lang>-<size>.pdf`.
+  Body font 7 pt (A5), 6.5 pt (B6, 新書判); CI builds A5, B6 and 新書判 and
+  lists them on the Pages index as print test samples.
 
 ## Status
 

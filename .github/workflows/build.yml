@@ -16,28 +16,62 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pdf:
+  # One job per edition size: a4 is the screen edition (notes-<lang>.pdf),
+  # the others are print test samples (notes-<lang>-<size>.pdf).  B5 is
+  # available with `make print-b5` but not built here.
+  build:
     runs-on: ubuntu-latest
     container: texlive/texlive:TL2025-historic
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [a4, a5, b6, shinsho]
     steps:
       - uses: actions/checkout@v4
 
       - name: Build PDFs (en, ja)
-        run: make dist
+        run: |
+          if [ "${{ matrix.variant }}" = a4 ]; then
+            make dist
+          else
+            make print-${{ matrix.variant }}
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pdf-${{ matrix.variant }}
+          path: dist/
+          if-no-files-found: error
+
+  # Collects whatever the build jobs produced.  A failed print size does not
+  # hold back the A4 editions; a missing A4 edition fails the job.
+  publish:
+    needs: build
+    if: always() && needs.build.result != 'cancelled'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pdf-*
+          merge-multiple: true
+          path: dist/
+
+      - name: Check the A4 editions
+        run: |
+          for f in dist/notes-en.pdf dist/notes-ja.pdf; do
+            [ -f "$f" ] || { echo "missing $f"; exit 1; }
+          done
+          ls -l dist/
 
       - name: Generate index.html for GitHub Pages
         run: sh .github/scripts/pdf-index.sh "${{ github.event.repository.name }}" "${{ github.server_url }}/${{ github.repository }}" "${{ github.sha }}"
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: notes-pdf
-          path: dist/
-          if-no-files-found: error
-
       # Publish the PDFs to the orphan branch `pdf` (one commit, force-pushed).
       # Readable at https://github.com/<owner>/<repo>/blob/pdf/notes-en.pdf, or,
       # with GitHub Pages enabled on that branch, at
-      #   https://<owner>.github.io/<repo>/  (index.html links to both PDFs)
+      #   https://<owner>.github.io/<repo>/  (index.html links to all PDFs)
       - name: Publish PDFs to the pdf branch
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@v4

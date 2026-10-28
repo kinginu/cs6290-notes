@@ -20,7 +20,7 @@ $ENV{BIBINPUTS}  = "$root:"                . ($ENV{BIBINPUTS}  // '');
 $ENV{INDEXSTYLE} = "$root/format:"         . ($ENV{INDEXSTYLE} // '');
 
 $pdf_mode  = 4;                       # 4 = lualatex
-$lualatex  = 'lualatex -interaction=nonstopmode -file-line-error -synctex=1 %O %S';
+$lualatex  = 'lualatex -interaction=nonstopmode -file-line-error -synctex=1 %O %P';
 $out_dir   = 'build';
 $biber     = 'biber %O %S';
 # upmendex handles both English and Japanese.  The style file (headings,
