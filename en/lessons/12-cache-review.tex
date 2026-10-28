@@ -104,8 +104,8 @@ is a second reason, besides cost, why the cache has to be small.  A small
 cache cannot hold everything, and misses are therefore
 unavoidable.\sidenote{The idea is Wilkes's \enquote{slave memory} of 1965
 \cite{wilkes1965}.  The first commercial machine to have one was the IBM
-System/360 Model~85 of 1968, whose 16~KB buffer its designers named the
-\emph{cache} \cite{liptay1968}.}
+System/360 Model~85 of 1968, whose 16--32~KB buffer was named the
+\emph{cache} in the paper describing it \cite{liptay1968}.}
 
 \begin{figure}[htbp]
   \centering
@@ -206,7 +206,7 @@ misses go on to further, larger cache levels (L2, L3; Lesson 14) and finally
 to main memory.  This first level is called the \term{L1 cache}[L1
 キャッシュ].  L1 caches are typically 16--64~KB (1~KB $= 2^{10}$ bytes):
 large enough that about \SI{90}{\percent} of accesses hit, and small enough
-that a hit takes only one to three clock cycles.\margin{Sizes today:
+that a hit takes only one to three clock cycles.\margin{Sizes in recent processors:
 Skylake has a 32~KB L1 per core, a 256~KB L2 and an 8~MB shared L3; Zen~3 has
 32~KB, 512~KB and 32~MB (7-cpu.com).}
 
@@ -234,8 +234,8 @@ The block size trades spatial locality against cache space.
     have been kept, and fewer blocks fit into the cache.
 \end{itemize}
 Typical block sizes are 32--128 bytes.\margin{Real block sizes: 64 bytes on
-every x86-64 processor and on most Arm cores, 128 bytes on Apple's M1 and
-M2.}  The number of blocks a
+current x86-64 processors and most Arm cores, 128 bytes on Apple's M1 and M2
+(Intel and Arm optimization manuals; Apple \texttt{hw.cachelinesize}).}  The number of blocks a
 cache can hold is its size divided by the block size: a
 16~KB cache with 64-byte blocks holds
 $2^{14}/2^{6} = 256$ blocks.
@@ -257,8 +257,9 @@ block size: with 128-byte blocks, at addresses 0, 128, 256, \ldots\
 \end{definition}
 
 Block sizes, and therefore line sizes, are always powers of
-two.\caution{The lecture keeps \emph{block} (in memory) and \emph{line} (its
-slot in the cache) apart; H\&P and vendor manuals call both a cache line.}
+two.\caution{This chapter keeps \emph{block} (in memory) and \emph{line}
+(its slot in the cache) apart; H\&P uses block and line as synonyms, and
+vendor manuals say cache line for both.}
 Only then
 can the block of an address and the position within the block be found by
 selecting bits of the address, as the next section shows, rather than by a
@@ -364,7 +365,7 @@ lines.  Three organizations are distinguished (\cref{fig:l12-placement}):
     form a set (\cref{sec:l12-sa}).
   \item[Fully associative] each block can be placed in any line of the
     cache (\cref{sec:l12-fa}).\margin{Typical associativities: Skylake L1
-    8-way, L2 4-way, L3 16-way; Zen~3 L1 8-way, L2 8-way, L3 16-way.}
+    8-way, L2 4-way, L3 16-way; Zen~3 L1 8-way, L2 8-way, L3 16-way (7-cpu.com).}
 \end{description}
 
 \begin{figure}[htbp]
@@ -507,8 +508,8 @@ block number, and a lookup compares it with the tag of every line in the
 cache.  Two blocks never have to compete for a line while another line is
 free, but a comparator is needed for every line, which makes a large fully
 associative cache slow and expensive.\margin{Fully associative structures
-stay small: TLBs of 64--512 entries (Lesson 13) are fully associative or
-nearly so; caches are not.}
+stay small: many L1 TLBs of 32--64 entries (Lesson 13) are fully associative;
+caches are not.}
 
 \subsection{One scheme for all three}
 
@@ -586,8 +587,8 @@ every access to a line whose counter is~$c$:
 On a miss, the victim is the line with counter~0; once the new block is in
 it, the access is treated like any other and the counters are updated as
 above.  \Cref{tab:l12-lru-trace} traces one 4-way set.\caution{Update the
-counters on \emph{every} access, hits included; updating them only on loads
-gives FIFO.}
+counters on \emph{every} access, hits included; updating them only when a
+block is brought into the cache gives FIFO.}
 
 \begin{table}[htbp]
   \centering\small
@@ -664,14 +665,15 @@ only read and are identical to their copies in memory.
   \label{ex:l12-write-back}
   Blocks X and Y map to the same line of a direct-mapped cache, which is
   initially invalid.  \Cref{tab:l12-write-back} follows a sequence of
-  accesses under write-back.  The two consecutive writes to Y cost a single
-  memory write, at step~6, and evicting Y at step~8 costs none, because Y
-  was not written after it was loaded at step~7.  Write-back needs 3 memory
-  writes in total; write-through would need one per write,
-  i.e.~4.\sidenote{Write-through is not extinct: the Pentium~4 and AMD's
+  accesses under write-back with write-allocate.  The two consecutive writes
+  to Y cost a single memory write, at step~6, and evicting Y at step~8 costs
+  none, because Y was not written after it was loaded at
+  step~7.\sidenote{Write-through is not extinct: the Pentium~4 and AMD's
   Bulldozer wrote their L1 data caches through to the next level and absorbed
   the writes in a buffer.  Such an L1 needs no dirty bits and never writes
-  back; both families later returned to write-back L1 caches.}
+  back; both families later returned to write-back L1 caches (Intel and AMD
+  optimization manuals).}  Write-back needs 3 memory writes in total;
+  write-through would need one per write, i.e.~4.
 \end{example}
 
 \begin{table}[htbp]
@@ -770,14 +772,14 @@ loads the new block; the access then proceeds as a hit.
   \label{ex:l12-overhead}
   \Cref{tab:l12-organizations} works out the organization of a
   64~KB cache with 128-byte blocks, 32-bit addresses,
-  LRU replacement and write-back, for several associativities.  For the
+  LRU replacement and write-back, for several associativities.\margin{Metadata is a reason
+  not to shrink blocks: with 16-byte blocks the same 8-way cache would have
+  4096 lines of 24 bits, 12~KB or \SI{19}{\percent} of its data.}  For the
   8-way cache, the address \texttt{0x0040A7C6} (block number
   \texttt{0x814F}) has index $\texttt{0x814F} \mathbin{\&} \texttt{0x3F} = 15$
   and tag $\texttt{0x814F} \gg 6 = \texttt{0x205}$.  Its 512 lines need
   $512 \times 24 = \num{12288}$ bits of metadata, i.e.\ 1536 bytes,
-  about \SI{2.3}{\percent} of the 64~KB of data.\margin{Metadata is a reason
-  not to shrink blocks: with 16-byte blocks the same 8-way cache would have
-  4096 lines of 24 bits, 12~KB or \SI{19}{\percent} of its data.}
+  about \SI{2.3}{\percent} of the 64~KB of data.
 \end{example}
 
 Lesson 13 applies the same ideas---blocks, tags and replacement---to the

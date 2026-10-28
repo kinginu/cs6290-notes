@@ -128,7 +128,9 @@ to memory or fault, e.g.\ by loading via an invalid pointer.}  When both
 directions assign a variable~\texttt{x}, the selection chooses between their
 two temporaries, \texttt{x = c ? x1 : x2}; when only one direction assigns
 it, as for each variable in this example, the other alternative is the old
-value.  The converted code contains no branch.
+value.  The converted code contains no branch.\margin{Removing the branch
+also leaves one straight-line stretch of code, which the compiler can then
+schedule as a whole (Lesson 10).}
 
 \begin{figure}[htbp]
   \centering
@@ -140,15 +142,14 @@ value.  The converted code contains no branch.
 \end{figure}
 
 The transformation gains something only if the selections can be carried out
-without a branch.\margin{Removing the branch also leaves one straight-line
-stretch of code, which the compiler can then schedule as a whole (Lesson
-10).}  Translated into ordinary branch instructions, each
+without a branch.\margin{Plain arithmetic can also select without a branch,
+by masking both alternatives with AND and OR, at several instructions
+each.}  Translated into ordinary branch instructions, each
 selection is itself an if-then-else on~\texttt{c}, as hard to predict as the
 branch that was removed, so the converted code would still mispredict and in
-addition execute the work of both directions.  Ordinary arithmetic can select
-without a branch by masking both alternatives with AND and OR, but that costs
-several instructions per selection; if-conversion is cheap only if the
-instruction set can make the effect of an instruction conditional.
+addition execute the work of both directions.  If-conversion is cheap only if
+the instruction set can make the effect of an instruction
+conditional.
 
 \section{Conditional move instructions}
 \label{sec:l05-cmov}
@@ -364,7 +365,7 @@ The predicate registers are set by compare instructions, which write a pair
 of predicates with complementary values, one for the condition and one for
 its negation.\margin{A 128-bit bundle holds three 41-bit instructions and a
 5-bit template; IA-64 also has 128 integer and 128 floating-point registers
-(Lesson 11).}
+(Lesson 11; H\&P §H.6).}
 
 \begin{figure}[htbp]
   \centering
@@ -419,7 +420,7 @@ both directions, and nothing else.\sidenote{IA-64 was developed jointly by HP
 and Intel from 1994, and full predication was part of its plan to expose
 parallelism at compile time instead of in hardware.  The first Itanium shipped
 in 2001; it never displaced x86-64, and Intel shipped the last one in July
-2021 (Lesson 11).}  Compared with the branch version it
+2021 (Lesson 11; Intel press releases).}  Compared with the branch version it
 executes the unneeded direction but no branch and no jump; here the two
 balance, and its $n_c = 4$ equals the average $n_b$ of the branch version.
 Its break-even rate by \cref{eq:l05-break-even} is $m = (4-4)/20 = 0$: the
@@ -433,7 +434,8 @@ the difference is $(M-1)/P$.  By lowering the break-even rate, full
 predication makes if-conversion pay off also for branches that are predicted
 too well to justify conditional moves.\margin{ARM's 32-bit A32 instructions
 carry a 4-bit condition field, so nearly all of them are predicated; AArch64
-(2011) dropped it, keeping conditional select (CSEL).}
+(2011) dropped it, keeping conditional select (CSEL) (Arm Architecture
+Reference Manual).}
 
 \begin{keypoint}[Lesson summary]
   Branch prediction costs nothing when right and tens of instructions when

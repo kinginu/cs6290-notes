@@ -38,9 +38,9 @@ processed one at a time, strictly one after another.}
 \begin{example}
   A processor that takes \SI{10}{\second} for each of two programs run one
   after the other has latency \SI{10}{\second} per program and throughput
-  \SI{0.1}{programs/s}.\margin{A DDR4-3200 module returns data
-  \SI{14}{\nano\second} after a read command (CL22) yet sustains
-  25.6~GB/s, because accesses overlap; Lesson 15.}  A second processor that takes \SI{15}{\second} per
+  \SI{0.1}{programs/s}.\margin{DDR4-3200: first data \SI{14}{\nano\second}
+  after a read (CL22), yet 25.6~GB/s sustained as accesses overlap
+  (Lesson 15).  JEDEC JESD79-4.}  A second processor that takes \SI{15}{\second} per
   program but runs two at once has a worse latency yet a throughput of
   $2/15 \approx \SI{0.13}{programs/s}$.
 \end{example}
@@ -48,7 +48,7 @@ processed one at a time, strictly one after another.}
 \section{Comparing performance}
 
 To say that machine $X$ is \enquote{$N$ times faster} than machine $Y$ we
-use the \term{speedup}[高速化率]:\source{Lesson 2, videos 4--7.}
+use the \term{speedup}[高速化率]:\source{Lesson 2, videos 4--7; H\&P §1.8.}
 \begin{equation}
   N \;=\; \frac{\text{speed}(X)}{\text{speed}(Y)}
      \;=\; \frac{\text{latency}(Y)}{\text{latency}(X)}
@@ -73,7 +73,7 @@ This is rarely possible---the machine may not exist yet, and the workload is
 usually unknown---so we resort to \term{benchmark}[ベンチマーク]s: programs,
 together with their input data, that a community agrees to use as a proxy
 for real workloads.\source{Lesson 2, videos 8--10; H\&P §1.8.}  A collection
-of such programs is a \emph{benchmark suite}.
+of such programs is a \term{benchmark suite}.
 
 \subsection{Types of benchmarks}
 
@@ -84,9 +84,8 @@ From most to least representative:
     an incomplete prototype.
   \item[Kernels] the most time-consuming part of a real application (e.g.\ a
     matrix multiply), extracted so that it can be run on its own.\margin{A
-    cycle-level simulator such as gem5 runs three to four orders of magnitude
-    slower than the hardware it models.}  Easier to run; still reflects the
-    real work.
+    cycle-level simulator such as gem5 runs three to five orders of magnitude
+    slower than the hardware it models.}  Easier to run; still reflects the real work.
   \item[Synthetic benchmarks] programs written to \emph{behave like} real
     applications (similar mix of instructions and memory accesses) while
     being simpler to run.  Useful early in a
@@ -152,8 +151,9 @@ how long the suite takes.  For that, add the times.}
 
 \begin{keypoint}
   Average \emph{times} arithmetically; average \emph{speedups}
-  geometrically.  The geometric mean is the only mean for which the mean of
-  the ratios equals the ratio of the means.
+  geometrically.  The geometric mean of the speedups equals the ratio of the
+  geometric means of the execution times, whichever machine is the
+  reference.
 \end{keypoint}
 
 \section{The iron law of performance}
@@ -178,17 +178,17 @@ videos 15--18; H\&P §1.9.}
   \item[Clock cycle time ($T_{\mathrm{clk}}$)] determined by the
     microarchitecture (how much logic sits between two
     latches),\margin{Pentium~4 (Prescott): 31 stages,
-    \SI{3.8}{\giga\hertz}; the Core of 2006: 14 stages, under
-    \SI{3}{\giga\hertz}, and faster.} the circuit design and the fabrication
-    technology.
+    \SI{3.8}{\giga\hertz}; Core~2 (Conroe, 2006): 14 stages,
+    \SI{2.93}{\giga\hertz}, yet faster.  Intel data.} the circuit design
+    and the fabrication technology.
 \end{description}
 
 The value of the law is that it exposes trade-offs: a change that reduces
 one factor often increases another.  A deeper pipeline lowers
 $T_{\mathrm{clk}}$ but raises CPI; a richer ISA lowers IC but may raise CPI
 or $T_{\mathrm{clk}}$.\caution{Never evaluate a change by a single factor.
-\enquote{Higher clock frequency} is not \enquote{faster} unless CPI and IC
-are unchanged.}
+\enquote{Higher clock frequency} is \enquote{faster} only if IC $\times$ CPI
+grows by a smaller factor than the frequency.}
 
 \subsection{Unequal instruction times}
 
@@ -239,9 +239,9 @@ of the time after the change, and not a fraction of the instruction count.}
   time.  A new FP unit makes them $4\times$ faster.  The overall speedup is
   $1/(0.6 + 0.4/4) = 1/0.7 \approx 1.43$.  Making the FP unit infinitely
   fast would only reach $1/0.6 \approx 1.67$.\sidenote{Amdahl's three-page
-  paper (AFIPS 1967) used this bound against massively parallel machines: with
-  \SI{95}{\percent} of the time parallel, no core count exceeds $20\times$.
-  Lesson 18 applies it to cores.}
+  paper (AFIPS 1967) argued in prose, without this formula, against large
+  parallel machines.  With \SI{95}{\percent} of the time parallel, no core
+  count exceeds $20\times$.  Lesson 18 applies it to cores.}
 \end{example}
 
 \subsection{Implications}
@@ -255,9 +255,10 @@ principles follow.\source{Lesson 2, videos 21--24.}
   a small fraction.  Optimize what the program actually spends its time on.
 \end{keypoint}
 
-The lecture also states the converse, jokingly called \enquote{Lhadma's
-law}:\caution{\enquote{Lhadma} is \enquote{Amdahl} spelled backwards.  It is
-the lecture's own name for the principle, not standard terminology.}
+The lecture also states the converse, jokingly called
+\term{Lhadma's law}:\caution{\enquote{Lhadma} is
+\enquote{Amdahl} spelled backwards.  It is the lecture's own name for the
+principle, not standard terminology.}
 \emph{do not sacrifice the uncommon case too much} when speeding up the
 common one.  If the \SI{10}{\percent} that is left untouched by an
 optimization is made $10\times$ slower as a side effect, it now takes as
@@ -269,8 +270,8 @@ slowdown.
 Repeatedly improving the same part of the execution yields
 \term{diminishing returns}[収穫逓減]: once that part has shrunk, it is no
 longer the common case, and the remaining time is dominated by everything
-else.  After each improvement the architect should re-measure and ask what
-the common case is \emph{now}.
+else (\cref{fig:l02-amdahl}).  After each improvement the architect should
+re-measure and ask what the common case is \emph{now}.
 
 \begin{example}
   Starting from the previous example (FP $=\SI{40}{\percent}$ of time),

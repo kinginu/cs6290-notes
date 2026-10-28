@@ -440,13 +440,13 @@ dependence through memory.  Two stores to the same address have a WAW
 dependence, and a store to an address that an earlier load reads has a WAR
 dependence.  The RAT cannot remove the false ones, because it renames
 registers, not memory locations, and whether two memory accesses conflict is
-known only once both addresses have been computed.\margin{Skylake can have 72
-loads and 56 stores in flight.  Intel optimization manual.}
+known only once both addresses have been computed.\margin{Skylake: 72 loads and 56
+stores in flight.  Intel optimization manual.}
 
 Tomasulo's algorithm therefore performs loads and stores in program
-order.\caution{\enquote{In program order} refers to the memory accesses.  The
-addresses themselves are computed as soon as their operands are ready, and
-therefore out of order.}  They are issued like other instructions, with their operands resolved through
+order.\caution{\enquote{In program order} refers to the memory
+accesses; when each address is computed is a separate design choice (H\&P
+§3.5 computes them in program order).}  They are issued like other instructions, with their operands resolved through
 the RAT, and the address adder computes the address.  A load then waits in a
 load buffer and a store in a store buffer (\cref{fig:l07-tomasulo}); a store
 whose value has not been computed yet captures it from the CDB.  The

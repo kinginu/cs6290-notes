@@ -187,8 +187,9 @@ execution time relative to perfect prediction is
   \label{eq:l04-relative}
 \end{equation}
 which for $w=1$ is exactly the CPI of \cref{eq:l04-cpi}.\margin{Real
-numbers: a Skylake-class core loses about 17 cycles per misprediction, with a
-224-entry reorder buffer to refill (Intel optimization manual).}
+numbers: a Skylake-class core loses about 16--20 cycles per misprediction
+(Agner Fog, microarchitecture manual) and must refill a 224-entry reorder
+buffer (Intel optimization manual).}
 
 \begin{example}
   \label{ex:l04-better}
@@ -265,8 +266,9 @@ of the same instruction is predicted with the new target.
 A BTB cannot have one entry for every possible instruction address.  It must
 be read within the fetch cycle, in addition to the fetch itself, which
 limits it to a small table---hundreds to a few thousand entries.\margin{Real
-capacities: about 4096 BTB entries on Intel Skylake; AMD's Zen~2 uses two
-levels, 512 entries in front of 7168 (vendor optimization guides).}  The PC is
+capacities: about 4096 BTB entries on Intel Skylake (commonly reported);
+AMD's Zen~2 uses three levels of 16, 512 and 7168 entries (Agner Fog,
+microarchitecture manual).}  The PC is
 therefore mapped to an entry by a simple hash: a few of its low-order bits.
 Instructions executed close together in time, such as those of a loop, lie
 close together in memory; they share their high-order bits but differ in the
@@ -691,7 +693,7 @@ branch which of them to trust.
 \end{definition}
 
 Both component predictors are trained on every branch as usual.\margin{The
-Alpha 21264 combined 1024 local histories of 10 bits, a 4096-entry global
+Alpha 21264 combined 1024 local histories of 10 bits, 1024 three-bit local counters, a 4096-entry global
 table indexed by 12 history bits and a 4096-entry chooser: about 29 kilobits
 (H\&P §3.3).}  The meta-predictor counter changes only when the components
 disagree in correctness: it moves towards the component that was right.
@@ -806,8 +808,8 @@ mispredicted.
 
 Since calls and returns nest, the RAS predicts returns almost perfectly
 (\cref{fig:l04-ras}).  Being small, it can fill up when calls nest
-deeply.\margin{Real return stacks hold 16 entries per hardware thread on
-Intel cores and 32 on AMD's Zen~2 (vendor documentation).}
+deeply.\margin{Real return stacks hold 16 entries on Intel cores and 32 on
+AMD's Zen~2 (Agner Fog, microarchitecture manual).}
 When a call finds the RAS full, the push wraps around and overwrites the
 oldest entry.  Returns occur in reverse order of the calls, so the entries
 needed soonest are the most recent ones, and most calls and returns happen

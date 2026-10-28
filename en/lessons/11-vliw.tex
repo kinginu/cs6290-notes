@@ -55,10 +55,10 @@ Correctness rests on the compiler.}
   operations, each equivalent to one instruction of an ordinary ISA, that are
   executed in parallel in the same cycle.\margin{Real width: an IA-64
   \emph{bundle} is 128~bits---three 41-bit operations and a 5-bit template
-  naming their execution units (Intel Itanium architecture manual).}  Choosing
-  the operations that form an instruction, and ensuring that they are
-  independent, is the task of the compiler; the processor performs no
-  dependence checking.
+  that gives their execution-unit types and the stop positions (Intel
+  Itanium architecture manual).}  Choosing the operations that form
+  an instruction, and ensuring that they are independent, is the task of the
+  compiler; the processor performs no dependence checking.
 \end{definition}
 
 An instruction that carries $N$ operations is about $N$ times as long as an
@@ -106,10 +106,12 @@ I8: SW  R7, 16(R8)    ; RAW with I7
   and still has a free slot; slots left over are filled with NOPs
   (\cref{tab:l11-packing}).\tip{Lower bound: $\lceil n/N\rceil$ instructions,
   and never fewer than the longest dependence chain has
-  operations---$\max(2,4) = 4$ here.  Packing in program order can cost one
-  more, as the two-slot column shows.}  With four slots the eight operations
-  occupy four instructions, hence four cycles, where an ordinary ISA needs
-  eight instructions; with two slots they occupy five.
+  operations---$\max(2,4) = 4$ here.  The bound need not be reachable: with
+  two slots it is 4, yet no schedule does better than five, because I5 and I6
+  together need all four loads, which fill the first two instructions.}  With
+  four slots the eight operations occupy four instructions, hence four cycles,
+  where an ordinary ISA needs eight instructions; with two slots they occupy
+  five.
 \end{example}
 
 \begin{table}[htbp]
@@ -160,8 +162,8 @@ It also has four disadvantages.
     wait for it, even independent ones, whereas an out-of-order processor
     keeps executing instructions that do not depend on it.\margin{The number
     the compiler must assume: on Skylake a load takes 4 cycles from L1, 12
-    from L2, about 40 from L3 and 200--300 from DRAM (Intel optimization
-    manual).}
+    from L2 and about 40 from L3 (Intel optimization manual), and about
+    200--300 cycles ($\approx$ 60--\SI{80}{\nano\second}) from DRAM (7-cpu.com).}
   \item \textbf{Irregular code is hard.}\tip{The first two are what the
     compiler cannot know: the actual latencies, the actual addresses and the
     actual branch directions.}  The compiler sees the program, not
@@ -194,8 +196,9 @@ was compiled for.\sidenote{Software can supply the missing compatibility.
 Transmeta's Crusoe (2000) executed no x86 instruction directly: a translator,
 the code morphing software, compiled blocks of x86 code into 128-bit VLIW
 instructions of four operations and cached them \cite{dehnert2003}; the later
-Efficeon used 256-bit instructions.  Nvidia's Denver (2014) translates Arm
-code the same way.}
+Efficeon used 256-bit instructions.  Nvidia's Denver (2014) decodes Arm
+instructions in hardware and translates only frequently executed Arm code into
+its native VLIW instructions.}
 
 \begin{example}[An old binary on a wider VLIW processor]
   \label{ex:l11-compat}

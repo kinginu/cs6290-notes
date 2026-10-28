@@ -90,8 +90,8 @@ each of which can become a stage (\cref{fig:l14-pipelined}):
     and the block offset picks the requested bytes out of the block, which are
     delivered.
 \end{enumerate}
-A miss is known at the end of the second stage.\margin{Reading every way's
-data beside the tags is what makes step~2 fast.  Large L2 and L3 caches read
+A miss is known at the end of the second stage.\margin{Reading the data
+of every way in parallel with the tag check is what keeps the lookup short.  Large L2 and L3 caches read
 the tags first and then only the matching way: slower, much less energy.}
 Pipelining does not reduce
 the number of cycles one lookup takes.  It prevents that number from limiting
@@ -731,7 +731,7 @@ only its own element, so the iterations can be executed in any order.
 \label{sec:l14-overlap}
 
 The miss penalty can be larger than the time needed to fetch a
-block.\source{Lesson 14, videos 28--30.}  An out-of-order processor (Lesson 7)
+block.\source{Lesson 14, videos 28--30; H\&P §2.3.}  An out-of-order processor (Lesson 7)
 has many instructions in progress, and several of its loads and stores may
 access memory within a few cycles.  Fetching a missing block takes many
 cycles, and in the meantime another access may miss as well.
@@ -782,7 +782,7 @@ When the data arrives, it is placed in the cache, all instructions recorded in
 the MSHR are woken up, and the MSHR is released.  Already two MSHRs give a
 large improvement over a blocking cache, four are better still, and because
 memory accesses take so long, even 16 to 32 MSHRs continue to
-help.\margin{Real machines track fewer: Intel cores from Nehalem to Skylake
+help.\margin{Real machines track fewer: Intel cores from Nehalem to Haswell
 have ten line-fill buffers, so at most ten L1 data misses are outstanding per
 core.  Intel optimization manual.}
 
@@ -925,9 +925,9 @@ the instructions instead of the memory accesses:
   \label{eq:l14-mpki}
 \end{equation}
 It thus states directly how often per instruction a program pays the miss
-penalty of that level.\tip{About a third of instructions access memory in
-typical code, so MPKI $\approx 330 \times$ global miss rate (H\&P instruction
-mixes).}
+penalty of that level.\tip{For a data cache: about a third of
+instructions load or store in typical code, so MPKI $\approx 330 \times$
+global miss rate (H\&P instruction mixes).}
 
 \begin{example}
   \label{ex:l14-local-global}

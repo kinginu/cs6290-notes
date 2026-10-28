@@ -27,9 +27,10 @@ An exception is an event, such as a division by zero or an access to an
 invalid memory address, that an instruction raises when it
 executes.\source{Lesson 8, videos 1--2; H\&P §C.4, §3.6.}  The processor
 saves the address of the excepting instruction and transfers control to an
-exception handler, usually part of the operating system.\caution{H\&P reserves
-\emph{interrupt} for an event that no instruction causes, such as a timer tick
-or an I/O completion; the mechanism of this chapter serves both.}  When the
+exception handler, usually part of the operating system.\caution{Some texts, following the MIPS convention,
+reserve \emph{interrupt} for an event that no instruction causes, such as a
+timer tick or an I/O completion; H\&P §C.4 calls both \emph{exceptions}.  The
+mechanism of this chapter serves both.}  When the
 handler
 has dealt with the cause, it may return to the saved address, so that the
 excepting instruction is executed again and the program continues after it.
@@ -165,7 +166,7 @@ instructions.\source{Lesson 8, videos 5--10; H\&P §3.6.}
   \end{description}
 \end{definition}
 
-The lecture draws only these three fields.  An entry must also record whether
+These three fields suffice for the examples of this chapter.  An entry must also record whether
 the instruction raised an exception or is a mispredicted branch, and the
 address of the instruction, which commit needs in order to take the exception
 or to restart fetching (\cref{sec:l08-recovery,sec:l08-rob-exceptions}).
@@ -183,7 +184,8 @@ wrapping around from the last entry to the first; recovery moves the issue
 pointer back (\cref{sec:l08-recovery}).  When every entry is in use, no
 instruction can be issued until the oldest one leaves the ROB.\margin{ROBs have
 grown from 40 entries on the Pentium Pro to 224 on Skylake (Lesson~7), 256 on
-AMD Zen~3 and 512 on Intel Golden Cove.}  Every issued
+AMD Zen~3 and 512 on Intel Golden Cove.  Intel optimization manual; AMD Family 19h software
+optimization guide.}  Every issued
 instruction receives an entry, including a branch, which writes no register:
 its entry keeps its place in the program order and, as shown below, records
 whether it was mispredicted.
@@ -301,7 +303,9 @@ With a ROB, instructions on a mispredicted path cannot change the register
 file as long as they are removed before they commit.\source{Lesson 8, videos
 11--12; H\&P §3.6.}  In the program of \cref{sec:l08-mispredictions}, I3 to
 I6 are issued while I2 waits for R1, and all of them except I6, which is
-still executing, write their results into their ROB entries.  When I2 finally executes and
+still executing, complete: I3 and I5 write their results into their ROB
+entries, and the load I4 raises a phantom exception, which is recorded in its
+entry (\cref{sec:l08-rob-exceptions}).  When I2 finally executes and
 the processor finds that the branch was mispredicted, the misprediction is
 recorded in the ROB entry of I2, and nothing else happens yet.  Instructions
 before the branch are unaffected and continue to execute and commit.\margin{The
@@ -323,7 +327,12 @@ actions (\cref{fig:l08-recovery}):
   \item restart fetching at the correct successor of the branch.
 \end{enumerate}
 A correctly predicted branch simply commits: the commit pointer advances and
-nothing else happens.
+nothing else happens.\sidenote{Recovering at commit is the simplest scheme and
+the one used in this chapter.  Real processors start recovery as soon as the
+mispredicted branch executes, discarding only the ROB entries after the branch
+and restarting fetching at once, so that no cycles are lost while the branch
+waits to commit (H\&P §3.6).  The RAT must then be brought back to its state
+at the branch, for example from a copy saved when the branch was issued.}
 
 \begin{figure}[htbp]
   \centering
@@ -334,15 +343,6 @@ nothing else happens.
     the register file.}
   \label{fig:l08-recovery}
 \end{figure}
-
-\begin{note}
-  Recovering at commit is the simplest scheme and the one used in the lecture.
-  Real processors start recovery as soon as the mispredicted branch executes,
-  discarding only the ROB entries after the branch and restarting fetching at
-  once, so that no cycles are lost while the branch waits to commit (H\&P
-  §3.6).  The RAT must then be brought back to its state at the branch, for
-  example from a copy saved when the branch was issued.
-\end{note}
 
 \section{Exceptions with a reorder buffer}
 \label{sec:l08-rob-exceptions}
@@ -421,7 +421,10 @@ ROB.\source{Lesson 8, videos 17--30; H\&P §3.6.}  The processor has three
 RSs for addition and subtraction (AD1 to AD3), two for multiplication and
 division (MD1, MD2) and a ROB of eight entries.  ADD and SUB take 1 cycle, MUL
 4 cycles and DIV 6 cycles, and there are enough execution units that no ready
-instruction waits for one.  The steps follow these conventions:
+instruction waits for one.  The steps follow these conventions:\margin{One
+commit per cycle is an assumption of this example: Skylake retires up to four
+micro-operations per cycle and AMD Zen~3 up to eight.  Intel optimization
+manual; AMD Family 19h software optimization guide.}
 \begin{itemize}
   \item one instruction is issued per cycle, into the free RS of the required
     kind with the lowest number;
@@ -434,9 +437,7 @@ instruction waits for one.  The steps follow these conventions:
     $D+k$; there is one CDB, and in this example no two results are written
     in the same cycle;
   \item an instruction commits no earlier than the cycle after its write
-    result, and at most one instruction commits per cycle.\margin{One commit
-    per cycle is an assumption of this example: Skylake retires up to four
-    micro-operations per cycle and AMD Zen~3 up to eight.}
+    result, and at most one instruction commits per cycle.
 \end{itemize}
 
 \needspace{12\baselineskip}
@@ -476,7 +477,7 @@ same cycle, can be used only from cycle~7; I6 waits for ROB3 and ROB5.
 \Cref{tab:l08-rob-state,tab:l08-rat-state} show the state at the end of
 cycle~6: AD1 holds I4 and AD3 holds I6, all other RSs are free, and the
 register file is unchanged.\tip{Entries in use $=$ (issue $-$
-commit) $\bmod\ 8$: at the end of cycle~6 that is $(7-1) \bmod 8 = 6$, namely
+commit) $\bmod\ 8$ (0 means empty or full): at the end of cycle~6 that is $(7-1) \bmod 8 = 6$, namely
 ROB1 to ROB6.}
 
 \begin{table}[htbp]
@@ -554,7 +555,7 @@ is recorded in ROB4, I2 and I3 still commit in cycles 10 and~11, and in
 cycle~12 I4 reaches the commit pointer and the exception is taken.  The
 handler finds $\text{R1}=12$, $\text{R2}=100$ and $\text{R4}=10$, but not
 $\text{R4}=14$, although I5 wrote 14 into ROB5 in cycle~7, before I1 had
-even finished: from outside, execution stopped exactly before I4.
+even written its result: from outside, execution stopped exactly before I4.
 
 \section{Timing with a reorder buffer}
 \label{sec:l08-timing}
@@ -648,8 +649,9 @@ use the free multiplier RSs.
 
 Issue then waits only when all RSs are occupied, so the same number of RSs is
 used more effectively.\margin{Intel's schedulers are
-unified (97 entries on Skylake, Lesson~7); AMD's Zen cores keep separate
-integer and floating-point schedulers.}  The cost lies in dispatch: instead of
+unified (97 entries on Skylake, Lesson~7); AMD's Zen cores use several
+distributed integer schedulers and a separate floating-point scheduler.
+Vendor optimization manuals.}  The cost lies in dispatch: instead of
 choosing among
 the RSs of one group for one execution unit, the dispatch logic must find, for
 each free execution unit, the ready instructions in the whole pool whose

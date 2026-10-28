@@ -43,7 +43,7 @@ influences both.
     high the ILP.  The compiler can place such instructions close together, and
     it can remove the branches, calls and returns that stand between them.
 \end{description}
-The compiler sees the whole program rather than a window of it, and it runs
+The compiler sees far more of the program than a hardware window, and it runs
 before the program executes, so it can afford analyses that a processor could
 never carry out within a clock cycle.\margin{The compiler's window is a whole
 function, and after inlining the whole call tree; the processor's is its
@@ -170,8 +170,9 @@ chains finds them anyway, but an out-of-order processor with a shorter window
 does not, and neither does an in-order processor, which executes the next
 instructions only up to the first one that must wait.\caution{Memory holds the
 compiler back as well: a load may be moved ahead of a store only if the two
-addresses can be proved different.  With two pointers of the same type they
-cannot, and the order stands.}  Three compiler
+addresses can be proved different.  Two pointers of the same type may point
+to the same location, so unless the compiler can prove otherwise, the order
+stands.}  Three compiler
 techniques make independent instructions easier to find: instruction
 scheduling, loop unrolling (\cref{sec:l10-unrolling}) and trace scheduling
 (\cref{sec:l10-other}).
@@ -221,8 +222,8 @@ I6:  ADD R10, R10, R8    ; y <- (e - f) * g + h
 \end{lstlisting}
   The instructions form two chains, I1--I3 and I4--I6, so the ideal processor
   executes I1 and I4 in cycle~1, I2 and I5 in cycle~2, and I3 and I6 in
-  cycle~3: the ILP is~2.  A two-wide in-order processor executes only I1 in
-  cycle~1, because I2 must wait for it, and only I2 in cycle~2.  In cycle~3 it
+  cycle~3: the ILP is~2.  A two-wide in-order processor, with every instruction
+  taking one cycle, executes only I1 in cycle~1, because I2 must wait for it, and only I2 in cycle~2.  In cycle~3 it
   executes I3 together with I4, but then I5 and I6 again need a cycle each.
   It takes five cycles, an IPC of $6/5 = 1.2$
   (\cref{fig:l10-scheduling}a).  Scheduled in the order I1, I4, I2, I5, I3,
@@ -290,7 +291,7 @@ miss an in-order processor stalls, and only the hardware of Lessons 7--9
 reacts.} for out-of-order processors
 whose window is short compared with the chains in the program, and for
 out-of-order processors whenever more instructions are ready than their width,
-since the order decides which of them execute first (Lesson 6).
+since the order decides which of them execute first (Lesson 7).
 
 \section{Scheduling and if-conversion}
 \label{sec:l10-if-conversion}
@@ -394,8 +395,8 @@ The ILP rises as well.  On the ideal processor (\cref{eq:l06-cycle}) the
 ADDIs of successive iterations form a chain of one cycle per iteration.  Every
 LW of an iteration reads R1 from the ADDI of the previous iteration and
 executes in the same cycle as the ADDI of its own iteration, and its ADD and
-SW follow in the next two cycles; the second write to R3 in the unrolled body
-is a WAW dependence that renaming removes.  The ideal processor thus executes
+SW follow in the next two cycles; the reuse of R3 by the second copy creates
+WAW and WAR dependences that renaming removes.  The ideal processor thus executes
 one iteration, or $k$ elements, per cycle, and the ILP of a long loop
 approaches the number of instructions per iteration: 5 for the original loop,
 8 for the unrolled one.  This relies on iterations that depend on each other
@@ -495,7 +496,8 @@ Larger code occupies more memory, and, as the lessons on caches will show, it
 causes more cache misses when its instructions are fetched, which can cancel
 the gain.\margin{The front end is the first limit: Skylake caches 1536 decoded
 micro-operations and Zen~2 4096, and a loop unrolled past that falls back to
-the decoders.  Intel optimization manual.}  Two further problems concern the
+the decoders.  Intel optimization manual; AMD Family 17h software
+optimization guide.}  Two further problems concern the
 number of iterations.  When $n$ is not a multiple of $k$, the remaining
 iterations need additional code.  And
 unrolling presumes that the number of remaining iterations is known when an
@@ -611,13 +613,13 @@ functions called from many sites the code grows considerably.
   call.  For the function of \cref{ex:l10-inlining}, whose body has two
   instructions, the same 10 sites need $10 \times 4 + 3 = 43$ instructions
   without inlining and only $10 \times 2 = 20$ with it: the code shrinks, and
-  each call executes 2 instructions instead of 7.
+  each call executes 2 instructions instead of 7.\margin{First-level instruction caches have stayed
+  small---32~KB on both Skylake and Zen~3---and every inlined copy competes for
+  them (Intel and AMD optimization manuals).}
 \end{example}
 
 As with loop unrolling, the larger code causes more cache misses and can
-cancel the gain.\margin{First-level instruction caches have stayed
-small---32~KB on both Skylake and Zen~3---and every inlined copy competes for
-them.}  Compilers therefore inline small functions, whose call
+cancel the gain.  Compilers therefore inline small functions, whose call
 overhead is large compared with their body, and functions called from a single
 site, whose one copy replaces the original; large functions called from many
 sites remain calls.
@@ -642,15 +644,16 @@ a loop like a pipeline: it schedules the instructions of successive iterations
 so that the iterations overlap, and every cycle combines independent
 instructions of several iterations while the results stay those of the
 original loop \cite{lam1988}.  The second, \term{trace
-scheduling}[トレーススケジューリング], carries if-conversion further: the
-compiler uses a profile to select the most frequently executed path through
+scheduling}[トレーススケジューリング], schedules across branches without
+removing them: the compiler uses a profile to select the most frequently executed path through
 several branches, schedules this path as one block of code, and adds checks
 that branch to compensation code, which corrects the results, when execution
 leaves the path \cite{fisher1981}.  Carried to its end, scheduling by the
 compiler leads to processors that leave the grouping of operations into
 parallel steps entirely to the compiler: the VLIW processors of
-Lesson 11.\sidenote{That VLIW supported software pipelining in hardware:
-IA-64's \emph{rotating} registers rename a register by iteration, rotating
+Lesson 11.\sidenote{IA-64, the best-known VLIW-style instruction set
+(Lesson 11), supports software pipelining in hardware: its \emph{rotating}
+registers rename a register by iteration, rotating
 predicates switch the stages of the pipeline on and off, and a dedicated loop
 branch fills and drains it, so one copy of the body does what unrolling needs
 several copies for.}

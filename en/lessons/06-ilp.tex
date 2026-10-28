@@ -77,7 +77,7 @@ one instruction would complete per cycle and the CPI would remain~1.
 \end{figure}
 
 Executing instructions ahead of an earlier one breaks the write-after-write
-dependence between I2 and I5.\tip{The second word of the name is what the
+dependence between I2 and I5.\tip{The last word of the name is what the
 \emph{earlier} instruction does: in write-after-read the earlier instruction
 reads.}  Both write R5, and in program order I5 writes
 last, so after these instructions R5 must hold the result of I5; every later
@@ -193,8 +193,8 @@ The physical registers are exactly the versions of \cref{sec:l06-false}.
 Every write creates a new version, and the RAT records which version is
 current in program order, so a reader automatically uses the version
 produced by its closest preceding writer.\sidenote{Renaming can even replace
-an instruction: Intel cores since Ivy Bridge execute most register-to-register
-moves in the RAT alone, pointing the destination entry at the source's
+an instruction: Intel cores from Ivy Bridge on can execute many
+register-to-register moves in the RAT alone, pointing the destination entry at the source's
 physical register.  The move then uses no execution unit and has no latency
 (Agner Fog, microarchitecture manual).}
 
@@ -205,13 +205,12 @@ physical register.  The move then uses no execution unit and has no latency
   registers to physical registers that the example does not use; P8, P9, \ldots\ are free and are
   allocated in increasing order.\margin{Real sizes: Skylake has 180 integer
   and 168 vector physical registers for 16 architectural ones of each kind
-  (Agner Fog, microarchitecture manual).}  \Cref{tab:l06-rename} lists each renamed instruction
+  (Intel; WikiChip).}  \Cref{tab:l06-rename} lists each renamed instruction
   and the RAT entries after it.  I2 reads P8, the result of I1, because I1
   has already updated the entry of R3.  I3 reads P4, the old R4, before I4
   maps R4 to P11.  The two writes to R5 go to P9 and P12, and at the end the
   RAT maps R5 to P12, so an instruction that follows reads the result of I5,
-  as program order requires.\margin{Dependences through memory locations are
-  not affected by register renaming; Lesson~9 treats them.}
+  as program order requires.
 \end{example}
 
 \begin{table}[htbp]
@@ -248,7 +247,8 @@ instruction reads, so WAW and WAR dependences between register accesses no
 longer exist.  Every read,
 on the other hand, still refers to the result of the instruction that
 produced the value in the original program, so every RAW dependence is
-preserved.  In \cref{tab:l06-rename} the only dependence left is that of I2
+preserved.\margin{Dependences through memory locations are not affected by
+register renaming; Lesson~9 treats them.}  In \cref{tab:l06-rename} the only dependence left is that of I2
 on I1 through P8.
 
 Same-cycle execution now only has to respect this one dependence.  I1, I3,
@@ -333,11 +333,12 @@ I8:  ADD R5, R3, R8
   in cycle~1.  I2 and I4 depend on instructions of cycle~1 and execute in
   cycle~2.  I5 and I7 each depend on an instruction of cycle~2 and execute
   in cycle~3 (\cref{fig:l06-ilp-graph}).  Hence $C=3$ and
-  $\text{ILP} = 8/3 \approx 2.67$.\sidenote{Real programs offer little more.
-  Wall simulated benchmarks under models ranging from realistic to impossibly
-  good---perfect branch prediction, unlimited renaming, perfect alias
-  analysis---and found the average parallelism rarely above~7, with about~5
-  more common \cite{wall1991}.}  Two pitfalls are visible.  R1 is written
+  $\text{ILP} = 8/3 \approx 2.67$.\sidenote{Real programs offer more, but not
+  much more.  Wall simulated benchmarks under models ranging from realistic
+  to impossibly good, though not perfect, branch prediction, renaming and
+  alias analysis, and found the average parallelism rarely above~7, with
+  about~5 more common; only perfect techniques gave much more
+  \cite{wall1991}.}  Two pitfalls are visible.  R1 is written
   by both I1 and I4, and I5 reads the value of I4; taking I1 as its producer
   would wrongly place I5 in cycle~2.  And I3 reads R2 and R7, which I6 and I7
   write only later; these are WAR dependences, removed by renaming, and they
@@ -431,8 +432,9 @@ A real processor falls short of the ideal for several reasons.
 \end{description}
 An out-of-order processor needs renaming to do so; without it, it would
 also have to respect the WAW and WAR dependences of
-\cref{sec:l06-dependences}.  An in-order processor reads and writes
-registers in program order and needs no renaming.
+\cref{sec:l06-dependences}.  An in-order processor reads
+registers in program order and, if all its instructions take equally long,
+also writes them in program order, so it needs no renaming.
 
 \begin{example}
   \label{ex:l06-ipc}
@@ -444,8 +446,8 @@ registers in program order and needs no renaming.
   executed in each cycle.  The in-order processors execute only I1 in
   cycle~1, because I2 must wait for R1 and blocks I3 to I8.  The same
   blocking recurs at I4 (waiting for R6), at I5 (waiting for R1 from I4) and
-  at I7 (waiting for R2), so these processors need 5 cycles whatever their
-  width.  The two-wide out-of-order processor executes two
+  at I7 (waiting for R2), so these processors need 5 cycles whether two or
+  four wide.  The two-wide out-of-order processor executes two
   ready instructions in every cycle and needs 4 cycles; only the four-wide
   out-of-order processor reaches the ILP.
 \end{example}
@@ -508,7 +510,8 @@ out-of-order execution pays off fully only in a wide processor.
   the IPC of every processor.  Real processors fall below it, limited by
   their width, their execution units and in-order execution; approaching the ILP takes a wide
   out-of-order processor.\margin{Both kinds ship in the same phone: Arm's
-  Cortex-A55 is 2 wide and in-order, the Cortex-A78 4 wide and out-of-order.}
+  Cortex-A55 is 2 wide and in-order, the Cortex-A78 4 wide and out-of-order
+  (Arm product pages).}
   The next lesson presents Tomasulo's
   algorithm, which executes instructions out of order with renaming.
 \end{keypoint}

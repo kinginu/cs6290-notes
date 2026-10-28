@@ -223,7 +223,8 @@ transient (a flipped memory bit).  A design fault, in contrast, is present in
 every copy of the design until the design is corrected, so it is permanent,
 even if it is activated only occasionally.\margin{Five entries of the
 \num{2048}-entry lookup table in the Pentium divider held a wrong value;
-replacing the chips cost Intel \$475 million.}
+replacing the chips cost Intel \$475 million (Edelman, SIAM Review
+39(1), 1997).}
 
 \section{Improving reliability and availability}
 \label{sec:l17-improving}
@@ -266,9 +267,10 @@ Saving the complete state of a system at regular intervals, so that
 execution can later resume from a saved state, is called
 \term{checkpointing}[チェックポインティング].  When an error is detected,
 the system restores the most recent checkpoint and executes again from
-there.\margin{A processor does this every few instructions: branch
-misprediction recovery in Lesson 8 restores a checkpoint of the register map
-and re-executes.  Only the granularity differs.}  The re-execution is likely
+there.\margin{A processor does the same on a small scale: branch
+misprediction recovery (Lesson 8) discards the work done after the branch
+and resumes from the committed register state.  Only the granularity
+differs.}  The re-execution is likely
 to succeed if the fault was transient,
 and often if it was intermittent; a permanent fault is activated again and
 cannot be tolerated this way.\caution{\enquote{Transient} describes the

@@ -26,7 +26,7 @@ data.\source{Lesson 20, videos 1--2; H\&P §5.5.}  As an example, consider a
 program that counts how often each letter occurs in a long document.  Two
 threads each process one half of the document and increment a shared array
 of 26 counters (\cref{ex:l20-count}).\margin{\texttt{count} is 26 ints, 104
-bytes, and fits in two 64-byte blocks: the threads invalidate each other's copy
+bytes, and occupies two or three 64-byte blocks: the threads invalidate each other's copy
 even when they count different letters (false sharing, Lesson 19).}
 
 \begin{example}[Counting letters]
@@ -217,7 +217,7 @@ Instruction sets provide more than one instruction that reads and writes a
 memory location as one atomic step.\source{Lesson 20, videos 8--10; H\&P
 §5.5.}  The simplest of them swaps a register with memory.\margin{x86 has no
 LL/SC: it has \texttt{XCHG}, atomic even without the \texttt{lock} prefix, and
-\texttt{lock cmpxchg}, a compare-and-swap.  Intel SDM vol.~2A.}
+\texttt{lock cmpxchg}, a compare-and-swap.  Intel SDM vol.~2.}
 
 \begin{definition}[Atomic exchange]
   An \term{atomic exchange}[アトミック交換] \texttt{EXCH R1, 0(R2)}
@@ -306,9 +306,8 @@ store.\source{Lesson 20, videos 11--13; H\&P §5.5.}
 What makes the pair atomic is the rule for clearing the link register: every
 write to a memory location---an \texttt{SC} or an ordinary store, by this
 core or by any other---clears every link register that holds the address of
-that location (\cref{fig:l20-llsc}).\margin{Per H\&P, an interrupt or
-exception between \texttt{LL} and \texttt{SC} also clears the link
-register.}  A core learns of the writes of other cores through the coherence
+that location (\cref{fig:l20-llsc}).\margin{Per H\&P, a context switch between
+\texttt{LL} and \texttt{SC} also makes the \texttt{SC} fail.}  A core learns of the writes of other cores through the coherence
 protocol of Lesson 19: the invalidation of the block that holds the linked
 address clears the link register.  Detection therefore works per block, so a
 write to another address in the same block clears the link as well; this
@@ -450,8 +449,8 @@ lock:   LW   R1, 0(R2)   ; ordinary read of lock variable
         BNEZ R1, lock    ; another thread won: start over
 \end{lstlisting}
 Waiting cores now only read the lock variable, so all of them keep the block
-in the shared state and their loads are cache hits: while the lock is held,
-the waiting cores cause no bus traffic at all
+in the shared state and their loads are cache hits: after one miss each, the
+waiting cores cause no bus traffic while the lock is held
 (\cref{tab:l20-coherence}, bottom).\margin{The resulting lock is known as
 \emph{test-and-test-and-set}, after the plain test that now precedes the
 atomic one.}  Writes, and with them invalidations,
@@ -499,7 +498,9 @@ Two points about the test-first lock are easy to get wrong.
     the value returned by \texttt{EXCH} must still be tested.  A lock that
     branches into the critical section on the result of the \texttt{LW}
     alone is the broken lock of \cref{sec:l20-implementing}.
-  \item \textbf{The other instructions test first by themselves.}
+  \item \textbf{The other instructions test first by themselves.}\caution{Hardware
+    usually obtains the block in M for any atomic read-modify-write, even
+    one whose test fails; there a plain load first still pays off.}
     \texttt{LL} is a read, and the lock of \cref{sec:l20-llsc} attempts the
     \texttt{SC} only after \texttt{LL} has found the lock free; a
     test-and-set writes only when it finds the lock free.  A waiting core
@@ -526,7 +527,7 @@ attempt an \texttt{SC}, so they are not affected.
 \section{Barrier synchronization}
 \label{sec:l20-barrier}
 
-Locks make threads take turns.\source{Lesson 20, videos 18--22; H\&P
+Locks make threads take turns.\source{Lesson 20, videos 18--23; H\&P
 Appendix I.4.}  A different form of coordination makes threads wait for each
 other.
 
@@ -578,9 +579,11 @@ void barrier(void) {
 }
 \end{lstlisting}
 The counter needs the lock: a lost increment (\cref{tab:l20-race}) would
-keep it below $N$ forever.\margin{One atomic increment would do: the lock
-around \texttt{++count} can be replaced by the LL/SC sequence of
-\cref{sec:l20-llsc}.}  The first thread of a round clears the release
+keep it below $N$ forever.\margin{A single atomic increment cannot
+replace the lock here, because clearing the flag must happen in the same
+critical section.  In the reusable barrier below, one atomic increment that
+returns the new value (an LL/SC loop that keeps the sum in a second
+register) does suffice.}  The first thread of a round clears the release
 flag, so that the threads of this round wait; the last one resets the
 counter for the next round and sets the flag, which ends the waiting loops
 of all the others.
@@ -607,7 +610,8 @@ The reusable barrier never clears the release flag; it only toggles it, once
 per round.  Each thread keeps a private variable \texttt{localSense} that it
 flips on entry, so that \texttt{localSense} is the value the flag will take
 when the current round is released; the last thread to arrive writes that
-value into the flag.  The counter, the flag and the lock are the shared
+value into the flag.\margin{Numbering the rounds is an equivalent generalization: the
+sense is the parity of the round number.}  The counter, the flag and the lock are the shared
 variables of the previous implementation.
 \needspace{12\baselineskip}
 \begin{lstlisting}[language=C, numbers=none, morekeywords={shared,private}]
@@ -637,9 +641,7 @@ does no harm: it only increments the
 counter, and its own \texttt{localSense} now holds the opposite value, so it
 waits for the next toggle.  Successive rounds alternate between the two
 values, so a thread can never mistake the release of the next round for its
-own.  Numbering the rounds instead of
-toggling a flag is an equivalent generalization: the sense is the parity of
-the round number.  In \cref{fig:l20-barrier}, \texttt{release} becomes 1
+own.  In \cref{fig:l20-barrier}, \texttt{release} becomes 1
 when thread~2 completes the first round and 0 again when thread~0 completes
 the second.\margin{The shared state does not grow with $N$: one counter, one
 flag and one lock, plus one private bit in each thread.}

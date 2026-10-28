@@ -60,7 +60,7 @@ and is cheaper per bit, but slower.  Caches, which must be fast
 and can be small, are built from SRAM; main memory, which must be large and
 cheap, is built from DRAM.\margin{The division is not absolute: IBM's POWER7
 (2010) built its 32~MB L3 cache from DRAM cells---trench eDRAM---on the
-processor die.}
+processor die (IBM POWER7 documentation).}
 
 \section{The SRAM cell}
 \label{sec:l15-sram}
@@ -196,9 +196,9 @@ one-transistor cell would be lost.
 \end{marginfigure}
 
 The trench gives the capacitor a large plate area while using little of the
-chip surface.  The other common design, used in most current DRAMs, stacks the
-capacitor above the access transistor; either way the cell occupies little
-more area than the transistor.  It also needs fewer wires than an SRAM cell: one bit line instead
+chip surface, so the cell occupies little more area than the transistor.%
+\margin{The other common design, used in most current DRAMs, stacks the
+capacitor above the access transistor.}  It also needs fewer wires than an SRAM cell: one bit line instead
 of two, and no supply connections for inverters.  \Cref{tab:l15-sram-dram}
 summarizes the comparison of the two cells.
 

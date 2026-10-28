@@ -21,25 +21,25 @@ textbook-style summary of what the lectures cover.  Built with
 | 1 | Introduction | ✅ | ✅ |
 | 2 | Metrics and Evaluation | ✅ | ✅ |
 | 3 | Pipelining | ✅ | ✅ |
-| 4 | Branches | | |
-| 5 | Predication | | |
-| 6 | ILP | | |
-| 7 | Instruction Scheduling (Tomasulo) | | |
-| 8 | ReOrder Buffer | | |
-| 9 | Memory Ordering | | |
-| 10 | Compiler ILP | | |
-| 11 | VLIW | | |
-| 12 | Cache Review | | |
-| 13 | Virtual Memory | | |
-| 14 | Advanced Caches | | |
-| 15 | Memory | | |
-| 16 | Storage | | |
-| 17 | Fault Tolerance | | |
-| 18 | Multi-Processing | | |
-| 19 | Cache Coherence | | |
-| 20 | Synchronization | | |
-| 21 | Memory Consistency | | |
-| 22 | Many Cores | | |
+| 4 | Branches | ✅ | ✅ |
+| 5 | Predication | ✅ | ✅ |
+| 6 | ILP | ✅ | ✅ |
+| 7 | Instruction Scheduling (Tomasulo) | ✅ | ✅ |
+| 8 | ReOrder Buffer | ✅ | ✅ |
+| 9 | Memory Ordering | ✅ | ✅ |
+| 10 | Compiler ILP | ✅ | ✅ |
+| 11 | VLIW | ✅ | ✅ |
+| 12 | Cache Review | ✅ | ✅ |
+| 13 | Virtual Memory | ✅ | ✅ |
+| 14 | Advanced Caches | ✅ | ✅ |
+| 15 | Memory | ✅ | ✅ |
+| 16 | Storage | ✅ | ✅ |
+| 17 | Fault Tolerance | ✅ | ✅ |
+| 18 | Multi-Processing | ✅ | ✅ |
+| 19 | Cache Coherence | ✅ | ✅ |
+| 20 | Synchronization | ✅ | ✅ |
+| 21 | Memory Consistency | ✅ | ✅ |
+| 22 | Many Cores | ✅ | ✅ |
 
 ## Writing conventions
 

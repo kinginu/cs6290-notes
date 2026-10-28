@@ -26,13 +26,13 @@ dependence that passes through a register.\source{Lesson 9, videos 1--2; H\&P
 §3.5--3.6.}  Branch prediction
 (Lesson 4) removes most of the cost of control dependences, and the ROB cancels
 the instructions of a mispredicted path; renaming (Lesson 6) removes the false
-dependences between writes to the same register; the scheduling of Tomasulo's
+(WAR and WAW) dependences that arise from reusing a register name; the scheduling of Tomasulo's
 algorithm (Lesson 7) makes each instruction wait until the register values it
 reads have been computed; and the ROB makes exceptions precise.
 
-Loads and stores remain.\margin{About 38\% of the instructions a typical
-x86 program executes are loads or stores, roughly two loads per store
-(Intel, \emph{Smart Memory Access} white paper, 2006).}  They depend on one
+Loads and stores remain.\margin{About a third of the instructions in
+typical integer programs are loads or stores, roughly two loads per store
+(H\&P Appendix A, SPEC instruction mix).}  They depend on one
 another through memory locations in the same way as instructions depend on one
 another through registers
 (\cref{sec:l07-load-store}):
@@ -229,9 +229,9 @@ value.
     I5 and all instructions after it and executes them again, starting by
     fetching I5.  None of them has committed, since I3 precedes them, so the
     ROB discards them like the instructions of a mispredicted path
-    (\cref{sec:l08-recovery}).\margin{Cancelling costs a pipeline restart ---
-    on Skylake-class cores 15--20 cycles, the order of a branch misprediction
-    (Agner Fog, microarchitecture manual).}  When I5 executes again, its
+    (\cref{sec:l08-recovery}).\margin{Cancelling costs a pipeline restart,
+    comparable to a branch misprediction, which Agner Fog's microarchitecture
+    manual puts at 15--20 cycles on Skylake-class cores.}  When I5 executes again, its
     search finds I3, and it receives the value by forwarding.
 \end{itemize}
 
@@ -295,7 +295,8 @@ from both ends.\source{Lesson 9, video 9; H\&P ch.~3.}
     up to the next store with that address.  The loads after that store receive
     the value of that store instead.\margin{Hardware forwards only a load that
     lies entirely inside one store; on a partial overlap the load waits for
-    the store to reach L1 instead, some 12 cycles (Agner Fog).}
+    the store to reach L1 instead, a dozen or so cycles on Skylake-class
+    cores (Agner Fog, microarchitecture manual).}
 \end{description}
 A load applies the first rule in its search (\cref{sec:l09-lsq}), and a store
 applies the second in its check of the completed later loads

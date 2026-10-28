@@ -17,7 +17,7 @@ that serve four or eight cores well break down when a chip has dozens or
 hundreds of them.  This lesson examines the challenges
 that such chips face---coherence traffic, off-chip traffic, the size of the
 coherence directory, the shared power budget and the placement of threads
-by the operating system---and the solution the lecture gives for each.
+by the operating system---and the solution to each.
 
 \section{Coherence traffic}
 \label{sec:l22-coherence}
@@ -32,15 +32,16 @@ cores access the block again.  With more cores the chip performs more writes
 per second in total, so the rate of coherence messages grows with the
 number of cores.\margin{The lecture's \enquote{hundreds} has arrived: AMD's
 EPYC 9965 puts 192 cores in one socket within a \SI{500}{W} budget, about
-\SI{2.6}{W} per core.}  On a shared bus this traffic soon becomes the
+\SI{2.6}{W} per core.  AMD product page.}  On a shared bus this traffic soon becomes the
 bottleneck:
 \begin{itemize}
   \item a bus carries one transfer at a time, so the cores wait for each
     other's coherence messages and cache misses;
   \item a bus that connects more cores is longer and has more devices
     attached, so each transfer is slower as well.\margin{Intel's last
-    front-side bus, shared by every socket, peaked at 12.8~GB/s; QuickPath
-    replaced it with point-to-point links in 2008.}
+    front-side buses ran at 1600~MT/s, 12.8~GB/s each; server chipsets had
+    already given each socket a bus of its own before QuickPath replaced the
+    buses with point-to-point links in 2008 (Intel chipset datasheets).}
 \end{itemize}
 
 A many-core chip therefore needs two things: an on-chip interconnect whose
@@ -84,7 +85,7 @@ structures that all cores share.\sidenote{Intel's server chips made the
 same move: the Xeon Scalable family of 2017 replaced the ring of earlier Xeons by a mesh, to
 escape the \enquote{latencies and bandwidth constraints associated with
 previous ring-based architecture} (Intel, \emph{Xeon Processor Scalable
-Family Technical Overview}), and every server Xeon since has used one.
+Family Technical Overview}), and every Xeon Scalable generation since has used one.
 Tilera's TILE64 had already put 64 tiles of processor, cache and router on a
 mesh in 2007.}
 
@@ -109,7 +110,7 @@ routers---to all routers of its own row and column in a flattened butterfly,
 to $\log_{2}N$ routers in a hypercube---which shortens the paths further but
 requires long, crossing links that are hard to build on a chip.\margin{Off
 the chip they are practical: IBM's Blue Gene/L used a 3-D torus and Blue
-Gene/Q a 5-D one, and Cray's XC supercomputers a dragonfly network.}
+Gene/Q a 5-D one, and Cray's XC supercomputers a dragonfly network.  IBM/Cray system descriptions.}
 
 If the traffic were spread evenly over the links, a network of $L$ links,
 each carrying up to $C$ messages per second, would carry
@@ -133,8 +134,8 @@ limit.\caution{A mesh raises throughput but does not shorten latency: a
 message to a distant tile passes many routers, each adding delay.}  When
 messages are addressed all over the chip and the routers send each message
 along one dimension and then the other, the links that cross the middle of
-the mesh are the busiest, and they saturate at about $2kC$ messages per
-second.  The capacity of a mesh therefore grows with $\sqrt{N}$ for such
+the mesh are the busiest: about half of all messages cross these $k$ links,
+so the network saturates when it carries about $2kC$ messages per second.  The capacity of a mesh therefore grows with $\sqrt{N}$ for such
 traffic, and in proportion to $N$ only while messages stay among
 neighbouring tiles; a bus, by contrast, never carries more than one link's
 worth of traffic however many cores it connects.  Since the capacity per
@@ -184,7 +185,7 @@ grows automatically with the number of cores, while each slice remains
 small and fast and the requests of the cores are spread over many
 slices.\margin{Intel's server LLC is sliced exactly so: \SI{1.375}{MB} per
 core on the Xeon Scalable family, \SI{38.5}{MB} over the 28 cores of a
-Platinum 8180.}
+Platinum 8180.  Intel ARK.}
 
 \begin{figure}[htbp]
   \centering
@@ -199,8 +200,8 @@ Platinum 8180.}
 
 On an L2 miss the core must send its request to the one slice that may hold
 the block, and it must be able to compute that slice from the address alone.
-The lecture distributes the blocks among the tiles in round-robin fashion,
-in one of two ways.
+The blocks are distributed among the tiles in round-robin fashion, in one
+of two ways.
 \begin{description}
   \item[By cache index] The lowest bits of the set number select the tile, so
     consecutive sets go to consecutive tiles.  The blocks are spread evenly,
@@ -401,8 +402,8 @@ active, turns the others off, and raises the voltage and the clock frequency
 of the active core above their normal values.  With the entire budget of $N$
 cores, the frequency could rise by a factor of $\sqrt[3]{N}$---1.59 for four
 cores---which would recover exactly the frequency lost by dividing the
-budget (\cref{eq:l22-freq}).  \Cref{tab:l22-turbo} shows the two
-processors of 2013 that the lecture uses as examples; their design power is
+budget (\cref{eq:l22-freq}).  \Cref{tab:l22-turbo} shows two
+quad-core processors of 2013; their design power is
 that of the whole package, which also contains the integrated graphics and
 the uncore, and is therefore not a budget for the cores alone.
 

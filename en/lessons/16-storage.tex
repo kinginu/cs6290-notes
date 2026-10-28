@@ -214,14 +214,14 @@ The components of a magnetic disk improve at very different
 rates.\source{Lesson 16, video 6; H\&P §D.2.}
 \begin{description}
   \item[Capacity] depends on how densely bits are recorded on the surface.
-    For many years it doubled roughly every one to two years; this growth
-    has slowed considerably since about 2010.
+    For many years it doubled roughly every one to two years.%
+    \margin{This growth has slowed considerably since about 2010.}
   \item[Seek time] is typically \SIrange{5}{10}{\milli\second} and improves
-    only very slowly.\caution{A quoted seek time is an average over random
-    seeks; a track-to-track seek takes under \SI{1}{\milli\second}, a
-    full-stroke seek about twice the average.}  What improvement there is
-    comes mainly from smaller
-    platter diameters, which shorten the distance the heads travel.
+    only very slowly.  What improvement there is comes mainly from smaller
+    platter diameters, which shorten the distance the heads
+    travel.\caution{A quoted seek time is an average over random seeks; a
+    track-to-track seek takes under \SI{1}{\milli\second}, a full-stroke
+    seek about twice the average.}
   \item[Rotation speed] rose slowly, from about \num{5000}~RPM to
     \num{10000}--\num{15000}~RPM for the fastest drives; most drives spin at
     \num{5400}--\num{7200}~RPM.  A faster rotation requires stronger
@@ -232,14 +232,14 @@ rates.\source{Lesson 16, video 6; H\&P §D.2.}
 
 The latency of a disk access is therefore set by mechanics and materials
 rather than by the progress of transistor technology that Moore's law
-describes (Lesson 1).  It improves far more slowly than processor speed, even
-though capacity grew quickly for many years.\sidenote{The magnetic disk is
-the oldest
-component of a computer still in use.  IBM's 350 disk storage unit (1956)
-held about 5~MB on fifty 24-inch platters turning at \num{1200}~RPM, and its
-single head needed some \SI{0.6}{\second} to reach a track.  Capacity has
+describes (Lesson 1).\sidenote{The magnetic disk is
+the oldest computer component still in use.  IBM's 350 (1956) held five
+million characters (about 3.75~MB) on fifty 24-inch platters turning at
+\num{1200}~RPM; its single access arm needed some \SI{0.6}{\second} to
+reach a track.  Capacity has
 since grown by six orders of magnitude, the access time by less than two.}
-Higher recording density does
+It improves far more slowly than processor speed, even
+though capacity grew quickly for many years.  Higher recording density does
 shorten the data read time of a given amount of data, since more bytes pass
 under the head in each revolution, but it does not affect the seek time or
 the rotational latency.
@@ -260,11 +260,11 @@ single spiral track.}
 
 Portability has a price.  A disk written in one drive must be readable in
 every other drive, so the recording format has to be fixed by an industry
-standard: CD, then DVD, then Blu-ray.\margin{CD (1982) holds 700~MB, DVD
-(1996) 4.7~GB and Blu-ray (2006) 25~GB per layer: roughly a decade and a
-factor of six apart.}  A denser recording technology becomes
+standard: CD, then DVD, then Blu-ray.  A denser recording technology becomes
 useful only after a new standard has been agreed on and drives, media and
-content for it have become widespread, which takes years.  Optical disks
+content for it have become widespread, which takes years.\margin{CD (1982) 700~MB, DVD (1996)
+4.7~GB, Blu-ray (2006) 25~GB per layer: each came 10--14 years after the last
+with five to seven times the capacity.}  Optical disks
 therefore improve in large, infrequent steps.  The platters of a magnetic
 disk never leave their drive; a manufacturer can adopt a better recording
 technology in its next product as long as the drive still connects through
@@ -419,7 +419,7 @@ the lowest cost for a large amount of data favors a magnetic disk, speed,
 low power and robustness favor flash, and a hybrid disk approaches both for
 workloads whose accesses concentrate on a small part of the data.\caution{The
 flash is a cache, not extra capacity: a 2~TB hybrid disk with 8~GB of flash
-is sold, and behaves, as a 2~TB drive.}
+is sold and behaves as a 2~TB drive.}
 
 \begin{table}[htbp]
   \centering\small
@@ -465,11 +465,12 @@ maker can offer one kind of interface for a wide range of devices.  The
 price is a limited rate of improvement.  A new version of a standard has to
 be agreed on by many companies, and devices built for the older version
 should keep working, so a bus cannot adopt a faster technology as soon as it
-becomes available.  The more devices depend on a standard, the more slowly
-it changes.\sidenote{PCI Express doubles its per-lane rate each
-generation: \num{2.5}~GT/s in 2003, then 5, 8, 16 (a seven-year wait), 32
-and 64~GT/s in 2022.  Compatibility runs both ways: a new card works in an
-old slot, at the old rate.}
+becomes available.\sidenote{PCI Express doubles its per-lane bandwidth each
+generation: \num{2.5}~GT/s in 2003, then 5, 8 (doubling through a leaner
+128b/130b encoding), 16 (a seven-year wait), 32 and 64~GT/s in 2022.
+Compatibility runs both ways: an old card works in a new slot and a new card
+in an old slot, at the slower rate.}  The more devices depend on a standard, the more slowly
+it changes.
 
 I/O devices also differ enormously in the throughput they need: a graphics
 adapter moves huge amounts of data, a disk much less, a keyboard almost none.
@@ -484,11 +485,11 @@ are therefore arranged in a hierarchy (\cref{fig:l16-io-buses}).
   controllers of the slower buses are attached to it.
 \end{definition}
 
-A SATA or SCSI controller on the mezzanine bus provides a SATA (or SCSI) bus
-for disks and optical drives, and a USB host controller provides a USB
-bus,\margin{SATA~3 carries 6~Gb/s (600~MB/s), USB 3.2 Gen~2 10~Gb/s and a
+A SATA or SCSI controller on the mezzanine bus provides a SATA (or SCSI) bus\margin{SATA~3 carries 6~Gb/s (600~MB/s), USB 3.2 Gen~2 10~Gb/s and a
 16-lane PCIe~5.0 slot some 63~GB/s; a keyboard needs a few hundred bytes per
-second.}
+second (SATA-IO, USB-IF, PCI-SIG specifications).}
+for disks and optical drives, and a USB host controller provides a USB
+bus,
 extended by hubs, for external devices such as keyboards and flash drives.
 These buses serve naturally slower devices, for which a stable standard
 matters more than speed; they are slower than the mezzanine bus and change

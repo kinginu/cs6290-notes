@@ -10,7 +10,7 @@
     {\node[ln-accent,anchor=west] at (4.3,3.4) {active $\propto V^2$};}
   % static: grows as V drops (leakage at low threshold)
   \draw[thick,ln-caution] plot[domain=0.6:5.6,samples=40] (\x,{1.6/\x});
-  \node[ln-caution,anchor=west] at (0.9,2.9) {\iflangja{静的電力}{static (leakage)}};
+  \node[ln-caution,anchor=west] at (0.9,2.9) {\iflangja{静的電力（リーク）}{static (leakage)}};
   % total
   \draw[thick,dashed,ln-muted] plot[domain=0.6:5.6,samples=40] (\x,{0.11*\x*\x+1.6/\x});
   \node[ln-muted,anchor=south west] at (4.0,1.1) {\iflangja{合計}{total}};

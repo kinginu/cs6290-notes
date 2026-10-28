@@ -8,8 +8,8 @@
   keywords={pipeline, stage, pipeline CPI, stall, flush, control dependence, data dependence, RAW, WAR, WAW, hazard, forwarding, pipeline depth},
 }
 
-Pipelining is the first and most fundamental technique for raising
-throughput: instead of finishing one instruction before starting the next,
+The first and most fundamental technique for raising throughput is
+\term{pipelining}[パイプライン化]: instead of finishing one instruction before starting the next,
 the processor overlaps the execution of several instructions, each in a
 different stage of completion.  This lesson reviews how a pipelined
 processor works, quantifies its ideal performance, and then studies the
@@ -20,7 +20,7 @@ reached.
 
 Executing an instruction involves a sequence of steps that use different
 pieces of hardware.  If the steps are arranged as \term{stage}[ステージ]s
-separated by latches, then as soon as instruction $I_1$ leaves stage~1 for
+separated by \term{latch}es, then as soon as instruction $I_1$ leaves stage~1 for
 stage~2, instruction $I_2$ can enter stage~1.  With $k$ stages, up to $k$
 instructions are in flight at once.\source{Lesson 3, videos 2--3; H\&P
 §C.1.}
@@ -37,9 +37,10 @@ The consequences for the two metrics of Lesson 2 are different:
 
 \subsection{Pipelining in a processor}
 
-The classic five-stage pipeline (\cref{fig:stages}) is used throughout the
-course as the reference design.\margin{Real processors have 10--20 stages;
-the five-stage model captures every issue that matters here.}
+The classic \term{five-stage pipeline}[5 段パイプライン] (\cref{fig:stages})
+is used throughout the course as the reference design.\margin{Current x86
+cores have about 14--20 stages (Agner Fog, microarchitecture manual); the
+five-stage model captures every issue that matters here.}
 
 \begin{figure}[htbp]
   \centering
@@ -49,8 +50,8 @@ the five-stage model captures every issue that matters here.}
 \end{figure}
 
 \begin{description}
-  \item[IF] \emph{instruction fetch}: read the instruction at the program
-    counter (PC) from the instruction memory and increment the PC.
+  \item[IF] \emph{instruction fetch}: read the instruction at the
+    \term{program counter} (PC) from the instruction memory and increment the PC.
   \item[ID] \emph{instruction decode} and register read: determine the
     operation and read the source operands from the register file.
   \item[EX] \emph{execute}: perform the ALU operation, or compute the
@@ -104,8 +105,8 @@ H\&P §C.2.}
 \begin{definition}[Stall]
   A \term{stall}[ストール] holds an instruction (and everything behind it)
   in its current stage for one or more cycles while the instructions ahead
-  of it continue.  A bubble---an empty slot---travels down the pipeline in
-  its place.
+  of it continue.  An empty slot, a \term{bubble}[バブル], travels down
+  the pipeline in its place.
 \end{definition}
 
 \begin{definition}[Flush]
@@ -126,9 +127,10 @@ executes at all depends on the outcome of an earlier branch.\source{Lesson
 3, videos 9--10; H\&P §C.2.}  In the five-stage pipeline the branch
 condition and target are known only at the end of EX.\sidenote{Early RISC
 pipelines exposed the wasted slots instead of flushing them: in MIPS and
-SPARC the instruction after a branch (the \emph{delay slot}) always
-executes, and the compiler fills it.  With many instructions in flight one
-slot buys little, and MIPS Release~6 (2014) dropped it.}  By then the two
+SPARC the instruction after a branch (the \emph{delay slot}) is executed,
+and the compiler fills it.  With many instructions in flight one slot buys
+little; MIPS Release~6 (2014) added compact branches without a delay slot,
+and RISC-V never had one.}  By then the two
 following instructions have already been fetched (\cref{fig:flush}); if the
 branch is taken they must be flushed and the fetch restarted at the target.
 
@@ -216,15 +218,18 @@ H\&P §C.2.}
   instruction would read a stale value or execute when it should not.
 \end{definition}
 
+A hazard caused by a data dependence is a \term{data hazard}[データハザード],
+one caused by a control dependence a \term{control hazard}[制御ハザード].
+
 In the five-stage pipeline:
 \begin{itemize}
   \item A \textbf{RAW} dependence is a hazard only if the instructions are
     close enough.  Registers are written in WB and read in ID, so an
     instruction depends hazardously on the previous one and the one before
     it, but an instruction three or more slots behind reads the register
-    after it has been written.\margin{With a register file that writes in
-    the first half of the cycle and reads in the second half, the distance
-    shrinks by one.}
+    after it has been written.\margin{This assumes the register file is
+    written in the first half of a cycle and read in the second half (H\&P
+    §C.2); otherwise the instruction three slots behind is hazardous too.}
   \item \textbf{WAR} and \textbf{WAW} dependences never cause hazards here,
     because instructions read registers in ID and write in WB \emph{in
     program order}; a later instruction cannot overtake an earlier one.
@@ -266,17 +271,17 @@ videos 15--16; H\&P §C.2.}
 \end{figure}
 
 Forwarding removes most RAW stalls but not all of them: a value cannot be
-forwarded \emph{backwards in time}.\tip{Stall cycles $=$ (cycle the value
-is ready) $-$ (cycle it is needed); $\le 0$ means forwarding alone
-suffices.}  The result of a load is only available
+forwarded \emph{backwards in time}.\tip{Stall cycles $=$ (first cycle in
+which the value can be used) $-$ (cycle in which it is needed); $\le 0$
+means forwarding alone suffices.}  The result of a load is only available
 at the end of MEM, whereas the next instruction needs it at the start of
 its own EX, which is the same cycle.  One stall cycle is therefore
 unavoidable for a \emph{load-use} pair even with full forwarding.
 
 \begin{example}\leavevmode % head on its own line, listing below it
   \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
-  LW  R1, 0(R2)      ; R1 available at end of MEM (cycle 4)
-  ADD R3, R1, R4     ; needs R1 in EX (cycle 4): 1 stall
+  LW  R1, 0(R2)   ; R1 available at end of MEM (cycle 4)
+  ADD R3, R1, R4  ; needs R1 in EX (cycle 4): 1 stall
 \end{lstlisting}
   With forwarding but no stall the \texttt{ADD} would use a stale R1;
   without forwarding it would stall two cycles.\margin{On a Skylake core an
@@ -288,7 +293,7 @@ unavoidable for a \emph{load-use} pair even with full forwarding.
 
 If pipelining a $k$-stage design gives up to $k\times$ the throughput, why
 not use hundreds of stages?\source{Lesson 3, video 17; H\&P §C.1, §1.5.}
-Three effects pull in different directions as the depth increases:
+Three effects pull in different directions as the \term{pipeline depth}[パイプライン段数] increases:
 \begin{itemize}
   \item \textbf{Clock period decreases} (less logic per stage), which
     lowers $T_{\mathrm{clk}}$ in the iron law---the intended benefit.  But
@@ -306,7 +311,7 @@ Three effects pull in different directions as the depth increases:
 
 Considering performance alone (the product CPI $\times T_{\mathrm{clk}}$),
 the optimum is deep---on the order of 30--40 stages.  Once power is
-included, the optimum moves to roughly 10--15 stages, which is where
+included, the optimum moves to roughly 10--15 stages, close to where
 current designs sit.\sidenote{The deepest pipeline ever shipped in an x86
 was the Pentium~4 \enquote{Prescott} of 2004: 31 stages, up to
 \SI{3.8}{\giga\hertz}, with power stopping it there.  Its successor, the
@@ -314,7 +319,7 @@ Core microarchitecture of 2006, went back to 14 stages, and depths have
 stayed near 15--20 since.}
 
 \begin{keypoint}[Lesson summary]
-  Pipelining raises throughput, not latency; ideal CPI is 1 and every stall
+  Pipelining improves throughput, not latency; ideal CPI is 1 and every stall
   or flush adds to it (\cref{eq:pipeline-cpi}).  Control and RAW dependences
   turn into hazards that cost cycles; forwarding removes most RAW stalls,
   and branch prediction (next lesson) attacks the control hazards.  Pipeline

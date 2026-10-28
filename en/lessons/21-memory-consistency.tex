@@ -286,16 +286,17 @@ Two observations make this possible.
   \item \textbf{Only loads need attention.}  Stores write memory at commit, in
     program order (\cref{sec:l09-write}), so they already take effect in
     program order.  A load that reads the location of an earlier store of the
-    same core obtains the store's value from the load-store queue (Lesson 9).
+    same core obtains the store's value from the load-store queue (Lesson 9).\margin{Intel's counters call these
+memory-ordering machine clears (\texttt{MACHINE\_CLEARS.MEMORY\_ORDERING});
+each flushes the pipeline and costs at least a branch misprediction, 16--20
+cycles on Skylake (Lesson 4).}
   \item \textbf{The ROB records the program order.}  Whatever the order of
     execution, the ROB holds the instructions in program order, and a load
     that has executed early can be regarded as taking effect when it commits.
     The value it read is correct for that point unless another core has
     written the location in between.
 \end{itemize}
-The core therefore watches the coherence traffic of the other cores\margin{Intel's counters call these
-memory-ordering machine clears (\texttt{MACHINE\_CLEARS}); each costs a
-pipeline refill, about 17 cycles on Skylake (Lesson 4).} for the
+The core therefore watches the coherence traffic of the other cores for the
 locations of all loads that have executed but not yet committed.  Under
 write-invalidate coherence, a write by another core arrives as an
 invalidation of the block that contains the location
@@ -397,11 +398,11 @@ If even two reads may be reordered, a program needs some way to obtain a
 particular order where it matters.  A system with relaxed consistency
 therefore distinguishes two kinds of operations.  Ordinary loads and stores
 may be reordered as the model allows.  Special operations, which the program
-uses where order matters, are never reordered.  The lecture calls such an
-instruction \texttt{MSYNC}\index{MSYNC}: every memory access that precedes an
+uses where order matters, are never reordered.  This chapter calls such an
+instruction \term{MSYNC}: every memory access that precedes an
 \texttt{MSYNC} in program order takes effect before any access that follows it
 (\cref{fig:l21-msync}).\margin{x86 has such an instruction,
-\texttt{MFENCE}\index{MFENCE}: the accesses before it become globally visible
+\term{MFENCE}: the accesses before it become globally visible
 before any that follow.}  Between two \texttt{MSYNC} instructions, accesses
 may still be reordered.\caution{\texttt{MSYNC} is a \emph{full} fence.  Real
 ISAs also have partial ones---x86 \texttt{SFENCE}, Arm \texttt{DMB
@@ -500,9 +501,17 @@ The importance of data races lies in the following property
     sequential consistency under every consistency model that recognizes its
     synchronization: one in which the synchronization operations are
     themselves sequentially consistent and each of them separates the earlier
-    accesses of its core from the later ones, as \texttt{MSYNC} does.
-    Reordering accesses to different locations, or reads of the same location,
-    does not change any value that is read, and every pair of accesses whose
+    accesses of its core from the later ones, as \texttt{MSYNC} does.\sidenote{Programming languages turned
+this into a contract.  C++11 and Java guarantee that a data-race-free
+program behaves as under sequential consistency, and in C++ a data race
+makes the whole program undefined.  The synchronization these models
+recognize is \texttt{std::atomic}---its default is
+\texttt{memory\_order\_seq\_cst}, with release/acquire as the cheaper
+option---and the locks built on it \cite{boehm2008}.}
+    Between two synchronization operations no other core makes a
+    conflicting access to the locations a core uses, so reordering that
+    core's accesses to different locations, or its reads of one location,
+    does not change any value that is read; every pair of accesses whose
     order could change a value is ordered by synchronization, which such a
     model keeps in order.
   \item A program \textbf{with data races} has no such guarantee.  On a system
@@ -513,13 +522,7 @@ The importance of data races lies in the following property
 A program can therefore be developed and debugged under sequential
 consistency, where even a program with data races produces results that some
 interleaving explains, and then run under relaxed consistency for speed once
-synchronization has removed the races.\sidenote{Programming languages turned
-this into a contract.  C++11 and Java guarantee that a data-race-free
-program behaves as under sequential consistency, and in C++ a data race
-makes the whole program undefined.  The synchronization these models
-recognize is \texttt{std::atomic}---its default is
-\texttt{memory\_order\_seq\_cst}, with release/acquire as the cheaper
-option---and the locks built on it \cite{boehm2008}.}
+synchronization has removed the races.
 
 The examples of this lesson all contain data races.  In
 \cref{ex:l21-flags} each core reads a flag that the other core writes without
@@ -531,11 +534,10 @@ store, but a system with relaxed consistency does not know this.  The
 the load of the data no longer races with the store; the polling loads of the
 flag themselves remain unsynchronized, but they can only delay the reader,
 because the flag changes only from 0 to 1.  The lost increment of
-\cref{tab:l20-race} is also a data race.  Under sequential consistency its
+\cref{tab:l20-race} is also a data race.\caution{A program that works on a sequentially consistent system can still
+fail under relaxed consistency if it contains a data race.}  Under sequential consistency its
 possible results are at least limited to those of the interleavings of the two
 threads; under relaxed consistency even that limit disappears.
-\caution{A program that works on a sequentially consistent system can still
-fail under relaxed consistency if it contains a data race.}
 
 \begin{keypoint}
   A data-race-free program whose synchronization the memory system recognizes
@@ -562,8 +564,9 @@ accesses.  Some models treat all accesses alike; from stronger to weaker:
     write made by a core that had read, directly or indirectly, the result of
     the earlier one---in the same order; concurrent writes may be seen in
     different orders by different cores.
-  \item[Processor consistency]\index{processor consistency} The writes of one
-    core are seen by all cores in the order in which that core made them, but
+  \item[Processor consistency] Under \term{processor
+    consistency}[プロセッサ一貫性] the writes of one core are seen by all
+    cores in the order in which that core made them, but
     different cores may see the writes of different cores in different orders,
     and a core's read may take effect before its own earlier write to another
     location.
@@ -581,26 +584,27 @@ sequential consistency:
     act like \texttt{MSYNC}: every earlier access takes effect before them and
     no later access does.  All other accesses may be reordered freely between
     them.
-  \item[Release consistency]\index{release consistency} Synchronization is
-    split into acquiring and releasing, as in \texttt{lock} and
-    \texttt{unlock}.  An acquire keeps later accesses from taking effect before
+  \item[Release consistency] Under \term{release consistency}[リリース一貫性]
+    synchronization is split into acquiring and releasing, as in
+    \texttt{lock} and \texttt{unlock}.\margin{Release consistency was defined
+    in 1990 for the Stanford DASH multiprocessor, the machine that made the
+    acquire/release split a hardware notion.  Gharachorloo et al., ISCA
+    1990.}  An acquire keeps later accesses from taking effect before
     it, and a release waits until all earlier accesses have taken effect, so
     ordinary accesses are never reordered across the boundaries of a critical
-    section---the placement of \texttt{MSYNC} in
-    \cref{sec:l21-relaxed}.\margin{Release consistency was defined in 1990
-    for the Stanford DASH multiprocessor, the machine that made the
-    acquire/release split a hardware notion.}
-  \item[Lazy release consistency]\index{lazy release consistency} Release
-    consistency implemented lazily, originally for distributed shared memory
-    built in software: the updates made in a critical section are transferred
-    to another node only when that node accesses the data after acquiring the
-    lock, not at every release.\sidenote{Lazy release consistency
+    section---the placement of \texttt{MSYNC} in \cref{sec:l21-relaxed}.\sidenote{Lazy release consistency
     \cite{keleher1992} was designed for software distributed shared memory
     on a network of workstations, where propagating an update means sending
-    a message: the TreadMarks system transfers a page only when a node that
-    has acquired the lock touches it.}
-  \item[Scope consistency]\index{scope consistency} Each lock defines a scope:
-    a thread that enters a critical section sees the updates made in earlier
+    a message: the TreadMarks system fetches the changes (diffs) to a page
+    only when a node that has acquired the lock touches it.}
+  \item[Lazy release consistency] Under \term{lazy release consistency},
+    release consistency implemented lazily, originally for distributed shared
+    memory built in software, the updates made
+    in a critical section are propagated to another node only when that node
+    next acquires the lock, not at every release.
+  \item[Scope consistency] Under \term{scope consistency}
+    each lock defines a scope: a thread that enters a critical section sees
+    the updates made in earlier
     critical sections of the same lock, but not necessarily those made under
     other locks \cite{iftode1996}.
 \end{description}

@@ -419,7 +419,7 @@ different answer to the same problem is the \emph{inverted} page table: one
 entry per frame rather than one per page, located by hashing the VPN.  Its
 size follows physical memory and does not grow with the address space, but
 collisions cost a chain walk and shared pages need extra machinery.  PowerPC
-and UltraSPARC used it (H\&P §B.4).}
+and PA-RISC used it; H\&P §B.4 describes the idea.}
 
 \subsection{More levels for 64-bit addresses}
 
@@ -509,11 +509,12 @@ inside the last page.}
 
 Pages are much larger than cache blocks (Lesson 12), because every page needs
 its own PTE and every page brought in from disk costs a disk access.  The usual
-page size is 4~KB.\margin{4~KB has been the x86 page size since the 386 of
-1985.  AArch64 instead lets the operating system choose a granule of 4, 16 or
-64~KB.}  Processors also support much larger pages, such as 2~MB
-and 1~GB on x86-64, which the operating system can use for large regions that
-a program fills completely, so that internal fragmentation hardly matters.
+page size is 4~KB.  Processors also support much larger pages, which the
+operating system can use for large regions that a program fills completely,
+so that internal fragmentation hardly matters.\margin{4~KB has been the x86
+page size since the 386 of 1985.  AArch64 instead lets the operating system
+choose a granule of 4, 16 or 64~KB.  x86-64 also offers 2~MB and 1~GB
+pages.}
 
 \section{Memory access time with translation}
 \label{sec:l13-access-time}
@@ -576,7 +577,7 @@ caches them.
   \index{TLB|see{translation lookaside buffer}} (TLB) is a small, fast cache of
   recent translations.  Each entry holds a valid bit, a tag taken from the VPN
   (the whole VPN in a fully associative TLB), the PFN to which that page is
-  mapped, and the access bits of its PTE.  If the VPN of an address matches a
+  mapped, and the permission bits of its PTE.  If the VPN of an address matches a
   valid entry, the PFN is taken from the entry and no page table is read.
 \end{definition}
 
@@ -667,7 +668,7 @@ The organization of a TLB follows from its role.\source{Lesson 13, videos
 \begin{description}
   \item[Associativity] Every TLB miss costs a walk of several memory reads, so
     TLBs are fully associative or highly set-associative; for so few entries
-    the comparators are affordable, and translations do not compete for
+    the comparators are affordable, and translations rarely compete for
     entries.
   \item[Size] The TLB should hit about as often as the cache, so it must cover
     the pages of the data the cache holds (\cref{ex:l13-tlb-size}); this takes
