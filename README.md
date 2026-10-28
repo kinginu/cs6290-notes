@@ -48,6 +48,9 @@ textbook-style summary of what the lectures cover.  Built with
 
 ## Writing conventions
 
+See [`docs/style-guide.md`](docs/style-guide.md); the production and review
+passes are in [`docs/workflow.md`](docs/workflow.md).  In short:
+
 - Textbook register: no lecture anecdotes or metaphors; scope limited to
   what the lectures cover.  Textbook pointers (Hennessy & Patterson, 6th
   ed.) go in the margin via `\source{}`.
@@ -56,7 +59,9 @@ textbook-style summary of what the lectures cover.  Built with
   margin.
 - Numbers in worked examples are our own; **no assignment, quiz or exam
   content is reproduced** (Georgia Tech honor code).
-- Build a single chapter in VS Code by opening `lessons/NN-*.tex`.
+- Build a single chapter with `tools/chapter-check.sh en 04-branches`, or
+  by opening it in VS Code (LaTeX Workshop builds the subfile alone);
+  `tools/chapter-lint.py 04-branches` checks both editions without TeX.
 
 ## License
 

@@ -3,19 +3,33 @@
 multiply-defined labels, missing glyphs, overfull boxes, crowded margins,
 and (print editions) the figures/tables shrunk to the measure.
 
-    tools/log-summary.py <log> <lang> [<chapter-slug>]
+    tools/log-summary.py <log> <lang> [<chapter-slug>] [--max-moved N]
 
 With a chapter slug (chapter-only build), undefined references to labels
 defined in other chapters of the same edition are listed separately: they
-resolve in the whole book.  Exit status: 0 if clean, 1 otherwise.
+resolve in the whole book.  "Margin notes moved down" is reported but not
+counted as a problem unless --max-moved N is given and the count exceeds N
+(e.g. a chapter's pre-edit baseline during a proofreading pass).
+Exit status: 0 if clean, 1 otherwise.
 """
 import glob
 import os
 import re
 import sys
 
-log, lang = sys.argv[1], sys.argv[2]
-slug = sys.argv[3] if len(sys.argv) > 3 else None
+args = sys.argv[1:]
+max_moved = None
+if "--max-moved" in args:
+    i = args.index("--max-moved")
+    try:
+        max_moved = int(args[i + 1])
+    except (IndexError, ValueError):
+        sys.exit("--max-moved needs an integer")
+    del args[i:i + 2]
+if len(args) < 2:
+    sys.exit("usage: log-summary.py <log> <lang> [<chapter-slug>] [--max-moved N]")
+log, lang = args[0], args[1]
+slug = args[2] if len(args) > 2 else None
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if not os.path.exists(log):
     print("!! no log file produced")
@@ -65,7 +79,10 @@ print(f"== overfull hboxes > 3pt: {len(big)}"
       + ("" if not big else " -> " + ", ".join(f"line {l} ({w:.1f}pt)" for w, l in big[:15])))
 
 moved = len(re.findall(r"Marginpar on page \d+ moved", joined))
-print(f"== margin notes moved down (crowded margin): {moved}")
+too_many = max_moved is not None and moved > max_moved
+problems += too_many
+print(f"== margin notes moved down (crowded margin): {moved}"
+      + (f" -> more than --max-moved {max_moved}" if too_many else ""))
 
 # Print editions: figures and tables the class shrank to the measure
 # (informational, not a problem).

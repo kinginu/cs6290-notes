@@ -24,3 +24,5 @@ dist/
 
 # rendered page previews
 .png/
+# Python bytecode (tools/)
+__pycache__/

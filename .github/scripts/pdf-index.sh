@@ -1,8 +1,11 @@
 #!/bin/sh
 # Generate dist/index.html linking to the built PDFs (served via GitHub Pages
 # from the `pdf` branch).  Usage: pdf-index.sh <title> <repo url> <commit sha>
+# The subtitle under the title is $PAGES_SUBTITLE (CI passes the repository
+# variable of that name; Settings -> Secrets and variables -> Actions).
 set -eu
 title=$1; repo=$2; sha=$3
+subtitle=${PAGES_SUBTITLE:-Lecture notes — English / 日本語}
 date=$(date -u +%Y-%m-%d)
 
 # Print test samples: dist/notes-<lang>-<size>.pdf, listed when present.
@@ -52,7 +55,7 @@ cat > dist/index.html <<HTML
   footer{margin-top:3rem;font-size:.85rem;color:#666}
 </style>
 <h1>${title}</h1>
-<p class="sub">Lecture notes — English / 日本語</p>
+<p class="sub">${subtitle}</p>
 <ul>
   <li><a class="pdf" href="notes-en.pdf">English edition<span>notes-en.pdf</span></a></li>
   <li><a class="pdf" href="notes-ja.pdf">日本語版<span>notes-ja.pdf</span></a></li>

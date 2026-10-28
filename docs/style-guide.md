@@ -18,6 +18,22 @@ when in doubt, imitate them.
   ("we now compute …") is fine, as in H&P.  A named
   law or principle the lecture introduces (e.g. "Lhadma's law") is content
   and stays, stated precisely.
+- **The chapter speaks for itself.**  Body text never refers to the
+  delivery medium ("the lecture", "the video", "the slides" / 「講義では」
+  「動画では」); write "this chapter" (「本章」) or state the content
+  directly.  Where the lecture's own wording matters (a term it uses
+  differently from the textbook), say so in a `\caution`; the `\source`
+  note is where the lecture or video is named.
+- **Detail beyond the lesson goes to the margin.**  Vendor specifics, named
+  products and later history that the lesson does not discuss (what
+  shipped after the lecture, how a vendor implements the idea) belong in a
+  `\margin` or `\sidenote`, not in the body.
+- **Lecture vs paper.**  Where the lecture simplifies a result of the paper
+  it cites (a rounded number, a dropped condition, an older version of the
+  design), the body keeps the lecture's statement and a `\caution` beside
+  it says what the paper states ("lecture vs paper: the paper measures …
+  under …").  Do not silently replace the lecture's statement, and do not
+  keep it without the caution.
 - **No quiz or exam content.**  Do not reproduce quiz questions, their numbers
   or their answers.  Worked examples use our own numbers; the concept a quiz
   tests may of course be explained.
@@ -87,8 +103,23 @@ and how it connects to the previous lesson.>
   proper nouns and acronyms; canonical Japanese form and reading).  If a
   needed term is missing from the glossary, choose the standard term and
   report it so the glossary can be updated.
+- No line break inside the braces of a Japanese `\term` argument (the
+  word, its reading, or the Japanese gloss in the English edition): the
+  break becomes a space in the gloss and in the index key.  Break the
+  source line before or after the `\term`.
+- No `\term` inside `\margin`, `\sidenote`, `\tip`, `\caution` or
+  `\source`: a margin note cannot carry its own gloss.  Define the term in
+  the body; the note may use `\term*` or plain text.
+- `\source` names the part of the lecture and the reference only; words
+  about the delivery format ("visual metaphor", "in this video", 比喩,
+  この動画) never appear in it.
+- These rules, the label and listing rules and the `\term` ownership are
+  checked by `tools/chapter-lint.py <slug>`.
 - Margin density: at most ~3 margin items within a short paragraph run; the
-  checker reports "margin notes moved down" — keep it at 0–2.
+  checker reports "margin notes moved down".  A new chapter keeps it at
+  0–2.  During a pass over finished chapters (e.g. the proofreading pass,
+  `workflow.md` §4) a chapter's count must never rise above its count
+  before the pass (`tools/chapter-check.sh … --max-moved <baseline>`).
 
 ### 3.1 What goes in the margin column
 
@@ -118,7 +149,14 @@ single line of argument; everything that supports it goes to the margin.
   — they are what makes the notes usable later.  Name where the number comes
   from in the same note or an adjacent `\source` (vendor optimization
   manual, H\&P figure, a paper), so that lecture content and added context
-  stay distinguishable.  Keep them few, current and uncontroversial.
+  stay distinguishable.  Verify every number; keep them few, current and
+  uncontroversial; never invent one.
+- **One number per fact across the book.**  A real-world number that
+  appears in more than one chapter is identical everywhere, with the same
+  source: the Skylake branch-misprediction penalty is 16–20 cycles and its
+  L3 latency 44 cycles in every chapter that mentions them.  When a pass
+  corrects such a number, it corrects every occurrence (`grep -rn` both
+  editions).
 - Do not park body-level reasoning in the margin: if a reader needs it to
   follow the argument, it belongs in the body.
 
@@ -128,10 +166,17 @@ single line of argument; everything that supports it goes to the margin.
   `sec:l04-btb`, `fig:l04-btb`, `tab:l04-…`, `eq:l04-…`, `def:l04-…`,
   `ex:l04-…`.  (Lessons 1–3 of cs6290 predate this rule and are unprefixed.)
   EN and JA use the **same** labels.
+- **Terms at first use.**  A term that `glossary.tsv` assigns to a chapter
+  (column `lesson`) is `\term`ed at its first use in that chapter, in both
+  editions; other chapters do not `\term` it again (§3).
+  `tools/glossary-check.py` lists terms that are missing, re-`\term`ed
+  elsewhere, absent from the glossary, or carry a gloss or reading that
+  differs from it.
 - Plain `\label{…}` inside `example`/`note` is enough — `\cref` prints
   "Example"/"Note" (no `\label[example]{…}` needed).
 - Cross-references: `\cref{…}`; to another chapter in prose: "Lesson 7"
-  (EN) / "第7章" (JA), numbers from the chapter list.
+  (EN) / "第7章" (JA), numbers from the chapter list, and only to a chapter
+  that actually treats the topic.
 - Figures shared by both editions: `figures/lNN-<name>.tex`, pure TikZ,
   language-dependent text via `\iflangja{日本語}{English}`, must fit the
   body width (120 mm) — or the margin (50 mm) when used in `marginfigure`
@@ -162,6 +207,12 @@ single line of argument; everything that supports it goes to the margin.
 - `\lessoninfo` keywords separated by `，`; `video={Lesson 4，動画 1--48}` /
   `video={P2L1}`; key point summary title `[章のまとめ]`.
 - Numbers, units, math identical to the English edition.
+- **Parity is checked mechanically**: the ordered sequence of commands of
+  the two editions — sections, labels, `\input`, `\source`, `\margin`,
+  `\sidenote`, `\tip`, `\caution`, `\term`, environments — must be
+  identical (`tools/parity-check.py`).  Each margin item is anchored at the
+  **same sentence** in both editions; a difference kept for layout is
+  marked with a `%` comment next to the item (`workflow.md` §4).
 
 ## 7. Checking your work
 
@@ -172,6 +223,17 @@ tools/chapter-check.sh en 04-branches     # or ja
 Required before a chapter is done: 0 errors, 0 undefined references
 (references to other chapters are listed separately and are fine), 0
 undefined citations, 0 multiply-defined labels, 0 missing glyphs, 0 overfull
-boxes > 3 pt.  Then open the rendered pages `.png/<lang>-<slug>-NN.png` and
+boxes > 3 pt, at most 2 "margin notes moved down" (during a pass: at most
+the chapter's count before it, §3).  Then open the rendered pages `.png/<lang>-<slug>-NN.png` and
 check that figures fit, tables do not overflow, and margin notes do not
 collide.  Do not commit; the maintainer commits.
+
+## 8. Page layout
+
+- **Print editions.**  Layout is judged on the A4 screen edition only.
+  `print=a5|b5|b6|shinsho` (`make en-a5`, `tools/book-check.sh en --print a5`)
+  scales that design to a two-sided compact page (body font 10 pt × `scale`:
+  0.7, 0.85, 0.65, 0.65; `scale=` overrides); figures and tables are scaled
+  and, if still too wide, shrunk to the measure (`lnotes-fit:` in the log).
+  Never edit a chapter for a print size.  Below `scale=0.6` text is not
+  readable; figure labels fall to about 4.5 pt.
