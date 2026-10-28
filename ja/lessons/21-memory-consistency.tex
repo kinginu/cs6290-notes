@@ -195,8 +195,7 @@ poll: LW   R1, 0(R4)    ; R1 <- ready
 \begin{definition}[逐次一貫性]
   共有メモリシステムは，どの実行の結果も，各コアのメモリアクセスがプログラム
   順に行われ，異なるコアのアクセスが何らかの任意の順序でインターリーブ
-  された場合と同じであるとき，\term[ちくじいっかんせい]{逐次一貫性}%
-  [sequential consistency]を提供するという．
+  された場合と同じであるとき，\term[ちくじいっかんせい]{逐次一貫性}[sequential consistency]を提供するという．
 \end{definition}
 
 Lamport \cite{lamport1979} に遡るこの定義には2つの部分がある．1つのコアの

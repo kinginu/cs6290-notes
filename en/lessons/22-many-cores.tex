@@ -30,7 +30,7 @@ location that other cores have cached causes \emph{coherence traffic}:
 invalidations sent to the other caches, and coherence misses when those
 cores access the block again.  With more cores the chip performs more writes
 per second in total, so the rate of coherence messages grows with the
-number of cores.\margin{The lecture's \enquote{hundreds} has arrived: AMD's
+number of cores.\margin{\enquote{Hundreds} of cores have arrived: AMD's
 EPYC 9965 puts 192 cores in one socket within a \SI{500}{W} budget, about
 \SI{2.6}{W} per core.  AMD product page.}  On a shared bus this traffic soon becomes the
 bottleneck:

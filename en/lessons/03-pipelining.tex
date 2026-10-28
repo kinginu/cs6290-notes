@@ -143,9 +143,9 @@ branch is taken they must be flushed and the fetch restarted at the target.
 
 The cost of this on the CPI depends on how often it
 happens.\margin{The \SI{20}{\percent}/\SI{60}{\percent} below are round
-lecture numbers; integer code really does branch about every fifth
+illustrative numbers; integer code really does branch about every fifth
 instruction (H\&P ch.~3).}  Typical
-figures used in the lecture are that \SI{20}{\percent} of instructions are
+figures are that \SI{20}{\percent} of instructions are
 branches and \SI{60}{\percent} of branches are taken; with the simple
 policy of always fetching the fall-through instruction (\enquote{predict
 not taken}), only taken branches cause a flush:
