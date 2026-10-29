@@ -26,6 +26,9 @@ $biber     = 'biber %O %S';
 # upmendex handles both English and Japanese.  The style file (headings,
 # symbol group names) and the -g flag (gojuon headings) depend on the
 # edition, which is inferred from the directory being built (en/ or ja/).
+# The second index of index=dual (<jobname>-second.idx: main-second.idx,
+# main-a5-second.idx, ...) holds the glosses, in the other edition's
+# language, so it gets the other edition's style.
 $makeindex = 'internal ln_upmendex %O -o %D %S';
 sub ln_upmendex {
     # A chapter without index entries yields an empty .idx, which upmendex
@@ -39,6 +42,7 @@ sub ln_upmendex {
         return 0;
     }
     my $lang = (Cwd::getcwd() =~ m{/ja(/|$)}) ? 'ja' : 'en';
+    $lang = ($lang eq 'ja') ? 'en' : 'ja' if File::Basename::basename($idx) =~ /-second\.idx$/;
     my @opts = ('-s', "$root/format/lnotes-$lang.ist");  # absolute: no kpathsea lookup
     push @opts, '-g' if $lang eq 'ja';
     return system('upmendex', @opts, @_);

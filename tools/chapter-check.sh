@@ -34,6 +34,7 @@ tex="$lang/lessons/$slug.tex"
 [ -f "$root/$tex" ] || { echo "no such file: $tex" >&2; exit 2; }
 mkdir -p "$root/.png"
 rm -f "$root/$lang/lessons/build/$slug".{aux,bbl,bcf,idx,ind,ilg,log,pdf,toc,fdb_latexmk,fls,run.xml,out}
+rm -f "$root/$lang/lessons/build/$slug"-second.{idx,ind,ilg}   # index=dual
 
 echo "== building $tex"
 in_container "${CHAPTER_MEM:-1500m}" latexmk -cd "$tex" > "$root/.png/$lang-$slug.latexmk.txt" 2>&1

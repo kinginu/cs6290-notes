@@ -11,6 +11,7 @@
 %%                  the Japanese edition always prints 第3章
 %%   norule         do not draw the vertical rule between body and margin
 %%   gloss=false    \term prints no margin gloss (default true)
+%%   index=dual     a second index of the glosses, after the first (default single)
 %%   print=<size>   a4 (default: screen edition, one-sided) or a compact
 %%                  two-sided print edition: a5, b5, b6, shinsho (新書判)
 %%   scale=<factor> print editions: override the size's scale factor
@@ -45,11 +46,20 @@
 \def\ln@scale{}
 \def\ln@fontsize{}
 \def\ln@twoside{}
+\newif\ifln@dualindex
+\def\ln@str@single{single}
+\def\ln@str@dual{dual}
+\def\ln@setindex#1{\def\ln@tmp{#1}%
+  \ifx\ln@tmp\ln@str@dual \ln@dualindextrue
+  \else\ifx\ln@tmp\ln@str@single \ln@dualindexfalse
+  \else\ClassError{lnotes}{Unknown value index=#1}{Use index=single or index=dual.}%
+  \fi\fi}
 \DeclareKeys[lnotes]{
   en       .code     = \ln@jafalse,
   ja       .code     = \ln@jatrue,
   norule   .code     = \ln@rulefalse,
   gloss    .if       = ln@gloss,
+  index    .code     = \ln@setindex{#1},
   lesson   .code     = \def\ln@unitname{Lesson},
   chapter  .code     = \def\ln@unitname{Chapter},
   print    .store    = \ln@print,
@@ -317,6 +327,7 @@
   \newcommand*{\sourcesname}{資料}
   \newcommand*{\textbookname}{教科書}
   \newcommand*{\keywordsname}{キーワード}
+  \newcommand*{\secondindexname}{English index}% index=dual: of the glosses
 \else
   \AtBeginDocument{\renewcommand*{\chaptername}{\ln@unitname}}
   \newcommand*{\definitionname}{Definition}
@@ -330,6 +341,7 @@
   \newcommand*{\sourcesname}{Sources}
   \newcommand*{\textbookname}{Textbook}
   \newcommand*{\keywordsname}{Keywords}
+  \newcommand*{\secondindexname}{日本語索引}% index=dual: of the glosses
 \fi
 
 %% ------------------------------------------------------------- margin core
@@ -390,6 +402,14 @@
 %% .latexmkrc, because latexmk -- not imakeidx -- runs the index processor.
 \RequirePackage{imakeidx}
 \makeindex[intoc,columns=2]
+%% index=dual: a second index of the glosses (\term's last argument), named
+%% <jobname>-second so the print jobs sharing build/ keep their own files
+%% (main-second.idx, main-a5-second.idx).  The glosses are in the other
+%% edition's language; .latexmkrc sorts this index with that edition's style.
+\ifln@dualindex
+  \edef\ln@secondidx{\jobname-second}
+  \makeindex[name=\ln@secondidx,title=\secondindexname,intoc,columns=2]
+\fi
 \indexsetup{headers={{\indexname}{\indexname}}}% imakeidx uppercases by default
 %% Cross-references inside the index: \index{BTB|see{branch target buffer}}
 \ifln@ja
@@ -447,11 +467,13 @@
 %%   - adds an index entry (sorted by <sort key> when given)
 %%   - shows <margin gloss> (e.g. the English term) in the margin, unless
 %%     the class option gloss=false is set
-%% \term* does the same without the index entry (for repeated mentions).
+%%   - index=dual: also indexes <margin gloss> in the second index
+%% \term* does the same without the index entries (for repeated mentions).
 \NewDocumentCommand{\term}{s o m o}{%
   \termformat{#3}%
   \IfBooleanF{#1}{%
     \IfValueTF{#2}{\index{#2@#3}}{\index{#3}}%
+    \ifln@dualindex\IfValueT{#4}{\index[\ln@secondidx]{#4}}\fi
   }%
   \ifln@gloss\IfValueT{#4}{\ln@margin{\textcolor{ln-accent}{$\triangleright$}\,\ln@gloss{#4}}}\fi
 }
@@ -807,10 +829,13 @@
     \ln@fullwidthmatter
     \IfValueTF{#1}{\ln@orig@printbibliography[#1]}{\ln@orig@printbibliography}%
     \ln@bodymatter}%
+  %% index=dual: \printindex without an argument prints both indexes.
   \NewCommandCopy\ln@orig@printindex\printindex
   \RenewDocumentCommand\printindex{o}{%
     \ln@fullwidthmatter
-    \IfValueTF{#1}{\ln@orig@printindex[#1]}{\ln@orig@printindex}%
+    \IfValueTF{#1}{\ln@orig@printindex[#1]}{%
+      \ln@orig@printindex
+      \ifln@dualindex\ln@orig@printindex[\ln@secondidx]\fi}%
     \ln@bodymatter}}
 
 \endinput

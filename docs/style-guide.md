@@ -206,6 +206,8 @@ single line of argument; everything that supports it goes to the margin.
   the existing chapters.  Keep established English acronyms (CPI, BTB, TLB,
   RPC).  Use `glossary.tsv` for every technical term.
 - `\term[よみ]{語}[English term]` — reading in hiragana, English gloss.
+  The Japanese edition (`index=dual`) also carries an English index built
+  from the glosses, so give every defining `\term` its gloss.
 - `\lessoninfo` keywords separated by `，`; `video={Lesson 4，動画 1--48}` /
   `video={P2L1}`; key point summary title `[章のまとめ]`.
 - Numbers, units, math identical to the English edition.
