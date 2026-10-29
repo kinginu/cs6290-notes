@@ -10,6 +10,7 @@
 %%   lesson|chapter English chapter label "Lesson 3" (default) or "Chapter 3";
 %%                  the Japanese edition always prints 第3章
 %%   norule         do not draw the vertical rule between body and margin
+%%   gloss=false    \term prints no margin gloss (default true)
 %%   print=<size>   a4 (default: screen edition, one-sided) or a compact
 %%                  two-sided print edition: a5, b5, b6, shinsho (新書判)
 %%   scale=<factor> print editions: override the size's scale factor
@@ -38,6 +39,7 @@
 \newif\ifln@ja
 \newif\ifln@rule \ln@ruletrue
 \newif\ifln@print
+\newif\ifln@gloss \ln@glosstrue
 \def\ln@unitname{Lesson}
 \def\ln@print{a4}
 \def\ln@scale{}
@@ -47,6 +49,7 @@
   en       .code     = \ln@jafalse,
   ja       .code     = \ln@jatrue,
   norule   .code     = \ln@rulefalse,
+  gloss    .if       = ln@gloss,
   lesson   .code     = \def\ln@unitname{Lesson},
   chapter  .code     = \def\ln@unitname{Chapter},
   print    .store    = \ln@print,
@@ -442,14 +445,15 @@
 %% \term[<sort key>]{<word>}[<margin gloss>]
 %%   - typesets <word> with \termformat
 %%   - adds an index entry (sorted by <sort key> when given)
-%%   - shows <margin gloss> (e.g. the English term) in the margin
+%%   - shows <margin gloss> (e.g. the English term) in the margin, unless
+%%     the class option gloss=false is set
 %% \term* does the same without the index entry (for repeated mentions).
 \NewDocumentCommand{\term}{s o m o}{%
   \termformat{#3}%
   \IfBooleanF{#1}{%
     \IfValueTF{#2}{\index{#2@#3}}{\index{#3}}%
   }%
-  \IfValueT{#4}{\ln@margin{\textcolor{ln-accent}{$\triangleright$}\,\ln@gloss{#4}}}%
+  \ifln@gloss\IfValueT{#4}{\ln@margin{\textcolor{ln-accent}{$\triangleright$}\,\ln@gloss{#4}}}\fi
 }
 
 %% ------------------------------------------------------------- theorem envs

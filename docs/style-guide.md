@@ -88,6 +88,8 @@ and how it connects to the previous lesson.>
 | `\margin{}` / `\sidenote{}` | short supporting remark (≤ 3 lines) |
 | `marginfigure` / `widefigure` / `widetable` | small figure in the margin / figure or table spanning body + margin |
 
+- The English edition sets `gloss=false` (`en/main.tex`) and prints no margin
+  glosses; write the Japanese gloss anyway.
 - The optional first argument of `\term` is the **index sort key** and the last
   one is the **margin gloss**: `\term{Amdahl's law}[Amdahl の法則]` — never
   put `key@display` into the gloss.
