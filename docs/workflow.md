@@ -43,6 +43,15 @@ because skipping it let real defects through.
    repository variable `PAGES_SUBTITLE` (Settings → Secrets and variables
    → Actions → Variables) to change it
    (`.github/scripts/pdf-index.sh`).
+   CI builds the A4 editions and the A5, B6 and 新書判 print editions,
+   each in colour and grayscale; a book restricts the sizes with the
+   repository variable `PRINT_VARIANTS`, a JSON list that must contain
+   `"a4"`, e.g. `["a4","a5"]` (the template leaves it unset and keeps all
+   sizes; `"b5"` can be added).  The `lint` job's summary shows what
+   `tools/parity-check.py --lint`, `tools/glossary-check.py` and
+   `tools/chapter-lint.py --all` find, with each tool's exit code in its
+   heading; the job is report-only (it always succeeds) and never blocks
+   publishing.
 6. Write `glossary.tsv` **before** the chapters: one row per concept with
    the chapter that first defines it (`lesson`), the Japanese term and its
    reading.  Term ownership is what keeps 20 independently written chapters

@@ -16,8 +16,9 @@ textbook-style summary of what the lectures cover.  Built with
 - Print editions: compact two-sided books scaled from the A4 layout
   (class option `print=`, no chapter changes): `make docker-print-a5`
   (also `b6`, `shinsho` = 新書判, `b5`) → `dist/notes-<lang>-<size>.pdf`.
-  Body font 7 pt (A5), 6.5 pt (B6, 新書判); CI builds A5, B6 and 新書判 and
-  lists them on the Pages index as print test samples.
+  Body font 7 pt (A5), 6.5 pt (B6, 新書判).  CI builds the A4 and A5
+  editions (repository variable `PRINT_VARIANTS`), each also as a grayscale
+  PDF, and lists them on the Pages index as a size × language × colour table.
 
 ## Status
 

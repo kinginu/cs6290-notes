@@ -53,7 +53,20 @@ def strip_noise(text):
     text = re.sub(r"\\begin\{lstlisting\}.*?\\end\{lstlisting\}", blank, text, flags=re.S)
     text = re.sub(r"\\(?:verb|lstinline)\*?([^\sA-Za-z{]).*?\1", blank, text)
     text = re.sub(r"\\lstinline\{[^}]*\}", blank, text)
-    text = re.sub(r"(?<!\\)%[^\n]*", blank, text)
+    # A `%` ending a line continues on the next line: drop the newline and
+    # the next line's leading whitespace.  Other comment text is blanked.
+    # Removed newlines are recorded so that line numbers stay valid.
+    out, removed, last = [], [], 0
+    for m in re.finditer(r"(?<!\\)%(?:(\n[ \t]*)|[^\n]*)", text):
+        out.append(text[last:m.start()])
+        if m.group(1) is not None:
+            removed.append((sum(len(x) for x in out), 1))
+        else:
+            out.append(blank(m))
+        last = m.end()
+    out.append(text[last:])
+    text = "".join(out)
+    strip_noise.removed = removed
     return text
 
 
@@ -84,6 +97,7 @@ def group(text, i, open_, close):
 def terms_in(path):
     """Yield (line, star, sort, word, gloss) for every \\term in a file."""
     text = strip_noise(open(path, encoding="utf-8").read())
+    removed = [pos for pos, _ in strip_noise.removed]
     for m in re.finditer(r"\\term(?![A-Za-z])(\*?)", text):
         i = m.end()
         sort = gloss = None
@@ -97,7 +111,8 @@ def terms_in(path):
         g = group(text, i, "[", "]")
         if g:
             gloss, i = g
-        line = text.count("\n", 0, m.start()) + 1
+        # a joined line reports the number of its first physical line
+        line = text.count("\n", 0, m.start()) + 1 + sum(1 for r in removed if r <= m.start())
         yield line, m.group(1) == "*", sort, word, gloss
 
 

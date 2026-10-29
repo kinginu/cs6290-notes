@@ -29,6 +29,8 @@ LuaLaTeX in Docker.  Read before writing or reviewing anything:
 - Without a local TeX, CI is the build: download the `build-logs` artifact
   and read it with `tools/log-summary.py` and `tools/layout-report.py`
   (`docs/workflow.md` §6).
+- `tools/sync-main.py` — regenerate the chapter and bibliography lists in
+  both `main.tex` after changing `docs/syllabus.json` or adding `bib/*.bib`.
 - `tools/commit-lesson.sh <slug>` / `tools/commit-pass.sh "<subject>" …` —
   the only way to commit; they push to `main`.
 
