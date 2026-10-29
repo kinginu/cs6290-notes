@@ -485,6 +485,13 @@
 %% video = lecture recording(s); sources = other primary material
 %% (documentation, tutorial, paper, talk).  Empty keys are not printed.
 %% Keys are parsed with the LaTeX kernel key system (\DeclareKeys/\SetKeys).
+%% The frame is a 0.4pt stroke along the middle of the boxrule, with no
+%% interior fill (the page is white).  The skin's default draws it as a gray
+%% rectangle with the white interior filled over it, leaving 0.4pt strips:
+%% a renderer without anti-aliasing (Ghostscript at 110 dpi, the page
+%% renders) rounds a sub-pixel strip away and the edge disappears, and at
+%% higher resolution the edges come out 1 or 2 px wide.  A stroke is always
+%% drawn at least one device pixel wide.
 \RequirePackage{enumitem}
 \DeclareKeys[lessoninfo]{
   video    .store = \ln@li@video,
@@ -500,8 +507,11 @@
            and test {\ifdefempty{\ln@li@sources}}
            and test {\ifdefempty{\ln@li@textbook}}
            and test {\ifdefempty{\ln@li@keywords}} }{}{%
-    \begin{tcolorbox}[enhanced, sharp corners, colback=white,
-        colframe=ln-rule, boxrule=0.4pt, left=\ln@sdim{6}{pt},
+    \begin{tcolorbox}[enhanced, sharp corners, boxrule=0.4pt,
+        frame code={\draw[ln-rule, line width=0.4pt]
+          ([shift={(0.2pt,0.2pt)}]frame.south west) rectangle
+          ([shift={(-0.2pt,-0.2pt)}]frame.north east);},
+        interior code={}, left=\ln@sdim{6}{pt},
         right=\ln@sdim{6}{pt}, top=\ln@sdim{4}{pt}, bottom=\ln@sdim{4}{pt},
         fontupper=\small\sffamily]
       \begin{description}[nosep, leftmargin=7em, labelwidth=6em, font=\bfseries\color{ln-muted}]
