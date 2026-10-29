@@ -2,6 +2,7 @@
 %%
 %% Layout: single-column body on the left, a narrow margin column on the
 %% right (Tufte-style sidenotes) separated by a thin vertical rule.
+%% The title page, contents, bibliography and index span the full width.
 %% Engine:  LuaLaTeX only (luatexja for Japanese).
 %%
 %% Class options (key=value)
@@ -63,7 +64,7 @@
 %%   {top}{bottom}{scale}
 %% The scale shrinks the A4 design (fonts, skips, figures) to the page; the
 %% body font is 10pt x scale.  \@namedef, not \def: a digit ends a csname.
-\@namedef{ln@sz@a5}{{148}{210}{15}{86}{3.5}{35}{13}{14}{0.7}}
+\@namedef{ln@sz@a5}{{148}{210}{15}{93}{3.5}{30}{13}{14}{0.7}}
 \@namedef{ln@sz@b5}{{182}{257}{18}{106}{4.5}{43.5}{16}{18}{0.85}}
 \@namedef{ln@sz@b6}{{128}{182}{13}{73}{3}{32}{12}{13}{0.65}}
 \@namedef{ln@sz@shinsho}{{113}{176}{13}{63}{3}{27}{12}{13}{0.65}}
@@ -164,6 +165,9 @@
 %% The margin column is ~24% of the page width.
 %% Print editions take the page from the size table; the margin column is on
 %% the outer side (geometry follows the class's twoside setting).
+%% \ln@geomfull: the layout of the front and back matter (title page,
+%% contents, bibliography, index), which has no margin column: the text
+%% block spans body + gap + margin column (see "Full-width matter" below).
 \ifln@print
 \edef\ln@hsep{\ln@sdim{6}{mm}}
 \edef\ln@fskip{\ln@sdim{10}{mm}}
@@ -173,6 +177,10 @@
   marginparsep=\ln@sep, marginparwidth=\ln@mpw,
   headsep=\ln@hsep, footskip=\ln@fskip,
 ]{geometry}
+\edef\ln@geomfull{%
+  inner=\ln@in, textwidth=\the\dimexpr\ln@tw+\ln@sep+\ln@mpw\relax,
+  top=\ln@top, bottom=\ln@bot, marginparsep=0pt, marginparwidth=0pt,
+  headsep=\ln@hsep, footskip=\ln@fskip}
 \edef\ln@tmp{\ln@sdim{4}{pt}}
 \setlength{\marginparpush}{\ln@tmp}
 \else
@@ -187,6 +195,9 @@
   headsep=6mm,
   footskip=12mm,
 ]{geometry}
+\def\ln@geomfull{%
+  left=20mm, top=25mm, bottom=25mm, textwidth=178mm,
+  marginparsep=0pt, marginparwidth=0pt, headsep=6mm, footskip=12mm}
 \setlength{\marginparpush}{4pt}
 \fi
 %% Full width (body + gap + margin column) for wide floats
@@ -195,7 +206,8 @@
 
 %% ---------------------------------------------------------- vertical rule
 \RequirePackage{eso-pic}
-%% Pages shipped out inside the titlepage environment get no rule.
+%% Pages shipped out inside the titlepage environment or in full-width
+%% matter (\ifln@fullwidth, below) get no rule.
 %% Two-sided (print): the rule is on the outer side, left of the body on
 %% even pages.
 \newcommand*{\ln@rulepos}{\dimexpr\textwidth+0.5\marginparsep\relax}
@@ -205,14 +217,15 @@
     \else-0.5\marginparsep\fi}
 \fi
 \newif\ifln@rulehere \ln@ruleheretrue
+\newif\ifln@fullwidth
 \ifln@rule
   \AddToShipoutPictureBG{%
-    \ifln@rulehere
+    \ifln@rulehere\ifln@fullwidth\else
     \AtTextLowerLeft{%
       \makebox[0pt][l]{%
         \hspace*{\ln@rulepos}%
         \color{ln-rule}\rule[-6pt]{0.4pt}{\dimexpr\textheight+12pt\relax}}}%
-    \fi}
+    \fi\fi}
   \AddToHook{env/titlepage/begin}{\global\ln@ruleherefalse}
   \AddToHook{env/titlepage/after}{\global\ln@ruleheretrue}
 \fi
@@ -237,6 +250,27 @@
     \ifx\ln@marka\ln@markb\else\rightmark\fi
   \endgroup}
 \ofoot*{\small\sffamily\pagemark}
+
+%% ------------------------------------------------------ full-width matter
+%% The title page, contents, bibliography and index have no margin column:
+%% \ln@fullwidthmatter switches to \ln@geomfull at a page boundary (the text
+%% block then spans body + gap + margin column, on the outer side in the
+%% two-sided print editions), \ln@bodymatter switches back.  Both are
+%% no-ops when already in that state.  The header and foot widths are
+%% stored lengths, so they are set again for each layout; the vertical rule
+%% is not drawn while \ifln@fullwidth.  The commands are wrapped at
+%% \begin{document} (end of the class).
+\newcommand*{\ln@hfwidths}{\KOMAoptions{headwidth=textwithmarginpar, footwidth=text}}
+\newcommand*{\ln@fullwidthmatter}{%
+  \ifln@fullwidth\else
+    \expandafter\newgeometry\expandafter{\ln@geomfull}% \clearpage first
+    \ln@hfwidths\global\ln@fullwidthtrue
+  \fi}
+\newcommand*{\ln@bodymatter}{%
+  \ifln@fullwidth
+    \restoregeometry% \clearpage first: the last page still has no rule
+    \ln@hfwidths\global\ln@fullwidthfalse
+  \fi}
 \setkomafont{disposition}{\sffamily\bfseries\color{ln-accent}}
 \setkomafont{chapterprefix}{\normalfont\sffamily\normalsize\color{ln-muted}}
 \setkomafont{chapter}{\sffamily\bfseries\LARGE\color{ln-accent}}
@@ -592,6 +626,7 @@
 \newcount\ln@picdepth
 \newcount\ln@tabdepth
 \newif\ifln@tabboxed
+\newif\ifln@nofit
 \ifln@print
   \newsavebox{\ln@picbox}
   \newsavebox{\ln@tabbox}
@@ -608,12 +643,21 @@
   \newcommand*{\ln@fitlog}[2]{% kind, box
     \typeout{lnotes-fit: \CurrentFile:\the\inputlineno\space #1
       \the\wd#2\space -> \the\linewidth}}
+  %% tcolorbox (keypoint, \lessoninfo) draws its frame as a tikzpicture
+  %% around the box it has already typeset at the body size and \linewidth:
+  %% that picture must not be scaled (it set the boxes at scale x width and
+  %% scale x font size).  \ifln@nofit is local to the drawing.
   \AddToHook{env/tikzpicture/before}{%
+    \ifln@nofit\else
     \ifnum\ln@picdepth=0 \begin{lrbox}{\ln@picbox}\ln@designsizes\fi
-    \global\advance\ln@picdepth 1 }
+    \global\advance\ln@picdepth 1 \fi}
   \AddToHook{env/tikzpicture/after}{%
+    \ifln@nofit\else
     \global\advance\ln@picdepth -1
-    \ifnum\ln@picdepth=0 \end{lrbox}\ln@fitpic\fi}
+    \ifnum\ln@picdepth=0 \end{lrbox}\ln@fitpic\fi\fi}
+  \AddToHook{env/tcb@drawing/begin}{\ln@nofittrue}
+  \pretocmd{\tcb@draw@pseudo@segmentation}{\ln@nofittrue}{}%
+    {\ClassWarningNoLine{lnotes}{tcolorbox segmentation not patched}}
   \newcommand*{\ln@fitpic}{%
     \sbox{\ln@picbox}{\scalebox{\ln@scale}{\usebox{\ln@picbox}}}%
     \ifdim\wd\ln@picbox>\linewidth
@@ -729,5 +773,30 @@
   \setlength{\parindent}{1\zw}
 \fi
 \setlist{nosep}
+
+%% Full-width matter (see above): the title page, contents, bibliography and
+%% index.  Wrapped at \begin{document}, after every package has defined them.
+\AtBeginDocument{%
+  \NewCommandCopy\ln@orig@maketitle\maketitle
+  \RenewDocumentCommand\maketitle{o}{%
+    \ln@fullwidthmatter
+    \IfValueTF{#1}{\ln@orig@maketitle[#1]}{\ln@orig@maketitle}%
+    \ln@bodymatter}%
+  \NewCommandCopy\ln@orig@tableofcontents\tableofcontents
+  %% Two-sided: the body starts on a recto (\mainmatter would add the blank
+  %% verso after the switch, with the rule).
+  \renewcommand*\tableofcontents{%
+    \ln@fullwidthmatter\ln@orig@tableofcontents
+    \if@twoside\cleardoubleoddpage\fi\ln@bodymatter}%
+  \NewCommandCopy\ln@orig@printbibliography\printbibliography
+  \RenewDocumentCommand\printbibliography{o}{%
+    \ln@fullwidthmatter
+    \IfValueTF{#1}{\ln@orig@printbibliography[#1]}{\ln@orig@printbibliography}%
+    \ln@bodymatter}%
+  \NewCommandCopy\ln@orig@printindex\printindex
+  \RenewDocumentCommand\printindex{o}{%
+    \ln@fullwidthmatter
+    \IfValueTF{#1}{\ln@orig@printindex[#1]}{\ln@orig@printindex}%
+    \ln@bodymatter}}
 
 \endinput
