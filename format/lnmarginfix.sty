@@ -1,0 +1,680 @@
+%% lnmarginfix.sty: a modified copy of marginfix.sty v1.2 (2020/05/06,
+%% https://ctan.org/pkg/marginfix) for the lnotes class.
+%% marginfix collects the \marginpar notes of a page and lays them out
+%% when the page is built (\@combinefloats): a note that would run below
+%% the text block is moved up into free space above it, and notes that
+%% still do not fit are carried to the top of the next page.
+%%
+%% Changed from marginfix.sty (each change is marked "lnotes:"):
+%%  1. First aid.  The LaTeX kernel repairs marginfix for its new output
+%%     routine (\let\@outputbox@attachfloats\@combinefloats, in
+%%     firstaid/latex2e-first-aid-for-external-files.ltx), keyed on the
+%%     file name marginfix.sty, so this copy applies it itself.
+%%  2. Note positions.  marginfix records the natural height of the page
+%%     at the anchor.  On a \flushbottom page the body is stretched to the
+%%     text height afterwards, so notes drifted above their anchors, more
+%%     so further down the page; and when the page builder later broke
+%%     the page before the anchor line (widow and club control, a box that
+%%     did not fit), the note stayed at the bottom of the page before.
+%%     This copy puts a LuaTeX user whatsit (no size, not a breakpoint)
+%%     after the anchor line and, when the page is built, finds it in the
+%%     column set to its final height (with its floats): the note's first
+%%     baseline is aligned with the anchor's baseline (the kernel puts the
+%%     top of the note box there, so a note starting with a color whatsit
+%%     sat one line ascent low), and a note whose anchor is not on the page
+%%     is carried to the page where it is.  \marginposadjustment still
+%%     shifts every note (positive: down).  Needs LuaTeX.
+%%  3. A note carried to the top of a page has its first baseline at
+%%     \topskip (marginfix used \ht of the note box, which is zero when
+%%     the note starts with a color or other whatsit).
+%%  4. Body layout as with the kernel.  The kernel's \@addmarginpar leaves
+%%     a kern and two empty boxes in the main vertical list after the
+%%     anchor; marginfix leaves nothing, and some pages then broke
+%%     differently (lnotes en A5: a definition moved to the previous
+%%     page).  This copy leaves the same nodes.  And marginfix rewrapped
+%%     the column box without the \maxdepth limit on its depth, which the
+%%     kernel's \@make@normalcolbox backs up by, so a page whose last line
+%%     is deep (a display, a box) was set with different glue.  With both,
+%%     the body is set exactly as without marginfix.
+%%  5. Warnings.  A note pushed below its anchor by the notes above it
+%%     gets the kernel's "Marginpar on page N moved" (the lnotes log
+%%     checkers count it); a note carried to the next page for lack of
+%%     room gets "Marginpar on page N carried over to the next page".
+%%  6. \ProvidesPackage name and this header.
+%%
+%% This work may be distributed and/or modified under the conditions of
+%% the LaTeX Project Public License, either version 1.3c of this license
+%% or (at your option) any later version.  The latest version of this
+%% license is in https://www.latex-project.org/lppl.txt
+%% The original notice of marginfix.sty follows.
+%%
+%% This is file `marginfix.sty',
+%% generated with the docstrip utility.
+%%
+%% The original source files were:
+%%
+%% marginfix.dtx  (with options: `package')
+%% 
+%% IMPORTANT NOTICE:
+%% 
+%% For the copyright see the source file.
+%% 
+%% Any modified versions of this file must be renamed
+%% with new filenames distinct from marginfix.sty.
+%% 
+%% For distribution of the original source see the terms
+%% for copying and modification in the file marginfix.dtx.
+%% 
+%% This generated file may be distributed as long as the
+%% original source files, as listed above, are part of the
+%% same distribution. (The sources need not necessarily be
+%% in the same archive or directory.)
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{lnmarginfix}%
+           [2026/10/29 v1.2-ln1 marginfix 1.2 for lnotes]
+\RequirePackage{iftex}
+\RequireLuaTeX
+\makeatletter
+\newif\ifmfx@ypos
+\DeclareOption{ypos}{\mfx@ypostrue}
+\ProcessOptions\relax
+\let\mfx@marginlist\@empty
+\let\mfx@injected\@empty
+\newinsert\Mfx@inject@insert
+\newbox\Mfx@marginbox
+\newdimen\Mfx@marginpos@min
+\newdimen\Mfx@marginpos@max
+\newdimen\Mfx@marginspace
+\newdimen\Mfx@marginheight
+\def\mfx@marginstart{0pt}
+\let\mfx@marginpieces\@empty
+\newbox\Mfx@piece@content
+\newcount\Mfx@piece@count
+\newif\ifmfx@in@phantom
+\newdimen\Mfx@mparshift
+\newdimen\marginheightadjustment
+\newdimen\marginposadjustment
+\def\@addmarginpar{%
+  \@next\@marbox\@currlist{}\MFX@AssertionError
+  \MFX@getypos
+  \expandafter\ifx\@marbox\Mfx@inject@insert
+    \mfx@injected\global\let\mfx@injected\@empty
+  \else
+    %% lnotes: (2) the position is \mfx@y@<n>, set when the page is built.
+    \global\advance\Mfx@note@count\@ne
+    \directlua{lnmfx.register(\the\Mfx@note@count, \the\@marbox)}%
+    \MFX@cons\mfx@marginlist{%
+      \noexpand\mfx@build@note\@currbox\@marbox
+        {\noexpand\csname mfx@y@\the\Mfx@note@count\noexpand\endcsname}%
+      \noexpand\mfx@build@skip{\the\marginparpush}%
+    }%
+    %% lnotes: (4) the nodes the kernel's \@addmarginpar leaves in the
+    %% main vertical list, with an empty box, so that the body is broken
+    %% into lines and pages exactly as without marginfix.
+    \kern-\@pagedp
+    \nointerlineskip
+    \hb@xt@\columnwidth{}%
+    \nointerlineskip
+    \hbox{\vrule\@height\z@\@width\z@\@depth\@pagedp}%
+  \fi
+}
+%% lnotes: (2) markers and positions, see the header.
+\newcount\Mfx@note@count
+\newdimen\Mfx@firstbl
+\newdimen\Mfx@heightfix
+\newbox\Mfx@floats
+\newbox\Mfx@topfloats
+\directlua{
+lnmfx = lnmfx or {}
+local uid = luatexbase.new_whatsit and luatexbase.new_whatsit('lnmarginfix') or 7461
+local pending, firstbl = {}, {}
+local HLIST, VLIST, RULE, GLUE, KERN, WHATSIT =
+  node.id('hlist'), node.id('vlist'), node.id('rule'), node.id('glue'),
+  node.id('kern'), node.id('whatsit')
+local USER = node.subtype('user_defined')
+% offset of the first baseline from the top of a vbox: the first line
+% may sit inside a nested \vtop whose height is zero (it starts with a
+% color whatsit), so nested vlists are searched too.
+function lnmfx.first_baseline(b)
+  local y = 0
+  if not b or not b.head then return 0 end
+  for n in node.traverse(b.head) do
+    if n.id == HLIST then
+      return y + n.height
+    elseif n.id == VLIST then
+      if n.head then return y + lnmfx.first_baseline(n) end
+      y = y + n.height + n.depth
+    elseif n.id == RULE then y = y + n.height + n.depth
+    elseif n.id == GLUE then y = y + n.width
+    elseif n.id == KERN then y = y + n.kern end
+  end
+  return y
+end
+function lnmfx.mark(k)
+  local w = node.new(WHATSIT, USER)
+  w.user_id, w.type, w.value = uid, 100, k
+  node.write(w)
+end
+function lnmfx.register(k, boxnum)
+  pending[k] = true
+  firstbl[k] = lnmfx.first_baseline(tex.box[boxnum])
+  lnmfx.mark(k)
+end
+function lnmfx.set_first_baseline(boxnum)
+  tex.setdimen('Mfx@firstbl', lnmfx.first_baseline(tex.box[boxnum]))
+end
+% Called when the page is built, with a copy of the column set to its
+% final height: each marker found gives the baseline of the line before
+% it, from the top of the text part (marker 0).  Notes not found (anchor
+% on a later page) get 16000pt.  Mfx@heightfix: the final height of the
+% text part (from marker 0 to the bottom floats, or to the bottom) minus
+% room (\@colroom); it differs from zero when glue around the floats
+% stretches or shrinks.
+function lnmfx.locate(boxnum, room)
+  tex.setdimen('global', 'Mfx@heightfix', 0)
+  for k in pairs(pending) do token.set_macro('mfx@y@' .. k, '16000pt', 'global') end
+  local p = tex.box[boxnum]
+  if not p or not p.head then return end
+  local y, base, top, bot, found = 0, 0, 0, 0, {}
+  for n in node.traverse(p.head) do
+    if n.id == HLIST or n.id == VLIST or n.id == RULE then
+      y = y + n.height; base = y; y = y + n.depth
+    elseif n.id == GLUE then y = y + node.effective_glue(n, p)
+    elseif n.id == KERN then y = y + n.kern
+    elseif n.id == WHATSIT and n.subtype == USER and n.user_id == uid then
+      local k = n.value
+      if k == 0 then top = y
+      elseif k == -1 then bot = y
+      elseif k == -2 then
+        tex.setdimen('global', 'Mfx@heightfix', p.height - top - (y - bot) - room)
+      elseif pending[k] then found[k] = base end
+    end
+  end
+  for k, b in pairs(found) do
+    token.set_macro('mfx@y@' .. k,
+      math.floor(b - top - firstbl[k] + tex.dimen['marginposadjustment']) .. 'sp', 'global')
+    pending[k] = nil
+  end
+end
+}
+\def\MFX@cons#1#2{%
+  \edef\temp@{#2}%
+  \expandafter\expandafter\expandafter\gdef
+  \expandafter\expandafter\expandafter#1%
+  \expandafter\expandafter\expandafter{\expandafter#1\temp@}%
+}
+
+\def\MFX@snoc#1#2{%
+  \edef\temp@{#2}%
+  \expandafter\expandafter\expandafter\gdef
+  \expandafter\expandafter\expandafter#1%
+  \expandafter\expandafter\expandafter{\expandafter\temp@#1}%
+}
+\def\MFX@run@clear#1{%
+  \expandafter\global\expandafter\let\expandafter#1\expandafter\@empty#1%
+}
+\def\MFX@inject#1{
+  \expandafter\def\expandafter\@freelist\expandafter{%
+    \expandafter\@elt\expandafter\Mfx@inject@insert
+    \expandafter\@elt\expandafter\Mfx@inject@insert
+    \@freelist}%
+  \expandafter\def\expandafter\mfx@injected\expandafter{\mfx@injected#1}%
+  \marginpar{}%
+}
+\def\MFX@getypos{%
+  \dimen@\dimexpr\@pageht+\@pagedp+\marginposadjustment+\Mfx@mparshift\relax
+  \ifnum\outputpenalty=-10002\relax
+    \advance\dimen@-\Mfx@strutheight
+  \fi
+  \edef\mfx@ypos{\the\dimen@}%
+  \global\Mfx@mparshift\z@
+}
+\newdimen\Mfx@strutheight
+\edef\marginpar{%
+  \unexpanded{\setbox\@tempboxa\hbox{\strut}\Mfx@strutheight\ht\@tempboxa}%
+  \expandafter\unexpanded\expandafter{\marginpar}%
+}
+\expandafter\def\expandafter\@combinefloats\expandafter{\expandafter
+  \MFX@combinefloats@before\@combinefloats}
+%% lnotes: (1) first aid.
+\let\@outputbox@attachfloats\@combinefloats
+\def\MFX@combinefloats@before{%
+  %% lnotes: (2) a copy of the column with its top and bottom floats, set
+  %% to \@colht as \@make@normalcolbox will set it, quietly; markers 0
+  %% and -1 delimit the text part.
+  \begingroup
+    \vbadness\@M \vfuzz\maxdimen
+    \def\@elt##1{\setbox\Mfx@floats\vbox{\unvbox\Mfx@floats\copy##1\vskip\floatsep}}%
+    \setbox\Mfx@floats\vbox{}%
+    \ifx\@toplist\@empty\else
+      \@toplist
+      \setbox\Mfx@floats\vbox{\unvbox\Mfx@floats\vskip-\floatsep\topfigrule\vskip\textfloatsep}%
+    \fi
+    \setbox\Mfx@topfloats\box\Mfx@floats
+    \setbox\Mfx@floats\vbox{}%
+    \ifx\@botlist\@empty\else
+      \@botlist
+      \setbox\Mfx@floats\vbox{\vskip\textfloatsep\botfigrule\unvbox\Mfx@floats\vskip-\floatsep}%
+    \fi
+    \setbox\@tempboxa\vbox to\@colht{\@texttop\unvbox\Mfx@topfloats
+      \directlua{lnmfx.mark(0)}\unvcopy\@outputbox
+      \directlua{lnmfx.mark(-1)}\unvbox\Mfx@floats
+      \directlua{lnmfx.mark(-2)}\vskip-\dp\@outputbox\@textbottom}%
+    \directlua{lnmfx.locate(\the\@tempboxa, \number\@colroom)}%
+  \endgroup
+  \advance\Mfx@marginheight\Mfx@heightfix
+  \advance\Mfx@marginheight\marginheightadjustment
+  \MFX@buildmargin
+  \MFX@attachmargin
+  \global\Mfx@marginheight\z@
+}
+\def\MFX@attachmargin{%
+  \setbox\Mfx@marginbox\vtop{%
+    \vskip\z@\unvbox\Mfx@marginbox}%
+  %% lnotes: (4) the column keeps its depth (\maxdepth-limited, as the
+  %% kernel's \@outputbox@append keeps it): \@make@normalcolbox backs up
+  %% by that depth, and a larger one changed the glue set of the page.
+  \setbox\@outputbox\vbox{\boxmaxdepth\dp\@outputbox
+    \begingroup
+    \setbox\@tempboxa\vbox{%
+      \hbox{%
+        \if\MFX@leftmargin
+          \llap{\box\Mfx@marginbox\hskip\marginparsep}%
+        \else
+          \hskip\columnwidth
+          \rlap{\hskip\marginparsep\box\Mfx@marginbox}%
+        \fi
+      }}%
+    \ht\@tempboxa\z@
+    \dp\@tempboxa\z@
+    \box\@tempboxa
+    \endgroup
+    \unskip
+    \unvbox\@outputbox
+  }%
+}
+\def\MFX@buildmargin{%
+  \advance\Mfx@marginheight\@colroom
+  \ifx\mfx@marginstart\relax
+  \else
+    \MFX@cons\mfx@marginpieces{%
+      \noexpand\@elt{\mfx@marginstart}{\the\Mfx@marginheight}}%
+    \gdef\mfx@marginstart{0pt}%
+    \global\advance\Mfx@piece@count\@ne
+  \fi
+  \ifx\mfx@marginpieces\@empty\else
+    \MFX@buildmargin@down
+    \MFX@buildmargin@up
+    \MFX@buildmargin@pieces
+  \fi
+}
+\def\MFX@buildmargin@down{%
+  \let\mfx@pieceheights\@empty
+  \def\@elt##1##2{%
+    \MFX@cons\mfx@pieceheights{\noexpand\@elt{\the\dimexpr##2-##1}}}%
+  \mfx@marginpieces
+  \MFX@popdimen\Mfx@marginheight\mfx@pieceheights
+  \let\mfx@build@note\MFX@margin@note@down
+  \let\mfx@build@skip\@gobble
+  \let\mfx@build@clear\MFX@build@clear@down
+  \let\mfx@marginout\@empty
+  \MFX@run@clear\mfx@marginlist
+}
+\def\MFX@margin@note@down#1#2#3{%
+  \MFX@whichbox\@marbox#1#2%
+  %% lnotes: (2) anchor not on this page: carry this and the later notes.
+  \ifdim#3>15000\p@
+    \mfx@build@clear
+    \mfx@build@note{#1}{#2}{#3}%
+  \else
+  \if\MFX@check@fit{}{\ht\@marbox+\dp\@marbox}%
+    \MFX@snoc\mfx@marginout{%
+      \noexpand\@cons\noexpand\@freelist#1%
+      \noexpand\@cons\noexpand\@freelist#2%
+      \noexpand\mfx@build@note\@marbox{#3}}%
+    \let\mfx@build@skip\MFX@margin@skip@down
+  \else
+    \mfx@build@clear
+    \mfx@build@note{#1}{#2}{#3}%
+  \fi
+  \fi
+}
+\def\MFX@margin@skip@down#1{%
+  \if\MFX@check@fit{}{#1}%
+    \MFX@snoc\mfx@marginout{\noexpand\mfx@build@skip{#1}}%
+  \else
+    \mfx@build@clear
+  \fi
+}
+\def\MFX@build@clear@down{%
+  %% lnotes: (2) a note anchored on a later page keeps its name.
+  \def\mfx@build@note##1##2##3{%
+    \ifdim##3>15000\p@
+      \MFX@cons\mfx@marginlist{\noexpand\mfx@build@note##1##2{\unexpanded{##3}}}%
+    \else
+      \PackageWarningNoLine{lnmarginfix}{Marginpar on page \thepage\space
+        carried over to the next page}%
+      \MFX@cons\mfx@marginlist{\noexpand\mfx@build@note##1##2{\MFX@minus@inf}}%
+    \fi}%
+  \def\mfx@build@skip##1{%
+    \MFX@cons\mfx@marginlist{\noexpand\mfx@build@skip{##1}}}%
+  \def\mfx@build@clear{%
+    \MFX@cons\mfx@marginlist{\noexpand\mfx@build@clear}}%
+}
+\def\MFX@check@fit#1#2{%
+  00\fi % close out the \if
+  \@tempswafalse
+  \ifdim\dimexpr#2<\Mfx@marginheight % it fits
+    \advance\Mfx@marginheight-\dimexpr#2\relax % deduct the size
+    \@tempswatrue
+  \else % didn't fit: check the next piece
+    \ifx\mfx@pieceheights\@empty\else % make sure there's anything there
+      #1%
+      \MFX@popdimen\Mfx@marginheight\mfx@pieceheights
+      \if\MFX@check@fit{#1}{#2}\fi
+    \fi
+  \fi
+  \if@tempswa % start a new \if
+}
+\def\MFX@popdimen#1#2{%
+  \def\@elt##1{%
+    #1##1\relax
+    \def\@elt####1{%
+      \MFX@cons#2{\noexpand\@elt{####1}}%
+    }%
+  }%
+  \MFX@run@clear#2%
+}
+\def\MFX@whichbox#1#2#3{%
+  \if\MFX@leftmargin
+    \def#1{#2}%
+  \else
+    \def#1{#3}%
+  \fi
+}
+\def\MFX@leftmargin{%
+  00\fi % close out the \if
+  \@tempcnta\@ne
+  \if@mparswitch
+    \unless\ifodd\c@page
+      \@tempcnta\m@ne
+    \fi
+  \fi
+  \if@reversemargin
+    \@tempcnta-\@tempcnta
+  \fi
+  \ifnum\@tempcnta<\z@ % start a new \if
+}
+\def\MFX@minus@inf{-4000\p@}
+\def\MFX@buildmargin@up{%
+  \let\mfx@pieceheights\@empty
+  \let\mfx@phantomheights\@empty
+  \let\temp@@\relax
+  \def\@elt##1##2{%
+    \MFX@snoc\mfx@pieceheights{\noexpand\@elt{\the\dimexpr##2-##1}}%
+    \ifx\temp@@\relax\else
+      \MFX@snoc\mfx@phantomheights{\noexpand\@elt{\the\dimexpr##1-\temp@@}}%
+    \fi
+    \def\temp@@{##2}%
+  }%
+  \mfx@in@phantomfalse
+  \mfx@marginpieces
+  \MFX@popdimen\Mfx@marginheight\mfx@pieceheights
+  \let\mfx@build@note\MFX@margin@note@up
+  \let\mfx@build@skip\@gobble
+  \MFX@run@clear\mfx@marginout
+}
+\def\MFX@margin@note@up#1#2{%
+  \ifmfx@in@phantom
+    \MFX@popdimen\Mfx@marginheight\mfx@pieceheights
+    \advance\Mfx@piece@count\m@ne
+    \mfx@in@phantomfalse
+  \fi
+  \if\MFX@check@fit{\advance\Mfx@piece@count\m@ne
+                    \MFX@popdimen\dimen@\mfx@phantomheights}{\ht#1+\dp#1}%
+    \MFX@snoc\mfx@marginout{%
+      \noexpand\mfx@build@note{#1}{#2}{\the\Mfx@piece@count}}%
+    \let\mfx@build@skip\MFX@margin@skip@up
+  \else\MFX@AssertionError\fi
+}
+\def\MFX@margin@skip@up#1{%
+  \dimen@#1\relax
+  \advance\Mfx@marginheight-\dimen@
+  \ifdim\Mfx@marginheight<\z@
+    \advance\dimen@\Mfx@marginheight
+    \MFX@snoc\mfx@marginout{%
+      \noexpand\mfx@build@skip{\the\dimen@}{\the\Mfx@piece@count}}%
+    \dimen@-\Mfx@marginheight
+    \ifmfx@in@phantom
+      \MFX@popdimen\Mfx@marginheight\mfx@pieceheights
+      \advance\Mfx@piece@count\m@ne
+      \mfx@in@phantomfalse
+    \else
+      \MFX@popdimen\Mfx@marginheight\mfx@phantomheights
+      \mfx@in@phantomtrue
+    \fi
+    \mfx@build@skip\dimen@
+  \else
+    \MFX@snoc\mfx@marginout{%
+      \noexpand\mfx@build@skip{\the\dimen@}{\the\Mfx@piece@count}}%
+  \fi
+}
+\def\MFX@buildmargin@pieces{%
+  \Mfx@piece@count\z@
+  \Mfx@marginspace\z@
+  \setbox\Mfx@marginbox\vbox{\vskip\z@}%  TODO - do we need this?
+  \let\@elt\MFX@buildmargin@piece
+  \MFX@run@clear\mfx@marginpieces
+  \let\@elt\relax
+  \global\Mfx@piece@count\z@
+}
+\def\MFX@buildmargin@piece#1#2{%
+  \ifdim\ht\Mfx@marginbox<#1\relax
+    \dimen@\dimexpr#1-\ht\Mfx@marginbox\relax
+    \setbox\Mfx@marginbox\vbox{%
+      \unvbox\Mfx@marginbox
+      \vskip\dimen@
+    }%
+    \advance\Mfx@marginspace\dimen@
+  \fi
+  \Mfx@marginpos@min#1\relax
+  \Mfx@marginpos@max#1\relax
+  \Mfx@marginheight#2\relax
+  \advance\Mfx@piece@count\@ne
+  \MFX@buildpiece@down
+  \MFX@buildpiece@up
+  \setbox\Mfx@marginbox\vbox{%
+    \unvbox\Mfx@marginbox
+    \box\Mfx@piece@content
+    \vskip\z@
+  }%
+}
+\def\MFX@buildpiece@down{%
+  \let\mfx@build@note\MFX@piece@note@down
+  \let\mfx@build@skip\MFX@piece@skip@down
+  \let\mfx@pieceout\@empty
+  \MFX@run@clear\mfx@marginout
+}
+\def\MFX@piece@note@down#1#2#3{%
+  \Mfx@marginspace\z@
+  \@tempswafalse
+  \ifdim#2>\Mfx@marginheight
+    \ifnum#3>\Mfx@piece@count
+      \@tempswatrue
+    \fi
+  \fi
+  \ifdim\dimexpr\ht#1+\dp#1+\Mfx@marginpos@min>\Mfx@marginheight
+    \@tempswatrue
+  \fi
+  \if@tempswa
+    \MFX@piece@clear
+    \mfx@build@note{#1}{#2}{#3}%
+  \else
+    \dimen@#2\relax
+    \ifdim\dimen@=\MFX@minus@inf
+      \ifdim\Mfx@marginpos@max=\z@
+        \directlua{lnmfx.set_first_baseline(\the#1)}% lnotes: (3)
+        \dimen@\topskip
+        \advance\dimen@-\Mfx@firstbl
+        \ifdim\dimen@<\z@ \dimen@\z@ \fi
+      \fi
+    \fi
+    \advance\dimen@-\Mfx@marginpos@max
+    %% lnotes: (5) a note pushed below its anchor by the notes above it
+    %% gets the kernel's warning, which the log checkers count.
+    \ifdim\dimen@<-\p@
+      \ifdim#2>\MFX@minus@inf
+        \@latex@warning@no@line{Marginpar on page \thepage\space moved}%
+      \fi
+    \fi
+    \ifdim\dimen@>\z@
+      \MFX@snoc\mfx@pieceout{\noexpand\mfx@build@compressible{\the\dimen@}}%
+      \advance\Mfx@marginpos@max\dimen@
+    \fi
+    \MFX@snoc\mfx@pieceout{\noexpand\mfx@build@note{#1}}%
+    \advance\Mfx@marginpos@min\dimexpr\ht#1+\dp#1\relax
+    \advance\Mfx@marginpos@max\dimexpr\ht#1+\dp#1\relax
+  \fi
+}
+\def\MFX@piece@skip@down#1#2{%
+  \dimen@#1\relax
+  \ifdim\Mfx@marginspace>\z@
+    \advance\dimen@-\Mfx@marginspace
+    \ifdim\dimen@<\z@ \dimen@\z@ \fi
+    \advance\Mfx@marginspace-\dimen@
+  \fi
+  \ifdim\dimen@>\z@
+    \ifdim\dimexpr#1+\Mfx@marginpos@min>\Mfx@marginheight
+      \MFX@piece@clear
+      \mfx@build@skip{\the\dimen@}{#2}%
+    \else
+      \MFX@snoc\mfx@pieceout{\noexpand\mfx@build@skip{\the\dimen@}{#2}}%
+      \advance\Mfx@marginpos@min\dimen@
+      \advance\Mfx@marginpos@max\dimen@
+    \fi
+  \fi
+}
+\def\MFX@piece@clear{%
+  \def\mfx@build@note##1##2##3{%
+    \MFX@cons\mfx@marginout{\noexpand\mfx@build@note##1{##2}{##3}}}%
+  \def\mfx@build@skip##1##2{%
+    \MFX@cons\mfx@marginout{\noexpand\mfx@build@skip{##1}{##2}}}%
+}
+\def\MFX@buildpiece@up{%
+  \Mfx@marginheight\dimexpr\Mfx@marginpos@max-\Mfx@marginheight\relax
+  \ifdim\Mfx@marginheight<\z@\Mfx@marginheight\z@\fi
+  \let\mfx@build@note\MFX@piece@note@up
+  \let\mfx@build@compressible\MFX@piece@compressible@up
+  \let\mfx@build@skip\MFX@piece@skip@maybedefer
+  \MFX@run@clear\mfx@pieceout\relax
+}
+\def\MFX@piece@skip@maybedefer#1#2{%
+  \ifnum#2>\Mfx@piece@count
+    \MFX@snoc\mfx@marginout{\noexpand\mfx@build@skip{#1}{#2}}%
+  \else
+    \let\mfx@build@skip\MFX@piece@skip@up
+    \mfx@build@skip{#1}{#2}%
+  \fi
+}
+\def\MFX@piece@note@up#1{%
+  \setbox\Mfx@piece@content\vbox{%
+    \box#1%
+    \unvbox\Mfx@piece@content}%
+  \let\mfx@build@skip\MFX@piece@skip@up
+}
+\def\MFX@piece@skip@up#1#2{%
+  \setbox\Mfx@piece@content\vbox{%
+    \vskip#1\relax
+    \unvbox\Mfx@piece@content}%
+}
+\def\MFX@piece@compressible@up#1{%
+  \advance\Mfx@marginheight-#1\relax
+  \ifdim\Mfx@marginheight<\z@
+    \MFX@piece@skip@up{-\Mfx@marginheight}\relax
+    \Mfx@marginheight\z@
+  \fi
+}
+\def\dumpmargins{%
+  \loop
+  \unless\ifx\mfx@marginlist\@empty
+    \let\temp@\mfx@marginlist
+    \vbox{}\clearpage
+    \ifx\temp@\mfx@marginlist
+      \PackageError{marginfix}{lost some margin notes%
+      \ifx\mfx@marginstart\relax\ (missing \noexpand\unblockmargin)\fi
+      }\@eha
+      \let\mfx@marginlist\@empty % be nicer by just dropping one?
+      % TODO: also, set an emergency mode to allow oversized notes
+    \fi
+  \repeat
+}
+\AtEndDocument{\dumpmargins}
+\def\marginskip#1{%
+  \MFX@cons\mfx@marginlist{\noexpand\mfx@build@skip{#1}}%
+}
+\def\clearmargin{%
+  \MFX@cons\mfx@marginlist{\noexpand\mfx@build@clear}%
+}
+\def\softclearmargin{%
+  \marginskip{\the\textheight}%
+}
+\def\extendmargin#1{%
+  \advance\Mfx@marginheight#1\relax
+}
+\def\mparshift#1{%
+  \advance\Mfx@mparshift#1\relax
+}
+\def\blockmargin{%
+  \@ifnextchar[%]
+    \MFX@blockmargin
+    {\MFX@blockmargin[0\p@]}%
+}
+\def\MFX@blockmargin[#1]{%
+  \MFX@inject{%
+    \ifx\mfx@marginstart\relax
+      \PackageError{marginfix}{two \\blockmargin with no \\unblockmargin}\@eha
+    \else
+      \MFX@cons\mfx@marginpieces{\noexpand
+        \@elt{\mfx@marginstart}{\expandafter\dimexpr\mfx@ypos+#1\relax}}%
+      \global\let\mfx@marginstart\relax
+      \global\advance\Mfx@piece@count\@ne
+    \fi
+  }%
+}
+\def\unblockmargin{%
+  \@ifnextchar[%]
+    \MFX@unblockmargin
+    {\MFX@unblockmargin[0\p@]}%
+}
+\def\MFX@unblockmargin[#1]{%
+  \MFX@inject{%
+    \ifx\mfx@marginstart\relax
+      \xdef\mfx@marginstart{\dimexpr\mfx@ypos+#1\relax}%
+    \else
+      \PackageError{marginfix}{\\unblockmargin with no \\blockmargin}\@eha
+    \fi
+  }%
+}
+\def\marginphantom{%
+  \@ifnextchar[%]
+    \MFX@marginphantom
+    {\MFX@marginphantom[0\p@]}%
+}
+\def\MFX@marginphantom[#1]#2{%
+  \ifdim#2<\z@\MFX@marginphantom[#1+#2]{-#2}\else
+  \MFX@inject{%
+    \ifx\mfx@marginstart\relax
+      \PackageError{marginfix}{\\marginphantom while margin blocked}\@eha
+    \else
+      \MFX@cons\mfx@marginpieces{\noexpand
+        \@elt{\mfx@marginstart}{\expandafter\dimexpr\mfx@ypos+#1\relax}}%
+      \xdef\mfx@marginstart{\dimexpr\mfx@ypos+#1+#2\relax}%
+      \global\advance\Mfx@piece@count\@ne
+    \fi
+  }%
+  \fi
+}
+\makeatother
+\endinput
+%%
+%% End of file `marginfix.sty'.

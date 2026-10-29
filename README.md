@@ -65,6 +65,8 @@ passes are in [`docs/workflow.md`](docs/workflow.md).  In short:
 
 ## License
 
-`format/` and the build files come from the template (MIT).  The notes
+`format/` and the build files come from the template (MIT), except
+`format/lnmarginfix.sty`, a modified copy of `marginfix` under the LPPL
+1.3c.  The notes
 themselves (`en/`, `ja/`, `figures/`) are © kinginu and released under
 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).

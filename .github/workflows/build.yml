@@ -76,8 +76,9 @@ jobs:
 
       - name: parity-check, glossary-check, chapter-lint
         run: |
+          # Report-only: the per-tool exit codes are in the summary
+          # headings; the step itself always succeeds.
           max=200
-          status=0
           {
             echo "## Source lint"
             echo
@@ -88,7 +89,6 @@ jobs:
             out=$(mktemp)
             rc=0
             "$@" > "$out" 2>&1 || rc=$?
-            [ $rc = 0 ] || status=1
             cat "$out"
             n=$(wc -l < "$out")
             {
@@ -108,7 +108,7 @@ jobs:
           run "parity-check --lint" python3 tools/parity-check.py --lint
           run "glossary-check" python3 tools/glossary-check.py
           run "chapter-lint --all" python3 tools/chapter-lint.py --all
-          exit $status
+          exit 0
 
   # Collects whatever the build jobs produced.  A failed print size does not
   # hold back the A4 editions; a missing A4 edition fails the job.

@@ -30,7 +30,8 @@ because skipping it let real defects through.
    `tools/sync-main.py`.
 4. Replace `README.md` with the book's own: title, links to the PDFs,
    status table, and a licence section that keeps the two licences apart
-   (`format/` and the build files are MIT from the template; the notes in
+   (`format/` and the build files are MIT from the template, except
+   `format/lnmarginfix.sty`, which stays LPPL 1.3c; the notes in
    `en/`, `ja/` and `figures/` need their own line, e.g. "© <holder>,
    CC BY-NC-SA 4.0").  Put the copyright holder of the book into
    `LICENSE`.
@@ -244,9 +245,11 @@ crowds margins.  A layout pass restores the book; it changes no content.
 `format/` is shared by every book made from the template and must stay
 identical everywhere.
 
-1. Change `format/lnotes.cls` in the **template** repository only; build the
+1. Change the class files (`format/lnotes.cls`, `format/lnmarginfix.sty`,
+   `format/lnotes-*.ist`) in the **template** repository only; build the
    template book and a small test document that exercises the change.
-2. Copy the class into each book repository, then for each edition:
+2. Copy every changed file of `format/` (and `.github/workflows/build.yml`
+   when it changed) into each book repository, then for each edition:
    `tools/book-check.sh <lang>` and `tools/layout-diff.sh <lang>`.  The
    diff shows every page whose text moved; a change meant to be cosmetic
    must not change page counts or page breaks.

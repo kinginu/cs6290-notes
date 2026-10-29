@@ -122,6 +122,13 @@ and how it connects to the previous lesson.>
   0–2.  During a pass over finished chapters (e.g. the proofreading pass,
   `workflow.md` §4) a chapter's count must never rise above its count
   before the pass (`tools/chapter-check.sh … --max-moved <baseline>`).
+- Copyfitting is automatic: the class aligns a margin note's first line
+  with the baseline of its anchor line, lifts a note that would run below
+  the text block into free space above it (a note never hangs below the
+  block), and as a last resort carries it to the top of the next page with
+  a "Marginpar on page N carried over to the next page" warning in the log.
+  So "moved down" means notes pushed below their anchors by crowding; a
+  "carried over" warning means the page's margin is full.
 
 ### 3.1 What goes in the margin column
 

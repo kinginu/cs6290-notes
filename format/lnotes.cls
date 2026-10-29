@@ -7,6 +7,9 @@
 %% start on page 3 (two-sided: on a recto); two-sided, the body also starts
 %% on a recto.
 %% Engine:  LuaLaTeX only (luatexja for Japanese).
+%% Files:   format/lnmarginfix.sty lays out the \marginpar notes (a fork of
+%%          marginfix; LPPL 1.3c, unlike the MIT class); format/lnotes-en.ist,
+%%          format/lnotes-ja.ist are the upmendex styles.
 %%
 %% Class options (key=value)
 %%   en | ja        document language (default: en)
@@ -350,12 +353,16 @@
 %% ------------------------------------------------------------- margin core
 \RequirePackage{marginnote}
 \RequirePackage{ragged2e}
-%% Two-sided: LaTeX decides the side of a \marginpar from the page counter
-%% when the note is processed, so a note on the first line of a page can land
-%% on the previous page's side; mparhack fixes this through the .aux.
-\if@twoside
-  \RequirePackage{mparhack}
-\fi
+%% \marginpar notes are laid out per page by lnmarginfix (format/, a fork of
+%% marginfix, LuaTeX only): a note that would run below the text block is
+%% moved up into free space above it, and what still does not fit is carried
+%% to the top of the next page, as is a note whose anchor line the page
+%% builder moved to the next page.  A note's first baseline sits on its
+%% anchor's baseline.  The side (outer column when two-sided) is picked when
+%% the page is built, so mparhack is not needed.  Load it after any package
+%% that patches \marginpar or \@addmarginpar.  \marginnote (in boxes,
+%% below) is placed where it is called, as before, and is not moved.
+\RequirePackage{lnmarginfix}
 %% Print: 0.75 of the body font (A4 \footnotesize is 0.8), against crowding.
 \ifln@print
   \edef\ln@mfs{\ln@sdim{7.5}{pt}}
