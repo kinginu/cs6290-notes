@@ -3,6 +3,9 @@
 %% Layout: single-column body on the left, a narrow margin column on the
 %% right (Tufte-style sidenotes) separated by a thin vertical rule.
 %% The title page, contents, bibliography and index span the full width.
+%% An empty page follows the title page in every edition, so the contents
+%% start on page 3 (two-sided: on a recto); two-sided, the body also starts
+%% on a recto.
 %% Engine:  LuaLaTeX only (luatexja for Japanese).
 %%
 %% Class options (key=value)
@@ -812,11 +815,23 @@
 
 %% Full-width matter (see above): the title page, contents, bibliography and
 %% index.  Wrapped at \begin{document}, after every package has defined them.
+\newcommand*{\ln@emptyafter@title}{%
+  \clearpage
+  \if@twoside
+    \cleardoubleoddpageusingstyle{empty}%
+  \else
+    \thispagestyle{empty}\null\clearpage
+  \fi}
 \AtBeginDocument{%
   \NewCommandCopy\ln@orig@maketitle\maketitle
+  %% An empty page follows the title in every edition (no head, foot or
+  %% rule: still full-width matter, page style empty), so the contents start
+  %% on page 3; two-sided, the empty page is the verso and the contents
+  %% start on a recto whatever the length of the title.
   \RenewDocumentCommand\maketitle{o}{%
     \ln@fullwidthmatter
     \IfValueTF{#1}{\ln@orig@maketitle[#1]}{\ln@orig@maketitle}%
+    \ln@emptyafter@title
     \ln@bodymatter}%
   \NewCommandCopy\ln@orig@tableofcontents\tableofcontents
   %% Two-sided: the body starts on a recto (\mainmatter would add the blank

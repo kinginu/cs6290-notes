@@ -17,19 +17,22 @@ concurrency:
 
 jobs:
   # One job per edition size: a4 is the screen edition (notes-<lang>.pdf),
-  # the others are print test samples (notes-<lang>-<size>.pdf).  B5 is
-  # available with `make print-b5` but not built here.
+  # the others are print test samples (notes-<lang>-<size>.pdf); each job
+  # also makes the grayscale twins (notes-<lang>[-<size>]-gray.pdf).  The
+  # sizes are the repository variable PRINT_VARIANTS (a JSON list, e.g.
+  # ["a4","a5"]; it must contain a4), default all but B5.  B5 is available
+  # with `make print-b5` or by adding "b5" to the variable.
   build:
     runs-on: ubuntu-latest
     container: texlive/texlive:TL2025-historic
     strategy:
       fail-fast: false
       matrix:
-        variant: [a4, a5, b6, shinsho]
+        variant: ${{ fromJSON(vars.PRINT_VARIANTS || '["a4","a5","b6","shinsho"]') }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build PDFs (en, ja)
+      - name: Build PDFs (en, ja; colour and grayscale)
         run: |
           if [ "${{ matrix.variant }}" = a4 ]; then
             make dist
@@ -58,6 +61,55 @@ jobs:
             ja/build/main.toc
           if-no-files-found: warn
 
+  # No-TeX checks of the sources (tools/*.py, Python standard library only),
+  # printed into the job summary.  Never blocks publish: findings mark this
+  # job failed (continue-on-error), nothing else.
+  lint:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: parity-check, glossary-check, chapter-lint
+        run: |
+          max=200
+          status=0
+          {
+            echo "## Source lint"
+            echo
+            echo "Findings are candidates for a human to judge; this job does not block publish."
+          } >> "$GITHUB_STEP_SUMMARY"
+          run() {  # run <heading> <command...>
+            heading=$1; shift
+            out=$(mktemp)
+            rc=0
+            "$@" > "$out" 2>&1 || rc=$?
+            [ $rc = 0 ] || status=1
+            cat "$out"
+            n=$(wc -l < "$out")
+            {
+              echo
+              echo "### $heading: exit $rc, $n lines"
+              echo
+              echo '```'
+              head -n "$max" "$out"
+              echo '```'
+              if [ "$n" -gt "$max" ]; then
+                echo
+                echo "_Truncated: first $max of $n lines; run \`$*\` locally for the rest._"
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+            rm -f "$out"
+          }
+          run "parity-check --lint" python3 tools/parity-check.py --lint
+          run "glossary-check" python3 tools/glossary-check.py
+          run "chapter-lint --all" python3 tools/chapter-lint.py --all
+          exit $status
+
   # Collects whatever the build jobs produced.  A failed print size does not
   # hold back the A4 editions; a missing A4 edition fails the job.
   publish:
@@ -76,9 +128,15 @@ jobs:
       - name: Check the A4 editions
         run: |
           for f in dist/notes-en.pdf dist/notes-ja.pdf; do
-            [ -f "$f" ] || { echo "missing $f"; exit 1; }
+            [ -f "$f" ] || { echo "missing $f (the a4 build failed, or PRINT_VARIANTS lacks \"a4\")"; exit 1; }
           done
           ls -l dist/
+
+      # pdfinfo gives the page counts on the index page; without it the
+      # index is written without them.
+      - name: Install pdfinfo
+        continue-on-error: true
+        run: command -v pdfinfo || { sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends poppler-utils; }
 
       - name: Generate index.html for GitHub Pages
         env:
