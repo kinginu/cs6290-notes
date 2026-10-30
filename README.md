@@ -49,8 +49,10 @@ textbook-style summary of what the lectures cover.  Built with
 
 ## Writing conventions
 
-See [`docs/style-guide.md`](docs/style-guide.md); the production and review
-passes are in [`docs/workflow.md`](docs/workflow.md).  In short:
+See [`docs/style-guide.md`](docs/style-guide.md) (generic rules, from the
+template) and [`docs/book.md`](docs/book.md) (this book's sources, citation
+formats, code and exclusions); the production and review passes are in
+[`docs/workflow.md`](docs/workflow.md).  In short:
 
 - Textbook register: no lecture anecdotes or metaphors; scope limited to
   what the lectures cover.  Textbook pointers (Hennessy & Patterson, 6th

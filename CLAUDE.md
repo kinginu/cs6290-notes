@@ -4,8 +4,7 @@ English/Japanese LaTeX notes, one chapter per source unit, built with
 LuaLaTeX in Docker.  Read before writing or reviewing anything:
 
 - `docs/style-guide.md` — how chapters are written, margin policy, layout
-- This book has no `docs/book.md`: its sources, citation formats, code
-  language and exclusions are in `docs/style-guide.md` §§1, 2, 4, 5
+- `docs/book.md` — this book: sources, citation formats, code, exclusions
 - `docs/syllabus.json` — chapter numbers, slugs, titles, source units
 - `glossary.tsv` — term ownership, Japanese terms and readings
 - `docs/workflow.md` — production stages, class changes, resources, git
@@ -37,8 +36,8 @@ LuaLaTeX in Docker.  Read before writing or reviewing anything:
 ## Rules
 
 - The English and Japanese chapters are exact mirrors; change both.
-- Never include what `docs/style-guide.md` §1 excludes (quiz and exam
-  content).
+- Never include what `docs/book.md` excludes (for courses: quiz, exam,
+  homework and project content).
 - `format/` is shared by every book.  In a book repository never edit it;
   report the needed change.  Class changes are made in the template
   repository and copied to each book (`docs/workflow.md` §8).

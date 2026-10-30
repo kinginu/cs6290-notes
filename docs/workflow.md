@@ -15,25 +15,33 @@ because skipping it let real defects through.
    ```
 2. Fill in `docs/book.md` (source material, citation formats, textbook,
    code language, exclusions) and `docs/syllabus.json` (one entry per
-   chapter: `number`, `slug`, `title`, `title_ja`, `units`; optional
-   `parts`; `unit` is the word used in commit messages).  `title_ja` is
-   required: `tools/sync-main.py` writes it into `ja/main.tex`.  `units` is
-   **mandatory** before any chapter is written: it is the ordered list of
-   the source's units for the chapter (for a course, the video titles of the
-   lesson, from the public course outline or video list; for a tutorial,
-   its section headings), and writers and reviewers verify coverage against
-   it.  A book without it (cs6200-notes) left the reviewers reconstructing
-   the lecture structure from memory.
+   chapter: `number`, `slug`, `title`, `title_ja`, `units`, optional
+   `lecture`; optional `parts`; `unit` is the word used in commit
+   messages).  A new book fills in `title_ja` and `units` for every chapter.
+   `title_ja` is the Japanese chapter title, which `tools/sync-main.py`
+   writes into `ja/main.tex`.  `units` is needed before any chapter is
+   written: it is the ordered list of the source's units for the chapter
+   (for a course, the video titles of the lesson, from the public course
+   outline or video list; for a tutorial, its section headings), and
+   writers and reviewers verify coverage against it.  cs6200-notes records
+   only lesson codes, so its reviewers had to reconstruct the lecture
+   structure from the public course outline.  `lecture` is the course's own
+   code for the lesson (e.g. P2L1); the README status table and `video=`
+   use it.
 3. Set the title block and class options in `en/main.tex` and `ja/main.tex`
-   (`chapter` option for "Chapter 3" instead of "Lesson 3"), delete the two
-   sample chapters and their `glossary.tsv` rows, and run
+   (`chapter` option for "Chapter 3" instead of "Lesson 3").  The shipped
+   defaults are `gloss=false` in the English edition and `index=dual` in
+   the Japanese one (the comments in each `main.tex` say why); the Japanese
+   title block keeps the English `\title`, `\author` and `\subject`.
+   Delete the two sample chapters and their `glossary.tsv` rows, and run
    `tools/sync-main.py`.
 4. Replace `README.md` with the book's own: title, links to the PDFs,
-   status table, and a licence section that keeps the two licences apart
+   status table, and a licence section that keeps the licences apart
    (`format/` and the build files are MIT from the template, except
    `format/lnmarginfix.sty`, which stays LPPL 1.3c; the notes in
    `en/`, `ja/` and `figures/` need their own line, e.g. "© <holder>,
-   CC BY-NC-SA 4.0").  Put the copyright holder of the book into
+   CC BY-NC-SA 4.0"; the template README, *Starting a book*, has the
+   wording both books use).  Put the copyright holder of the book into
    `LICENSE`.
 5. Publishing: GitHub Pages is **not** enabled by the template; for a
    public repository enable it by hand on the `pdf` branch (Settings →
