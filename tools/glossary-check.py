@@ -23,6 +23,12 @@ read as /); EN matching is case-insensitive.  A plural suffix outside the
 braces (\\term{latch}es) is not part of the word.  A \\term without a gloss
 is listed as a note; it does not affect the exit status.
 
+The note column is also checked: `see: X` marks an alias row, `also: X` a
+synonym for the index, anything else is free text.  A note that reads
+"also called X", or consists of Japanese text only (a synonym written
+without `also:`), is listed as a note; it does not affect the exit status.
+A bare English synonym cannot be told from free text and is not reported.
+
 Exit status: 1 if anything in (a)-(e) is found, else 0; 2 = usage.
 """
 import argparse
@@ -33,6 +39,7 @@ import re
 import sys
 
 KANJI = re.compile(r"[\u3400-\u9fff\uf900-\ufaff]")
+JA_ONLY = re.compile(r"[\u3000-\u30ff\u3400-\u9fff\uf900-\ufaff\uff00-\uffef]+")
 
 
 def norm(s):
@@ -123,7 +130,11 @@ def load_glossary(path):
     if missing:
         sys.exit(f"{path}: missing columns {', '.join(sorted(missing))}")
     out = []
-    for r in rows:
+    load_glossary.notes = []
+    for i, r in enumerate(rows, start=2):
+        note = (r.get("note") or "").strip()
+        if re.match(r"(?i)also called\b", note) or JA_ONLY.fullmatch(note):
+            load_glossary.notes.append(f"glossary.tsv:{i}: note \"{note}\" ({r['en']}): write \"also: X\" for a synonym")
         try:
             lesson = int((r.get("lesson") or "").strip())
         except ValueError:
@@ -238,6 +249,10 @@ def main():
         print(f"no glossary: {gpath}", file=sys.stderr)
         return 2
     rows = load_glossary(gpath)
+    if load_glossary.notes:
+        print(f"== glossary.tsv: note: {len(load_glossary.notes)} synonym(s) without \"also:\"")
+        for s in load_glossary.notes:
+            print("      " + s)
     langs = ["en", "ja"] if a.lang == "both" else [a.lang]
     total = 0
     chapters = 0
