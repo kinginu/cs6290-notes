@@ -824,17 +824,23 @@
 %% index.  Wrapped at \begin{document}, after every package has defined them.
 \newcommand*{\ln@emptyafter@title}{%
   \clearpage
-  \if@twoside
+  \ifln@print
+    %% Print editions: no page is shipped; the page number still steps to
+    %% the next recto.  The PDF's first page becomes the front cover (e.g.
+    %% 製本直送's 表紙自動 course, whose inside cover is blank), so page 2 of
+    %% the PDF is the first recto of the book block.
+    \ifodd\c@page\else\stepcounter{page}\fi
+  \else\if@twoside
     \cleardoubleoddpageusingstyle{empty}%
   \else
     \thispagestyle{empty}\null\clearpage
-  \fi}
+  \fi\fi}
 \AtBeginDocument{%
   \NewCommandCopy\ln@orig@maketitle\maketitle
-  %% An empty page follows the title in every edition (no head, foot or
-  %% rule: still full-width matter, page style empty), so the contents start
-  %% on page 3; two-sided, the empty page is the verso and the contents
-  %% start on a recto whatever the length of the title.
+  %% An empty page follows the title in the screen edition (no head, foot
+  %% or rule: still full-width matter, page style empty), so the contents
+  %% start on page 3.  The print editions ship no empty page but number the
+  %% contents from the next recto, so the title page can serve as the cover.
   \RenewDocumentCommand\maketitle{o}{%
     \ln@fullwidthmatter
     \IfValueTF{#1}{\ln@orig@maketitle[#1]}{\ln@orig@maketitle}%
