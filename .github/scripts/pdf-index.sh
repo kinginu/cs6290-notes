@@ -1,17 +1,19 @@
 #!/bin/sh
 # Generate dist/index.html linking to the built PDFs (served via GitHub Pages
 # from the `pdf` branch).  Usage: pdf-index.sh <title> <repo url> <commit sha>
+# The PDFs are named <name>-<lang>...pdf with <name> = $PDF_NAME, default <title>.
 # The subtitle under the title is $PAGES_SUBTITLE (CI passes the repository
 # variable of that name; Settings -> Secrets and variables -> Actions).
 #
 # One table: a row per format present in dist/ (A4 first, then the print
 # sizes), a column per edition and colour mode:
-#   dist/notes-<lang>[-<size>].pdf       colour
-#   dist/notes-<lang>[-<size>]-gray.pdf  grayscale (make gray)
+#   dist/<name>-<lang>[-<size>].pdf       colour
+#   dist/<name>-<lang>[-<size>]-gray.pdf  grayscale (make gray)
 # Each cell links to the PDF and shows its page count when pdfinfo is
 # installed; a missing file is shown as an empty cell.
 set -eu
 title=$1; repo=$2; sha=$3
+name=${PDF_NAME:-$title}
 subtitle=${PAGES_SUBTITLE:-Lecture notes — English / 日本語}
 date=$(date -u +%Y-%m-%d)
 
@@ -46,16 +48,16 @@ for size in a4 a5 b6 shinsho b5; do
   present=0
   for lang in en ja; do
     for g in "" -gray; do
-      [ -f "dist/notes-$lang$suffix$g.pdf" ] && present=1
+      [ -f "dist/$name-$lang$suffix$g.pdf" ] && present=1
     done
   done
   [ $present = 1 ] || continue
   rows="$rows
 <tr><th scope=\"row\">$(size_label $size)</th>
-  $(cell notes-en$suffix.pdf colour)
-  $(cell notes-en$suffix-gray.pdf gray)
-  $(cell notes-ja$suffix.pdf カラー)
-  $(cell notes-ja$suffix-gray.pdf グレー)</tr>"
+  $(cell $name-en$suffix.pdf colour)
+  $(cell $name-en$suffix-gray.pdf gray)
+  $(cell $name-ja$suffix.pdf カラー)
+  $(cell $name-ja$suffix-gray.pdf グレー)</tr>"
 done
 
 cat > dist/index.html <<HTML

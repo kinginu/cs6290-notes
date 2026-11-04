@@ -5,7 +5,8 @@
 #   tools/layout-diff.sh <en|ja> [<git ref>]      (default ref: origin/pdf)
 #
 # Run tools/book-check.sh <lang> first so <lang>/build/main.pdf is current.
-# The reference PDF is notes-<lang>.pdf on the `pdf` branch that CI
+# The reference PDF is <repo>-<lang>.pdf (notes-<lang>.pdf before the
+# rename) on the `pdf` branch that CI
 # publishes, i.e. the last pushed state.  The text of every page is
 # extracted (Ghostscript txtwrite) and compared with whitespace removed, so
 # a pure horizontal shift is not reported but any change of line breaks,
@@ -21,7 +22,9 @@ new="$root/$lang/build/main.pdf"
 [ "$ref" = origin/pdf ] && git -C "$root" fetch -q origin pdf
 work="$root/.png/layout-diff-$lang"
 rm -rf "$work"; mkdir -p "$work"
-git -C "$root" show "$ref:notes-$lang.pdf" > "$work/old.pdf" || exit 2
+name=$(basename "$(git -C "$root" remote get-url origin 2>/dev/null || echo "$root")" .git)
+git -C "$root" show "$ref:$name-$lang.pdf" > "$work/old.pdf" 2>/dev/null ||
+  git -C "$root" show "$ref:notes-$lang.pdf" > "$work/old.pdf" || exit 2
 cp "$new" "$work/new.pdf"
 in_container 1500m sh -c "cd /work/.png/layout-diff-$lang &&
   gs -q -dNOPAUSE -dBATCH -sDEVICE=txtwrite -o old-%03d.txt old.pdf &&

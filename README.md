@@ -10,8 +10,8 @@ textbook-style summary of what the lectures cover.  Built with
 - `figures/` and `references.bib` are shared by both editions.
 - **Read the latest PDFs in the browser** (rebuilt by CI on every push):
   <https://kinginu.github.io/cs6290-notes/> —
-  [English](https://kinginu.github.io/cs6290-notes/notes-en.pdf) ·
-  [日本語](https://kinginu.github.io/cs6290-notes/notes-ja.pdf)
+  [English](https://kinginu.github.io/cs6290-notes/cs6290-notes-en.pdf) ·
+  [日本語](https://kinginu.github.io/cs6290-notes/cs6290-notes-ja.pdf)
 - Local build: `make docker-all` → `en/build/main.pdf`, `ja/build/main.pdf`.
 - Print editions: compact two-sided books scaled from the A4 layout
   (class option `print=`, no chapter changes): `make docker-print-a5`

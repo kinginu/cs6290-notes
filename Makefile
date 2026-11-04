@@ -1,17 +1,22 @@
 # Build targets.  Run inside the Docker container (or any TeX Live 2025).
 #   make en / make ja / make all      build en/build/main.pdf, ja/build/main.pdf
-#   make dist                         copy PDFs to dist/notes-<lang>.pdf
+#   make dist                         copy PDFs to dist/<repo>-<lang>.pdf
 #   make en-a5 / ja-b6 / ...          print edition <lang>/build/main-<size>.pdf
 #   make print-<size>                 both languages, copied to
-#                                     dist/notes-<lang>-<size>.pdf
+#                                     dist/<repo>-<lang>-<size>.pdf
 #   make print                        every print size
 #   make gray / make gray-<size>      grayscale twin of each PDF in dist/:
-#                                     dist/notes-<lang>[-<size>]-gray.pdf
+#                                     dist/<repo>-<lang>[-<size>]-gray.pdf
 #                                     (dist and print-<size> make them too)
 #   make clean
 #   make docker-<target>              run <target> inside the container
 #   make docker-shell                 interactive shell in the container
 LATEXMK    ?= latexmk
+# PDF file names start with the repository name: dist/<repo>-<lang>.pdf,
+# e.g. cs6290-notes-en.pdf.  Taken from the origin remote (then the directory
+# name); CI passes the GitHub repository name.  docker-% hands it to the
+# container, whose /work mount has neither.
+PDF_NAME   ?= $(or $(basename $(notdir $(shell git remote get-url origin 2>/dev/null))),$(notdir $(CURDIR)))
 LANGS      := en ja
 SIZES      := a5 b6 shinsho b5
 DOCKER_RUN := docker compose run --rm tex
@@ -45,22 +50,22 @@ $(LANG_SIZES):
 
 $(PRINT_SIZES): print-%: $(addsuffix -%,$(LANGS))
 	mkdir -p dist
-	$(foreach l,$(LANGS),cp $(l)/build/main-$*.pdf dist/notes-$(l)-$*.pdf;)
+	$(foreach l,$(LANGS),cp $(l)/build/main-$*.pdf dist/$(PDF_NAME)-$(l)-$*.pdf;)
 	$(MAKE) --no-print-directory gray-$*
 
 print: $(PRINT_SIZES)
 
 dist: $(LANGS)
 	mkdir -p dist
-	$(foreach l,$(LANGS),cp $(l)/build/main.pdf dist/notes-$(l).pdf;)
+	$(foreach l,$(LANGS),cp $(l)/build/main.pdf dist/$(PDF_NAME)-$(l).pdf;)
 	$(MAKE) --no-print-directory gray
 
-gray: $(call gray_of,$(foreach l,$(LANGS),dist/notes-$(l).pdf))
+gray: $(call gray_of,$(foreach l,$(LANGS),dist/$(PDF_NAME)-$(l).pdf))
 
 $(GRAY_SIZES): gray-%:
-	@$(if $(wildcard $(foreach l,$(LANGS),dist/notes-$(l)-$*.pdf)),:,echo "no dist/notes-<lang>-$*.pdf: run make print-$* first")
+	@$(if $(wildcard $(foreach l,$(LANGS),dist/$(PDF_NAME)-$(l)-$*.pdf)),:,echo "no dist/$(PDF_NAME)-<lang>-$*.pdf: run make print-$* first")
 	@$(MAKE) --no-print-directory \
-	  $(foreach l,$(LANGS),$(call gray_of,dist/notes-$(l)-$*.pdf)) gray-none
+	  $(foreach l,$(LANGS),$(call gray_of,dist/$(PDF_NAME)-$(l)-$*.pdf)) gray-none
 
 # gray-none: the sub-make above always has a goal, even with no PDF in dist/.
 .PHONY: gray-none
@@ -85,4 +90,4 @@ docker-shell:
 	$(DOCKER_RUN) bash
 
 docker-%:
-	$(DOCKER_RUN) make $*
+	$(DOCKER_RUN) make PDF_NAME=$(PDF_NAME) $*
