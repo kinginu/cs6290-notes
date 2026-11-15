@@ -1,0 +1,54 @@
+% Return address stack states: three four-entry stacks with the top-of-stack
+% pointer, (a) partly filled, (b) full with the values of figures/l04-ras,
+% (c) after a fifth call has wrapped around and overwritten the oldest entry.
+% Usage: \input{figures/l04-ras-states}   Width: body (about 10 cm).
+\begin{tikzpicture}[x=1cm,y=1cm, font=\footnotesize\sffamily, >={Stealth[length=1.8mm]},
+  val/.style={font=\footnotesize\ttfamily},
+  idx/.style={font=\scriptsize, text=ln-muted, anchor=east},
+  lab/.style={anchor=west, font=\footnotesize\bfseries}]
+  % one panel per state: x offset, label; slots are 1.6 x 0.55
+  % ---------------- (a) partly filled
+  \begin{scope}[xshift=0cm]
+    \node[lab] at (-0.45,2.65) {(a)};
+    \foreach \i/\v in {0/0x1004,1/0x2210} {
+      \draw[fill=ln-box] (0,0.55*\i) rectangle (1.6,0.55*\i+0.55);
+      \node[val] at (0.8,0.55*\i+0.275) {\v};
+    }
+    \foreach \i in {2,3} {
+      \draw[dashed, ln-rule] (0,0.55*\i) rectangle (1.6,0.55*\i+0.55);
+      \node[font=\scriptsize, text=ln-muted] at (0.8,0.55*\i+0.275) {\iflangja{空}{empty}};
+    }
+    \foreach \i in {0,...,3} { \node[idx] at (-0.05,0.55*\i+0.275) {\i}; }
+    \draw[<-, thick, ln-accent] (1.65,0.825) -- (2.2,0.825)
+      node[anchor=west, font=\scriptsize, text=ln-accent] {\iflangja{先頭}{top}};
+  \end{scope}
+  % ---------------- (b) full
+  \begin{scope}[xshift=3.7cm]
+    \node[lab] at (-0.45,2.65) {(b)};
+    \foreach \i/\v in {0/0x1004,1/0x2210,2/0x2A08,3/0x3104} {
+      \draw[fill=ln-box] (0,0.55*\i) rectangle (1.6,0.55*\i+0.55);
+      \node[val] at (0.8,0.55*\i+0.275) {\v};
+    }
+    \foreach \i in {0,...,3} { \node[idx] at (-0.05,0.55*\i+0.275) {\i}; }
+    \draw[<-, thick, ln-accent] (1.65,1.925) -- (2.2,1.925)
+      node[anchor=west, font=\scriptsize, text=ln-accent] {\iflangja{先頭}{top}};
+  \end{scope}
+  % ---------------- (c) fifth call wraps around: slot 0 overwritten
+  \begin{scope}[xshift=7.4cm]
+    \node[lab] at (-0.45,2.65) {(c)};
+    \foreach \i/\v in {1/0x2210,2/0x2A08,3/0x3104} {
+      \draw[fill=ln-box] (0,0.55*\i) rectangle (1.6,0.55*\i+0.55);
+      \node[val] at (0.8,0.55*\i+0.275) {\v};
+    }
+    \draw[fill=ln-accent!15] (0,0) rectangle (1.6,0.55);
+    \node[val] at (0.8,0.275) {0x4010};
+    \foreach \i in {0,...,3} { \node[idx] at (-0.05,0.55*\i+0.275) {\i}; }
+    \node[val, text=ln-muted] (old) at (0.8,-0.3) {0x1004};
+    \draw[ln-muted] (old.west) -- (old.east);
+    \draw[<-, thick, ln-accent] (1.65,0.275) -- (2.2,0.275)
+      node[anchor=west, font=\scriptsize, text=ln-accent] {\iflangja{先頭}{top}};
+    \node[font=\scriptsize, align=center, anchor=north] at (0.8,-0.6)
+      {\iflangja{RET 1--4: 正しく予測\\RET 5: 0x1004 ではなく 0x4010（予測ミス）}%
+        {RETs 1--4: correct\\RET 5: 0x4010, not 0x1004 (miss)}};
+  \end{scope}
+\end{tikzpicture}

@@ -420,8 +420,8 @@ organization, not a ranking.  This lesson covers levels 0, 1, 4, 5 and 6.
 \section{RAID 0: striping}
 \label{sec:l17-raid0}
 
-The first organization uses no redundancy at all and aims only at
-performance.\source{Lesson 17, videos 16--18; H\&P §D.2.}  The data of one
+The first RAID organization, RAID 0, uses no redundancy at all and aims only
+at performance.\source{Lesson 17, videos 16--18; H\&P §D.2.}  The data of one
 logical disk is distributed over several physical disks so that consecutive
 blocks are stored on different disks, which is called
 \term{striping}[ストライピング].  The blocks at the same position on all
@@ -479,7 +479,7 @@ the \emph{mean time to data loss} (MTTDL).
 \section{RAID 1: mirroring}
 \label{sec:l17-raid1}
 
-The second organization spends disks on reliability.\source{Lesson 17,
+The second, RAID 1, spends disks on reliability.\source{Lesson 17,
 videos 19--22; H\&P §D.2.}  Writing the same data to two disks, so that each
 holds a complete copy of every block, is called
 \term{mirroring}[ミラーリング].  An array of two mirrored disks

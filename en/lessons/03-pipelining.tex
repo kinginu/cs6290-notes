@@ -289,10 +289,11 @@ unavoidable for a \emph{load-use} pair even with full forwarding.
   cycles, not 1 (Intel optimization manual).}
 \end{example}
 
-\section{How many stages?}
+\section{Choosing the pipeline depth}
 
-If pipelining a $k$-stage design gives up to $k\times$ the throughput, why
-not use hundreds of stages?\source{Lesson 3, video 17; H\&P §C.1, §1.5.}
+Pipelining a design into $k$ stages raises the throughput by up to $k\times$,
+yet real pipelines do not have hundreds of stages.\source{Lesson 3, video 17;
+H\&P §C.1, §1.5.}
 Three effects pull in different directions as the \term{pipeline depth}[パイプライン段数] increases:
 \begin{itemize}
   \item \textbf{Clock period decreases} (less logic per stage), which

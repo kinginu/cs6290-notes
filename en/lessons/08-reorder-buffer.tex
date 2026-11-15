@@ -79,7 +79,8 @@ register file, and three things go wrong.
 \section{Branch mispredictions}
 \label{sec:l08-mispredictions}
 
-Branch mispredictions cause the same problem.\source{Lesson 8, video 3; H\&P
+Branch mispredictions cause the same problem as exceptions
+(\cref{sec:l08-exceptions-ooo}).\source{Lesson 8, video 3; H\&P
 §3.6.}  In the following program the branch predictor lets the processor
 fetch and issue I3 to I6 while I2 waits for the result of the division:
 \begin{lstlisting}[language={[x86masm]Assembler}, numbers=none]
@@ -120,7 +121,8 @@ speculated instruction, buffered and discarded with it.}
 \section{Correct out-of-order execution}
 \label{sec:l08-correct}
 
-Both problems have the same cause.  An instruction changes the registers as
+Exceptions and branch mispredictions have the same cause.  An
+instruction changes the registers as
 soon as it has computed its result, before it is known that every earlier
 instruction has completed without an exception or a
 misprediction.\source{Lesson 8, video 4; H\&P §3.6; \cite{smith1988}.}  The
@@ -147,7 +149,7 @@ a history buffer and a future file.}
   program order.
 \end{keypoint}
 
-\section{The reorder buffer}
+\section{Structure and operation of the reorder buffer}
 \label{sec:l08-rob}
 
 The structure that remembers the program order is a queue of the issued
@@ -713,7 +715,7 @@ execution ends.
   \end{tabular}
 \end{table}
 
-\section{What is out of order}
+\section{In-order and out-of-order steps}
 \label{sec:l08-order}
 
 A processor with out-of-order execution\index{out-of-order execution} does not

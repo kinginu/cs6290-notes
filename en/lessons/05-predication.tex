@@ -141,20 +141,21 @@ schedule as a whole (Lesson 10).}
   \label{fig:l05-if-conversion}
 \end{figure}
 
-The transformation gains something only if the selections can be carried out
-without a branch.\margin{Plain arithmetic can also select without a branch,
+The transformation pays off only if the selections themselves can be carried
+out without a branch.\margin{Plain arithmetic can also select without a branch,
 by masking both alternatives with AND and OR, at several instructions
-each.}  Translated into ordinary branch instructions, each
+each.}  Implemented with ordinary branch instructions, each
 selection is itself an if-then-else on~\texttt{c}, as hard to predict as the
 branch that was removed, so the converted code would still mispredict and in
 addition execute the work of both directions.  If-conversion is cheap only if
-the instruction set can make the effect of an instruction
-conditional.
+the instruction set has instructions whose effect can be made conditional
+on~\texttt{c}.
 
 \section{Conditional move instructions}
 \label{sec:l05-cmov}
 
-The simplest such instruction makes only a copy conditional.\source{Lesson 5,
+Of the instructions that make the effect of an instruction conditional, the
+simplest makes only a copy conditional.\source{Lesson 5,
 videos 4--5; H\&P §H.4, §A.6.}
 
 \begin{definition}[Conditional move]

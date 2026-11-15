@@ -54,7 +54,8 @@ broadcasting it to all cores.
 \section{Network on chip}
 \label{sec:l22-noc}
 
-The shared bus is replaced by a network.\source{Lesson 22, videos 3--4;
+On a many-core chip, the shared bus is replaced by a network.\source{Lesson 22,
+videos 3--4;
 H\&P Appendix F; \cite{dally2001}.}
 
 \begin{definition}[Network on chip]
@@ -159,7 +160,8 @@ data in its own tile matters (\cref{sec:l22-llc}).
 \section{Off-chip traffic and the distributed LLC}
 \label{sec:l22-llc}
 
-The second challenge is the traffic that leaves the chip.\source{Lesson 22,
+The second challenge of a many-core chip is the traffic that leaves the
+chip.\source{Lesson 22,
 videos 5--7.}  Each core has its own caches, and the miss rate per core does
 not change with the number of cores, so a chip with more cores sends
 proportionally more requests to main memory.  These requests pass through
@@ -337,7 +339,8 @@ LLC.
 \section{Sharing the power budget}
 \label{sec:l22-power}
 
-The third challenge is power.\source{Lesson 22, videos 12--14; H\&P §1.5.}
+The third challenge of a many-core chip is power.\source{Lesson 22,
+videos 12--14; H\&P §1.5.}
 A chip can dissipate only as much power as its package and cooling remove,
 and this power budget is shared by all its cores.  The more cores a chip
 has, the less power each core receives, and the lower its supply voltage
@@ -439,7 +442,8 @@ runs its performance cores at \SI{3.2}{GHz} within \SI{125}{W} and reaches
 \section{SMT, cores and chips}
 \label{sec:l22-os}
 
-The last challenge concerns the operating system.\source{Lesson 22, videos
+The last challenge of a many-core chip concerns the operating
+system.\source{Lesson 22, videos
 16--17.}  A many-core system uses all the kinds of parallelism of Lesson 18
 at once: a board carries several chips, each chip several cores, and each
 core runs several threads with SMT.  The operating system sees every

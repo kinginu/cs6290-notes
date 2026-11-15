@@ -20,7 +20,7 @@ and function call inlining remove the branches, calls and returns that keep
 them apart.\caution{\enquote{Compiler ILP} is not a second kind of ILP: the ILP
 is a property of the program (Lesson 6), and the compiler changes the program.}
 
-\section{How the compiler can raise IPC}
+\section{Limits on IPC that the compiler influences}
 \label{sec:l10-limits}
 
 The IPC of every processor is bounded by the ILP of the program it executes
@@ -157,7 +157,7 @@ from 3 to~2.
   processors that can execute several instructions per cycle.
 \end{keypoint}
 
-\section{Instruction scheduling}
+\section{Instruction scheduling by the compiler}
 \label{sec:l10-scheduling}
 
 A processor executes independent instructions in the same cycle only if it

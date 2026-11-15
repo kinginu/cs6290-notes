@@ -283,7 +283,9 @@ between them.
 \section{Load-linked/store-conditional}
 \label{sec:l20-llsc}
 
-The alternative splits the atomic read and write into two instructions,
+Instead of a single atomic read/write instruction (\cref{sec:l20-atomic}),
+load-linked/store-conditional splits the atomic read and write into two
+instructions,
 each of which accesses memory only once, like an ordinary load or
 store.\source{Lesson 20, videos 11--13; H\&P §5.5.}
 

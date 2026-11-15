@@ -77,6 +77,8 @@ how it connects to the previous chapter.>
   reference documentation covers it (formats in `book.md`).  Cite a section
   number only when you are sure of it; otherwise cite the chapter
   ("H\&P ch.~3").
+- **A section opening stands alone.** The first sentence of a `\section` names its subject and does not depend on the previous section: no "such …", "the same problem", "the second …", "the waste" (そのような／同じ問題／第2の…／この無駄) without naming what is meant, and no rhetorical question. A link back is fine once the subject is named. A `\subsection` may continue its section.
+- **Section titles** are noun phrases, parallel to the other sections of the chapter. The first section introduces the chapter's own topic by name. A section title never repeats the chapter title or another chapter's title verbatim; qualify it. Avoid adverbial fragments (「…で」) and questions as titles.
 - `\lessoninfo`: `keywords` lists about 6–15 key terms (a guideline, not a
   limit); `textbook=` names the textbook chapters or sections.  Papers and
   RFCs the unit discusses go into `sources=`, each with a bib entry; a book

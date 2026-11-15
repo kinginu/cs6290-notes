@@ -18,7 +18,7 @@ register renaming, and that the remaining dependences define the
 instruction-level parallelism of a program: the bound against which the
 instructions per cycle of real processors are measured.
 
-\section{All instructions in the same cycle}
+\section{Same-cycle execution}
 \label{sec:l06-same-cycle}
 
 A pipeline that never stalls or flushes completes one instruction per cycle,
@@ -57,7 +57,8 @@ determined by the data dependences of the program.
 \section{Dependences in same-cycle execution}
 \label{sec:l06-dependences}
 
-The read-after-write dependence of I2 on I1 must be respected: I2 can execute
+In the program of \cref{sec:l06-same-cycle}, the read-after-write dependence
+of I2 on I1 must be respected: I2 can execute
 no earlier than one cycle after I1, when the result of I1 can be forwarded to
 it.\source{Lesson 6, videos 4--6; H\&P §3.1.}  I3, I4 and I5 read no register
 that an earlier instruction writes, so they can still execute in the same
@@ -266,7 +267,7 @@ correct values through the RAT.
   itself.
 \end{keypoint}
 
-\section{Instruction-level parallelism}
+\section{The ILP of a program}
 \label{sec:l06-ilp}
 
 Once false dependences are removed, the number of cycles needed to execute a

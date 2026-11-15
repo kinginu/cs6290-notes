@@ -581,8 +581,9 @@ every counter that is used has to be trained separately.
 \section{Shared counters: PShare and GShare}
 \label{sec:l04-share}
 
-The waste disappears if the counters are not private to a
-branch.\source{Lesson 4, videos 34--39; H\&P §3.3; \cite{mcfarling1993}.}
+Most of the counters private to a branch are never used; the waste disappears
+if the counters are not private to a branch.\source{Lesson 4, videos 34--39;
+H\&P §3.3; \cite{mcfarling1993}.}
 The BHT keeps only an $N$-bit history per entry, and all branches share one
 large table of two-bit counters.
 
@@ -813,7 +814,8 @@ AMD's Zen~2 (Agner Fog, microarchitecture manual).}
 When a call finds the RAS full, the push wraps around and overwrites the
 oldest entry.  Returns occur in reverse order of the calls, so the entries
 needed soonest are the most recent ones, and most calls and returns happen
-deep in the call tree.  Overwriting the oldest entry loses only the
+deep in the call tree.  Overwriting the oldest entry
+(\cref{fig:l04-ras-states}) loses only the
 predictions for returns from the outermost functions, which are rare, whereas
 discarding the new return address would lose the predictions for the
 frequent calls at the deepest level.
@@ -824,6 +826,15 @@ frequent calls at the deepest level.
   \caption{A four-entry return address stack.  Calls push, returns pop; when
     the stack is full, a push wraps around and overwrites the oldest entry.}
   \label{fig:l04-ras}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \input{figures/l04-ras-states}
+  \caption{Return address stack states: (a) partly filled, (b) full, and
+    (c) after a fifth call has wrapped around and overwritten the oldest
+    entry, so that only the outermost return is mispredicted.}
+  \label{fig:l04-ras-states}
 \end{figure}
 
 \subsection{Recognizing a return}
