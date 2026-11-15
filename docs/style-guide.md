@@ -77,8 +77,19 @@ how it connects to the previous chapter.>
   reference documentation covers it (formats in `book.md`).  Cite a section
   number only when you are sure of it; otherwise cite the chapter
   ("H\&P ch.~3").
-- **A section opening stands alone.** The first sentence of a `\section` names its subject and does not depend on the previous section: no "such …", "the same problem", "the second …", "the waste" (そのような／同じ問題／第2の…／この無駄) without naming what is meant, and no rhetorical question. A link back is fine once the subject is named. A `\subsection` may continue its section.
-- **Section titles** are noun phrases, parallel to the other sections of the chapter. The first section introduces the chapter's own topic by name. A section title never repeats the chapter title or another chapter's title verbatim; qualify it. Avoid adverbial fragments (「…で」) and questions as titles.
+- **A section opening stands alone.**  The first sentence of a `\section`
+  names its subject and does not depend on the previous section: no "such
+  …", "the same problem", "the second …", "the waste" (「そのような」「同じ
+  問題」「第2の…」「この無駄」) without naming what is meant, and no
+  rhetorical question.  A link back is fine once the subject is named
+  ("Like exceptions (\cref{…}), branch mispredictions …").  A
+  `\subsection` may continue its section.
+- **Section titles** are noun phrases, parallel to the other sections of
+  the chapter.  The first section introduces the chapter's own topic by
+  name.  A section title never repeats the chapter title or another
+  chapter's title verbatim; qualify it ("Branches in a pipeline", "The ILP
+  of a program").  Avoid adverbial fragments (「…で」) and questions as
+  titles.
 - `\lessoninfo`: `keywords` lists about 6–15 key terms (a guideline, not a
   limit); `textbook=` names the textbook chapters or sections.  Papers and
   RFCs the unit discusses go into `sources=`, each with a bib entry; a book
@@ -284,6 +295,14 @@ it goes to the margin.
 - `\term[よみ]{語}[English term]` — reading in hiragana, English gloss.
   With `index=dual` the Japanese edition also carries an English index
   built from the glosses, so give every defining `\term` its gloss.
+- **Translate the sense, not the words.**  Recurring calques to avoid:
+  「何かが得られる／何も得ない」 for *gains*, 「報われる」 for *pays off*,
+  「…が唯一のものである」 for *the only thing that*, 「到達する」 for
+  *reach (a service)*, 「代価として…を払う」 for *at the cost of*,
+  「…することができ，…することもできる」 chains, and English participial
+  clauses copied as 「…すると，…は」 with no subject.  Name the subject when
+  Japanese would leave it ambiguous.  A sentence may be split or joined, as
+  long as every macro stays with the sentence it belonged to.
 - `\lessoninfo` keywords separated by `，`; items in `\source` and
   `textbook=` separated by `；`; `video={Lesson 4，動画 1--48}`; key point
   summary title `[章のまとめ]`; other chapters as `第N章`.
